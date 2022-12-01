@@ -699,8 +699,8 @@ void AllFilesClosed(void)
 
 #define TYPE_MAX_NT 	11
 #define TYPE_MAX_NE 	12
-#define TYPE_MIN_NT 	13
-#define TYPE_MIN_NE 	14
+#define TYPE_Min_NT 	13
+#define TYPE_Min_NE 	14
 #define TYPE_MAX_G 		22
 #define TYPE_Min_G 		23
 
@@ -716,6 +716,11 @@ void AllFilesClosed(void)
 #define TXT_MaxNe 		"(MXNe)"
 #define TXT_gMAX 		"(MXgX)"
 #define TXT_gmin 		"(migm)" // minumum g
+
+#define TXT_SBMXNt 		"(SB)MXNt"
+#define TXT_SBMXNe 		"(SB)MXNe"
+#define TXT_SBMXgX 		"(SB)gX"
+#define TXT_SBmigm 		"(SB)gm"
 
 #define TXT_MXNtgX 		"(MXNtgX)"
 #define TXT_MXNtgm 		"(MXNtgm)"
@@ -1868,7 +1873,7 @@ int ShiftQualData(short aiPATs05, int shiDir03, int iPwrOnOff04, unsigned int *S
 						if( MaxNt <= sq[0].Nt16 ) MaxNt = sq[0].Nt16; /* Find Nt_Max */
 
 				#ifdef PWR_ON_UP_SHIFT_SSPOINT_START
-						if( 0==strcmp(sTimePos, TXT_SBTIME) )
+						if( 0==strncmp(sTimePos, TXT_SBTIME, 4) )
 						{
 							if( MaxAcc <= sq[0].LAcc17 ) MaxAcc = sq[0].LAcc17; /* Find g_Max */
 							if( minAcc >= sq[0].LAcc17 ) minAcc = sq[0].LAcc17; /* Find g_mix */
@@ -2141,8 +2146,8 @@ int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsig
 
 
 					if( 0==strcmp( sq2[0].sTimePos, TXT_SSTIME) ) iSScount++;
-					if( 0==strcmp( sq2[0].sTimePos, TXT_SBTIME) ) iSBcount++;
-					if( 0==strcmp( sq2[0].sTimePos, TXT_SPTIME) ) iSPcount++;
+					if( 0==strncmp( sq2[0].sTimePos, TXT_SBTIME, 4) ) iSBcount++;
+					if( 0==strncmp( sq2[0].sTimePos, TXT_SPTIME, 4) ) iSPcount++;
 
 					/* SS가 많을 경우 --- */
 					if( iSScount>iSBcount+1 )
@@ -2157,7 +2162,7 @@ int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsig
 
 			}
 			while (!feof (inpfile));
-			fprintf(stderr,"----------------------------------------------\n");
+			fprintf(stderr,"---------------------------------------------------------------\n" );
 
 		}
 
@@ -2273,8 +2278,8 @@ int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsig
 
 
 					if( 0==strcmp( sq2[0].sTimePos, TXT_SSTIME) ) { iSScount++; ignoredRecord=0; }
-					if( 0==strcmp( sq2[0].sTimePos, TXT_SBTIME) ) { iSBcount++;  }
-					if( 0==strcmp( sq2[0].sTimePos, TXT_SPTIME) ) { iSPcount++;  }
+					if( 0==strncmp( sq2[0].sTimePos, TXT_SBTIME, 4) ) { iSBcount++;  }
+					if( 0==strncmp( sq2[0].sTimePos, TXT_SPTIME, 4) ) { iSPcount++;  }
 
 					/* ignored  */
 					if( iSScount==ignoredSScnt[ic] )
@@ -2618,8 +2623,8 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 				{
 
 					if( 0==strcmp( sq2[0].sTimePos, TXT_SSTIME) ) iSScount++;
-					if( 0==strcmp( sq2[0].sTimePos, TXT_SBTIME) ) iSBcount++;
-					if( 0==strcmp( sq2[0].sTimePos, TXT_SPTIME) ) iSPcount++;
+					if( 0==strncmp( sq2[0].sTimePos, TXT_SBTIME, 4) ) iSBcount++;
+					if( 0==strncmp( sq2[0].sTimePos, TXT_SPTIME, 4) ) iSPcount++;
 
 					if( iSPcount && (kkloop==iSPcount) /* && (0==strcmp( sq2[0].sTimePos, TXT_SPTIME)) */ ) /* SP point */
 					{
@@ -2741,8 +2746,8 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 				{
 
 					if( 0==strcmp( sq2[0].sTimePos, TXT_SSTIME) ) iSScount++;
-					if( 0==strcmp( sq2[0].sTimePos, TXT_SBTIME) ) iSBcount++;
-					if( 0==strcmp( sq2[0].sTimePos, TXT_SPTIME) ) iSPcount++;
+					if( 0==strncmp( sq2[0].sTimePos, TXT_SBTIME, 4) ) iSBcount++;
+					if( 0==strncmp( sq2[0].sTimePos, TXT_SPTIME, 4) ) iSPcount++;
 
 					if( iSPcount && (kkloop==iSPcount) /* && (0==strcmp( sq2[0].sTimePos, TXT_SPTIME)) */ ) /* SP point */
 					{
@@ -2871,7 +2876,7 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 						isSBOnce = 0;
 						isSPOnce = 0;
 					}
-					if( 0==strcmp( sq2[0].sTimePos, TXT_SBTIME) ) 
+					if( 0==strncmp( sq2[0].sTimePos, TXT_SBTIME, 4) ) 
 					{
 						isSBOnce = 1;
 						iSBcount++;
@@ -2879,7 +2884,7 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 						isSSOnce = 0;
 						isSPOnce = 0;
 					}
-					if( 0==strcmp( sq2[0].sTimePos, TXT_SPTIME) ) 
+					if( 0==strncmp( sq2[0].sTimePos, TXT_SPTIME, 4) ) 
 					{
 						isSPOnce = 1;
 						iSPcount++;
@@ -3010,8 +3015,8 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 				{
 
 					if( 0==strcmp( sq2[0].sTimePos, TXT_SSTIME) ) iSScount++;
-					if( 0==strcmp( sq2[0].sTimePos, TXT_SBTIME) ) iSBcount++;
-					if( 0==strcmp( sq2[0].sTimePos, TXT_SPTIME) ) iSPcount++;
+					if( 0==strncmp( sq2[0].sTimePos, TXT_SBTIME, 4) ) iSBcount++;
+					if( 0==strncmp( sq2[0].sTimePos, TXT_SPTIME, 4) ) iSPcount++;
 
 					if( iSPcount && (kkloop==iSPcount) /* && (0==strcmp( sq2[0].sTimePos, TXT_SPTIME)) */ ) /* SP point */
 					{
@@ -3070,7 +3075,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 	short iItemPreOK = 0;
 	short iSave = 0;
 	short iFirstSS = 1;
-
+	char TmpStr[20];
 
 	/* line inputted from file */
 	char QualData[QUAL_DATA_MAX_SIZE]; 
@@ -3161,8 +3166,18 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 		exit(0);
 	}
 
+	memset( TmpStr, 0x00, sizeof(TmpStr) );
 
-	fprintf(stderr,">>Max values location checking [%s + %s] -> [%s] \r\n", infile, shi_inp, shi_out );
+	     if(TYPE_MAX_NT==mType) strcpy(TmpStr, "Nt Max");
+	else if(TYPE_MAX_NE==mType) strcpy(TmpStr, "Ne Max");
+	else if(TYPE_Min_NT==mType) strcpy(TmpStr, "Nt min");
+	else if(TYPE_Min_NE==mType) strcpy(TmpStr, "Ne min");
+	else if(TYPE_MAX_G==mType)  strcpy(TmpStr, "g Max");
+	else if(TYPE_Min_G==mType)  strcpy(TmpStr, "g min");
+	else strcpy(TmpStr, "**Unknown**");
+
+
+	fprintf(stderr,">>%s values location checking [%s + %s] -> [%s] \r\n", TmpStr, infile, shi_inp, shi_out );
 	memset( mValue, 0x00, sizeof(mValue) );
 	memset( msTime, 0x00, sizeof(msTime) );
 	memset( iNum, 0x00, sizeof(iNum) );
@@ -3255,7 +3270,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 					gTimeDiff = gSStime;
 				}
 
-				if( 0==strcmp( sq2[0].sTimePos, TXT_SBTIME) ) /* SB point */
+				if( 0==strncmp( sq2[0].sTimePos, TXT_SBTIME, 4) ) /* SB point */
 				{
 					is2File = 1;
 					isSBpoint = TRUE;
@@ -3267,7 +3282,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 					if( isSSpoint && (int)((sq2[0].Nt16)*1000) == (int)(mValue[iSScount]*1000) )
 					{
 						if( 0==strcmp(sq2[0].sTimePos, TXT_SSTIME) || 
-							0==strcmp(sq2[0].sTimePos, TXT_SBTIME) || 
+							/* 0==strcmp(sq2[0].sTimePos, TXT_SBTIME) || */
 							0==strcmp(sq2[0].sTimePos, TXT_SPTIME)  )
 						{
 							isSSpoint = 1;
@@ -3275,7 +3290,9 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 						}
 						else
 						{
-							if( 0==strcmp(sq2[0].sTimePos, TXT_MaxNe) )
+							if( 0==strncmp(sq2[0].sTimePos, TXT_SBTIME, 4) )
+								strcpy( sq2[0].sTimePos, TXT_SBMXNt);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_MaxNe) )
 								strcpy( sq2[0].sTimePos, TXT_MXNtNe);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_gMAX) )
 								strcpy( sq2[0].sTimePos, TXT_MXNtgX);
@@ -3285,6 +3302,8 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 								strcpy( sq2[0].sTimePos, maxType);
 
 							isSSpoint = 0;
+
+							//fprintf(stderr,"  NtMax: Same record[ %s/ %d ], location updated!!! \n", sq2[0].sTimePos, iSScount );
 						}
 					}
 					break;
@@ -3293,7 +3312,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 					if( isSSpoint && (int)((sq2[0].Ne15)*1000) == (int)(mValue[iSScount]*1000) )
 					{
 						if( 0==strcmp(sq2[0].sTimePos, TXT_SSTIME) || 
-							0==strcmp(sq2[0].sTimePos, TXT_SBTIME) || 
+							/* 0==strcmp(sq2[0].sTimePos, TXT_SBTIME) ||  */
 							0==strcmp(sq2[0].sTimePos, TXT_SPTIME)  )
 						{
 							isSSpoint = 1;
@@ -3301,7 +3320,9 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 						}
 						else
 						{
-							if( 0==strcmp(sq2[0].sTimePos, TXT_MaxNt) )
+							if( 0==strncmp(sq2[0].sTimePos, TXT_SBTIME, 4) )
+								strcpy( sq2[0].sTimePos, TXT_SBMXNe);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_MaxNt) )
 								strcpy( sq2[0].sTimePos, TXT_MXNtNe);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_gMAX) )
 								strcpy( sq2[0].sTimePos, TXT_MXNegX);
@@ -3311,6 +3332,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 								strcpy( sq2[0].sTimePos, maxType);
 
 							isSSpoint = 0;
+							//fprintf(stderr,"  NeMax: Same record[ %s/ %d ], location updated!!! \n", sq2[0].sTimePos, iSScount );
 						}
 					}
 					break;
@@ -3320,7 +3342,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 					{
 						if( 0==strcmp(sq2[0].sTimePos, TXT_gmin) || 
 							0==strcmp(sq2[0].sTimePos, TXT_SSTIME) || 
-							0==strcmp(sq2[0].sTimePos, TXT_SBTIME) || 
+							/* 0==strcmp(sq2[0].sTimePos, TXT_SBTIME) ||  */
 							0==strcmp(sq2[0].sTimePos, TXT_SPTIME)  )
 						{
 							isSSpoint = 1;
@@ -3328,7 +3350,9 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 						}
 						else
 						{		
-							if( 0==strcmp(sq2[0].sTimePos, TXT_MaxNt) )
+							if( 0==strncmp(sq2[0].sTimePos, TXT_SBTIME, 4) )
+								strcpy( sq2[0].sTimePos, TXT_SBMXgX);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_MaxNt) )
 								strcpy( sq2[0].sTimePos, TXT_MXNtgX);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_MaxNe) )
 								strcpy( sq2[0].sTimePos, TXT_MXNegX);
@@ -3336,6 +3360,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 								strcpy( sq2[0].sTimePos, maxType);
 
 							isSSpoint = 0;
+							//fprintf(stderr,"  g_Max: Same record[ %s/ %d ], location updated!!! \n", sq2[0].sTimePos, iSScount );
 						}
 					}
 					break;
@@ -3345,7 +3370,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 					{
 						if( 0==strcmp(sq2[0].sTimePos, TXT_gMAX) || 
 							0==strcmp(sq2[0].sTimePos, TXT_SSTIME) || 
-							0==strcmp(sq2[0].sTimePos, TXT_SBTIME) || 
+							/* 0==strcmp(sq2[0].sTimePos, TXT_SBTIME) || */
 							0==strcmp(sq2[0].sTimePos, TXT_SPTIME)  )
 						{
 							isSSpoint = 1;
@@ -3354,8 +3379,9 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 						}
 						else
 						{
-
-							if( 0==strcmp(sq2[0].sTimePos, TXT_MaxNt) )
+							if( 0==strncmp(sq2[0].sTimePos, TXT_SBTIME, 4) )
+								strcpy( sq2[0].sTimePos, TXT_SBmigm);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_MaxNt) )
 								strcpy( sq2[0].sTimePos, TXT_MXNtgm);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_MaxNe) )
 								strcpy( sq2[0].sTimePos, TXT_MXNegm);
@@ -3364,12 +3390,14 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 
 							isSSpoint = 0;
 							isSBpoint = 0;
+							//fprintf(stderr,"  g_min: Same record[ %s/ %d ], location updated!!! \n", sq2[0].sTimePos, iSScount );
 						}
 					}
 					break;
-				case TYPE_MIN_NT:
+
+				case TYPE_Min_NT:
 					break;
-				case TYPE_MIN_NE:
+				case TYPE_Min_NE:
 					break;
 
 				}
@@ -3419,7 +3447,9 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 			fprintf(stderr,"  Deleted Max Table file [%s] -> OK \n", shi_inp );
 		else
 			fprintf(stderr,"  Deleted Max Table file [%s] -> Failed (%d) \n", shi_inp, ci );
+		fprintf(stderr,"---------------------------------------------------------------\n" );
 	}
+	
 #endif
 }
 
@@ -3568,7 +3598,7 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05)
 			{
 				continue;
 			}
-			else if( 0==strcmp( sq3[0].sTimePos, TXT_SSTIME) ) /* SS point */
+			else if( 0==strncmp( sq3[0].sTimePos, TXT_SSTIME, 4) ) /* SS point */
 			{
 				is2File = 1;
 				isSSpoint = TRUE;
@@ -3576,7 +3606,7 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05)
 
 				gTimeDiff = gSStime;
 			}
-			else if( 0==strcmp( sq3[0].sTimePos, TXT_SBTIME) ) /* SB point */
+			else if( 0==strncmp( sq3[0].sTimePos, TXT_SBTIME, 4) ) /* SB point */
 			{
 				is2File = 1;
 				isSBpoint = TRUE;
@@ -3585,7 +3615,7 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05)
 				gTimeDiff = (gSBtime - gSStime);
 
 			}
-			else if( 0==strcmp( sq3[0].sTimePos, TXT_SPTIME) ) /* SP point */
+			else if( 0==strncmp( sq3[0].sTimePos, TXT_SPTIME, 4) ) /* SP point */
 			{
 			
 				is2File = 2;
@@ -10607,7 +10637,6 @@ int main(int argc, char *argv[])
 				fprintf(stderr,"  Deleted temp file [%s] -> OK \n", infile );
 			else
 				fprintf(stderr,"  Deleted temp file [%s] -> Failed(%d) \n", infile, ii );
-			fprintf(stderr,"---------------------------------------------------------------\n" );
 		}
 #endif
 		// ------------------------------------------------------------------------------------
