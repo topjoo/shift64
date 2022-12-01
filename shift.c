@@ -1355,7 +1355,7 @@ short apsTableIndex(void)
 		}
 	}
 
-	fprintf(stderr,">>APS Table Nums  : %d (", aps_index );
+	fprintf(stderr,">>APS Table Nums  : %2d (", aps_index );
 	for(kk=0; kk<aps_index-1; kk++)
 	{
 		fprintf(stderr,"%.1lf ", ApsTble[kk] );
@@ -1380,7 +1380,7 @@ short vsKPHTableIndex(void)
 		}
 	}
 
-	fprintf(stderr,">>VS Table Nums   : %d (", vs_index );
+	fprintf(stderr,">>VS Table Nums   : %2d (", vs_index );
 	for(kk=0; kk<vs_index-1; kk++)
 	{
 		fprintf(stderr,"%d ", (int)VSkphTble[kk] );
@@ -1958,35 +1958,34 @@ int ShiftQualData(short aiPATs05, int shiDir03, int iPwrOnOff04, unsigned int *S
 	fprintf(stderr,"  Total Records ---------------: %9lu lines \n", RecordCnt );
 	fprintf(stderr,"  Error Records (ignored) -----: %9lu lines \n", iNGcount );
 	fprintf(stderr,"  Quality Records -------------: %9lu lines \n", iOKcount );
-	fprintf(stderr,"     SS Point Counts--%-8s : %9lu lines \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), iSScount );
-	fprintf(stderr,"     SB Point Counts--%-8s : %9lu lines \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), iSBcount );
-	fprintf(stderr,"     SP Point Counts--%-8s : %9lu lines \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), iSPcount );
 
-
-	*SScnt = iSScount;
-	*SBcnt = iSBcount;
-	*SPcnt = iSPcount;
-		
 
 	totChkModeID = 0;
 	for(ii=0; ii<MODE_ID_NUMS-1 ;ii++)
 	{
 		if( chkPATs_ModeID[ii] > 0UL )
 		{
-			fprintf(stderr,"    %3d:%-22s : %9lu lines %s \n", ii, arrPATs_ModeID[ii].ModeID, chkPATs_ModeID[ii], (aiPATs05==ii?"Used":" ") );
+			fprintf(stderr,"    %3d:%-22s : %9lu lines %s \n", ii, arrPATs_ModeID[ii].ModeID, chkPATs_ModeID[ii], (aiPATs05==ii?"* Used":" ") );
 			totChkModeID += chkPATs_ModeID[ii];
 		}
 	}
 	fprintf(stderr,"  Quality Sum Records ---------: %9lu lines \n", totChkModeID );
 	fprintf(stderr,"  Shift Sorted Rec %-11s : %9lu/ %lu lines \n", arrPATs_ModeID[aiPATs05].ModeID, iSortCount, chkPATs_ModeID[aiPATs05] );
+	fprintf(stderr,"     SS Point Counts--%-8s : %9lu lines \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), iSScount );
+	fprintf(stderr,"     SB Point Counts--%-8s : %9lu lines \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), iSBcount );
+	fprintf(stderr,"     SP Point Counts--%-8s : %9lu lines \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), iSPcount );
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
+	*SScnt = iSScount;
+	*SBcnt = iSBcount;
+	*SPcnt = iSPcount;
 
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 	fprintf(stderr,">>ModeID %s files are saved as below! \n", arrPATs_ModeID[aiPATs05].ModeID);
 	fprintf(stderr,"  Sorted file: %s \n", shift_out);
 	//fprintf(stderr,"  ModeID file: %s \n", shift_file );
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
+
 
 }
 
@@ -3498,7 +3497,7 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05)
 	short isSBpoint = 0;
 	short isSPpoint = 0;
 
-	
+	short ig_Max = 0, ig_min = 0;
 	//AllFilesClosed();
 
 	if(inpfile) { fclose(inpfile);	inpfile=NULL;  }
@@ -3591,6 +3590,7 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05)
 			}
 			/* === 1 STEP : record (17 items check) =============== */
 
+
 			is2File = 0;
 			if( 0==strcmp( sq3[0].sTimePos, TXT_UNKNOWN) ||
 				0==strcmp( sq3[0].sTimePos, TXT_UPCASE) ||
@@ -3613,6 +3613,19 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05)
 				gSBtime = sq3[0].Time01;
 
 				gTimeDiff = (gSBtime - gSStime);
+
+				if( 0==strcmp( sq3[0].sTimePos, TXT_SBMXgX) ) /* SB & gX */
+				{
+					ig_Max = 1;
+					gMaxTime = sq3[0].Time01;
+					gMaxVal  = sq3[0].LAcc17;
+				}
+				else if( 0==strcmp( sq3[0].sTimePos, TXT_SBmigm) ) /* SB & g_min */
+				{
+					ig_min = 1;
+					gminTime = sq3[0].Time01;
+					gminVal  = sq3[0].LAcc17;
+				}
 
 			}
 			else if( 0==strncmp( sq3[0].sTimePos, TXT_SPTIME, 4) ) /* SP point */
@@ -3640,50 +3653,89 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05)
 				// ------------------------------------
 				// -- g Max time
 				// ------------------------------------
-				if( 0==strcmp( sq3[0].sTimePos, TXT_gMAX) )
+				if( 0==strcmp( sq3[0].sTimePos, TXT_gMAX) ) /* Max gX */
 				{
+					ig_Max = 1;
 					gMaxTime = sq3[0].Time01;
-					gMaxVal = sq3[0].LAcc17;
+					gMaxVal  = sq3[0].LAcc17;
 				}
-				else if( 0==strcmp( sq3[0].sTimePos, TXT_MXNtgX) )
+				else if( 0==strcmp( sq3[0].sTimePos, TXT_SBMXgX) ) /* SB & gX */
 				{
+					ig_Max = 1;
 					gMaxTime = sq3[0].Time01;
-					gMaxVal = sq3[0].LAcc17;
+					gMaxVal  = sq3[0].LAcc17;
 				}
-				else if( 0==strcmp( sq3[0].sTimePos, TXT_MXNegX) )
+				else if( 0==strcmp( sq3[0].sTimePos, TXT_MXNtgX) ) /* MX Nt & gX */
 				{
+					ig_Max = 1;
 					gMaxTime = sq3[0].Time01;
-					gMaxVal = sq3[0].LAcc17;
+					gMaxVal  = sq3[0].LAcc17;
+				}
+				else if( 0==strcmp( sq3[0].sTimePos, TXT_MXNegX) ) /* MX Nt & gX */
+				{
+					ig_Max = 1;
+					gMaxTime = sq3[0].Time01;
+					gMaxVal  = sq3[0].LAcc17;
 				}			
+				//else
+				//{
+				//	fprintf(stderr,"Jerk2 Calc Error>> g_Max time posistion error.  %s \n", sq3[0].sTimePos );
+				//}
+
 
 				// ------------------------------------
 				// -- g min time
 				// ------------------------------------
-				if( 0==strcmp( sq3[0].sTimePos, TXT_gmin) )
+				if( 0==strcmp( sq3[0].sTimePos, TXT_gmin) ) /* min g_min */
 				{
+					ig_min = 1;
 					gminTime = sq3[0].Time01;
 					gminVal  = sq3[0].LAcc17;
 				}
-				else if( 0==strcmp( sq3[0].sTimePos, TXT_MXNtgm) )
+				else if( 0==strcmp( sq3[0].sTimePos, TXT_SBmigm) ) /* SB & g_min */
 				{
+					ig_min = 1;
 					gminTime = sq3[0].Time01;
 					gminVal  = sq3[0].LAcc17;
 				}
-				else if( 0==strcmp( sq3[0].sTimePos, TXT_MXNegm) )
+				else if( 0==strcmp( sq3[0].sTimePos, TXT_MXNtgm) ) /* MX Nt & g_min */
 				{
+					ig_min = 1;
 					gminTime = sq3[0].Time01;
 					gminVal  = sq3[0].LAcc17;
 				}
-
-				if( (gMaxTime > 0.0f) && (gminTime > 0.0f) )
+				else if( 0==strcmp( sq3[0].sTimePos, TXT_MXNegm) ) /* MX Ne & g_min */
 				{
-					if( (gminTime-gMaxTime) > 0.0f || (gminTime-gMaxTime) < 0.0f  )
-					{
-						fJerk2 = ((gminVal-gMaxVal)*1000.0)/((gminTime-gMaxTime)*1000.0);
-					}
+					ig_min = 1;
+					gminTime = sq3[0].Time01;
+					gminVal  = sq3[0].LAcc17;
 				}
+				//else
+				//{
+				//	fprintf(stderr,"Jerk2 Calc Error>> g_min time posistion error.  %s \n", sq3[0].sTimePos );
+				//}
 
 			}
+			
+			
+			/* ----------------------------------------------------- */
+			/* Calc Jerk											 */
+			/* ----------------------------------------------------- */
+
+			fJerk2 = 0.0f;
+			if( ig_Max && ig_min )
+			{
+				if( (gminTime*1000-gMaxTime*1000) > 0.0f || (gminTime*1000-gMaxTime*1000) < 0.0f  )
+				{
+					fJerk2 = (gminVal*1000 - gMaxVal*1000)/(gminTime*1000 - gMaxTime*1000);
+					ig_Max = 0;
+					ig_min = 0;
+				}
+			}
+			/* ----------------------------------------------------- */
+			/* Calc Jerk											 */
+			/* ----------------------------------------------------- */
+		
 
 
 		#if SAVEMODE
@@ -10715,18 +10767,16 @@ int main(int argc, char *argv[])
 				else
 					fprintf(stderr,"  Deleted temp file [%s] -> Failed(%d) \n", shi_out, ii );
 			}
-			else
-			{
-				strcpy(shi_out, shi_ori);
-				strcat(shi_out,	"z");
-				strcat(shi_out, arrPATs_ModeID[iModeID].ModeNm);
 
-				ii = remove( shi_out );
-				if( 0 == ii )
-					fprintf(stderr,"  Deleted temp file [%s] -> OK \n", shi_out );
-				else
-					fprintf(stderr,"  Deleted temp file [%s] -> Failed(%d) \n", shi_out, ii );
-			}
+			strcpy(shi_out, shi_ori);
+			strcat(shi_out,	"z");
+			strcat(shi_out, arrPATs_ModeID[iModeID].ModeNm);
+
+			ii = remove( shi_out );
+			if( 0 == ii )
+				fprintf(stderr,"  Deleted temp file [%s] -> OK \n", shi_out );
+			else
+				fprintf(stderr,"  Deleted temp file [%s] -> Failed(%d) \n", shi_out, ii );
 
 			// -------------------------------------------------------------
 			strcpy(shi_out, shi_ori);
