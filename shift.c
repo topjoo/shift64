@@ -694,8 +694,12 @@ void AllFilesClosed(void)
 #define SHIFT_SKIP_DN 	22 /* SKIP_DN */
 #define SHIFT_NDR 		33 /* D-N-R */
 
-#define PWR_ON 			10
-#define PWR_OFF 		20
+
+#define SHI_STATIC 		10 /* Static */
+#define SHI_PWR_ON 		11 /* Power On */
+#define SHI_PWR_OFF 	12 /* Power Off */
+#define SHI_N_STOP_DN 	15 /* Near Stop Down Shift */
+
 
 #define TYPE_MAX_NT 	11
 #define TYPE_MAX_NE 	12
@@ -786,9 +790,7 @@ static double fAPSpwrLvl = -1.0f;
 static double fAPStol    = APS_TOLENANCE;  /* APS tolerance */
 static short iModeID = -1; /* 8:md_NOR */
 static short iFileDeleted = 0;
-static short iPwrOnOff = -1;
-static short iAPSNum = APS_TABLE_NUM;
-static short ivsKPHNum = VS_TABLE_NUM;
+
 
 #define PWR_ON_UP_SHIFT_SSPOINT_START 		1
 
@@ -971,13 +973,14 @@ iShift, iShiType12, arrGear[iShiType12].sGear, TqFr, ShiftPh, sNe, sNt16, Long_A
 #define 	WR_GearRatio  	" %4.2lf"
 #define 	WR_GearSOne  	" %9.2lf"
 #define 	WR_GearSTwo  	" %9.2lf"
-#define 	WR_Jerk1  		" %7.2lf"
+#define 	WR_Jerk1  		" %8.2lf"
 #define 	WR_MaxNe  		" %8.2lf"
 #define 	WR_MaxNt  		" %8.2lf"
 #define 	WR_MaxAcc  		" %7.4lf"
 #define 	WR_minAcc  		" %7.4lf"
 #define 	WR_TimeTxt 		" %-2s"
-#define 	WR_Jerk2  		" %7.2lf"
+#define 	WR_Jerk2  		" %8.2lf"
+#define 	WR_mSec  		" %4d"
 
 #define 	WR_MaxNe_DEC    " %6d"
 #define 	WR_MaxNt_DEC  	" %6d"
@@ -1039,7 +1042,7 @@ iShift, iShiType12, arrGear[iShiType12].sGear, TqFr, ShiftPh, sNe, sNt16, Long_A
 
 #define SAVE_LastFMT (WR_TIME01 WR_iPATS05 WR_iPATS05S WR_curGear08 WR_tgtGear11 WR_VSP03 WR_TQI07 WR_APS09 WR_No10 \
 					WR_ShiNew12 WR_ShiType12 WR_Shi12S WR_tQFr13 WR_ShiftPh14 WR_Ne15 WR_Nt16 WR_LAcc17 WR_TimeDiff \
-					WR_TimePos WR_GearRatio WR_Jerk1 WR_Jerk2 )
+					WR_TimePos WR_GearRatio WR_Jerk1 WR_Jerk2 WR_mSec)
 
 
 #define NtMAX_FORMAT	("%5d" WR_TIME01 WR_MaxNt)
@@ -1392,7 +1395,7 @@ short vsKPHTableIndex(void)
 
 
 
-int ShiftQualData(short aiPATs05, int shiDir03, int iPwrOnOff04, unsigned int *SScnt, unsigned int *SBcnt, unsigned int *SPcnt)
+int ShiftQualData(short aiPATs05, int iPwrOnOff04, int shiDir03, unsigned int *SScnt, unsigned int *SBcnt, unsigned int *SPcnt)
 {
 	FILE *shiFile=NULL;
 
@@ -1400,7 +1403,7 @@ int ShiftQualData(short aiPATs05, int shiDir03, int iPwrOnOff04, unsigned int *S
 	unsigned int iTimeShift = 0;
 	double avgTime = 0.0f;
 	unsigned long long avgCount = 0ULL;
-
+	int iavgTime = 0;
 	char shift_out[MAX_CHARS*LENGTH_OF_FILENAME+1];
 	unsigned int ii=0;
 	short iItemCurOK = 0; /* 1: OK, 0: NG */
@@ -1451,6 +1454,9 @@ int ShiftQualData(short aiPATs05, int shiDir03, int iPwrOnOff04, unsigned int *S
 	double MaxNt = 0.0f;
 	double MaxAcc = 0.0f;
 	double minAcc = GMAX_RVALUE;
+	short iAPSNum = APS_TABLE_NUM;
+	short ivsKPHNum = VS_TABLE_NUM;
+	
 
 	memset(QualData, 0x00, sizeof(QualData) );
 	memset(sq, 0x00, sizeof(sq) );
@@ -1489,6 +1495,7 @@ int ShiftQualData(short aiPATs05, int shiDir03, int iPwrOnOff04, unsigned int *S
 		fprintf(stderr,"\n");
 		fprintf(stderr,">>PATs-ModeID -> Unknown ModeID, check please... \r\n" );
 		// FAIL
+		AllFilesClosed();
 		exit(0);
 		return 0;
 	}
@@ -1501,13 +1508,13 @@ int ShiftQualData(short aiPATs05, int shiDir03, int iPwrOnOff04, unsigned int *S
 
 	iAPSNum   = apsTableIndex();
 	ivsKPHNum = vsKPHTableIndex();
-		
 
 	/* ===================================================================================== */
 	/* get file  */
 	//fprintf(stderr,"\n");
-	fprintf(stderr,">>ModeID %s Sorting... \n", arrPATs_ModeID[aiPATs05].ModeID );			
-	fprintf(stderr,">>shift Direction (%s)... \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down": \
+	//fprintf(stderr,">>ModeID %s Sorting... \n", arrPATs_ModeID[aiPATs05].ModeID );
+	fprintf(stderr,">>Shift Type      : %s \n", (iPwrOnOff04==SHI_PWR_ON?"PWR On":(iPwrOnOff04==SHI_PWR_OFF?"PWR Off":(iPwrOnOff04==SHI_STATIC?"Static":(iPwrOnOff04==SHI_N_STOP_DN?"Stop Dn":"Unknown")))) );
+	fprintf(stderr,">>Shift Direction : Shift %s \n", (shiDir03==SHIFT_UP?"UP":(shiDir03==SHIFT_DN?"DOWN": \
 		(shiDir03==SHIFT_SKIP_DN?"SkipDown":(shiDir03==SHIFT_SKIP_UP?"SkipUp":"Unknown"))) ));			
 
 	/* ===================================================================================== */
@@ -1538,8 +1545,10 @@ int ShiftQualData(short aiPATs05, int shiDir03, int iPwrOnOff04, unsigned int *S
 		{
 			// FAIL
 			printf("\n\nCan not create output file(%s).. check plz... \n\n", shift_out );
+			AllFilesClosed();
 			exit(0);
 		}
+
 
 	#if SAVEMODE
 		if(shiFile)
@@ -1668,7 +1677,7 @@ int ShiftQualData(short aiPATs05, int shiDir03, int iPwrOnOff04, unsigned int *S
 			}
 			/* === 3 STEP : ModeID check ===================== */
 
-			if( iPwrOnOff04 == PWR_ON )
+			if( iPwrOnOff04 == SHI_PWR_ON )
 			{
 				if( sq[0].APS09 < fAPSpwrLvl ) continue; /* APS power level check and ignored */
 			}
@@ -1716,15 +1725,16 @@ int ShiftQualData(short aiPATs05, int shiDir03, int iPwrOnOff04, unsigned int *S
 				/* ----------------------------------------------------- */
 				/* Calc Jerk 											 */
 				/* ----------------------------------------------------- */
+				fJerk1 = 0.0f;
 				if(preTime)
 				{
-					DiffTime  = ((unsigned int)(sq[0].Time01 * 1000) - preTime);
+					DiffTime  = ((unsigned int)(sq[0].Time01 * 1000 * 10) - preTime);
 					if(DiffTime)
 					{
-						fJerk1 = (sq[0].LAcc17 * 1000 - preLAcc)/DiffTime; /* UNIT: m2/sec/msec */
+						fJerk1 = (sq[0].LAcc17 * 1000 - preLAcc)*10/(DiffTime); /* UNIT: m2/sec/msec */
 					}
 				}
-				preTime = (unsigned int)(sq[0].Time01 * 1000);
+				preTime = (unsigned int)(sq[0].Time01 * 1000 * 10);
 				preLAcc = (sq[0].LAcc17 * 1000);
 				/* ----------------------------------------------------- */
 				/* Calc Jerk 											 */
@@ -1828,9 +1838,9 @@ int ShiftQualData(short aiPATs05, int shiDir03, int iPwrOnOff04, unsigned int *S
 					else if( SHIFT_NDR==shiDir03 )
 					{
 						/* ---------------------------------------------------------------------------------
-						※	N-D 경우 Shift Begin (SB) 점 판단식 : Nt - Nt_max ≤ -30RPM 되는 싯점 
-									 Synch Point (SP) 점 판단식 : Nt ≤ 30RPM 되는 싯점	
-						--------------------------------------------------------------------------------------- */
+							P/N-D/R : Shift Begin  (SB) 점 판단식 : Nt - Nt_max ≤ -30RPM 되는 싯점 
+						              Shift Finish (FF) 점 판단식 : Nt ≤ 30RPM 되는 싯점	 
+					      ---------------------------------------------------------------------------------- */
 
 
 					}
@@ -1845,14 +1855,14 @@ int ShiftQualData(short aiPATs05, int shiDir03, int iPwrOnOff04, unsigned int *S
 
 
 				/* --------------------------------------------------------------
-				Power on upshift CASE >> 
+				Power ON UP-shift CASE >> 
 				 (1) Nt_max와 Ne_max는 SB 시점값이고, 
 				 (2) Nt_min과 Ne_min은 FF 시점값을 취합니다.
 
 				 (3) G_max와G_min는 SS에서 SB 구간 중 최대값과 최소값입니다.
 				 (4) △G 는 (SB~FF의 G_평균값과 FF~SF의 G_평균값)의 차이값입니다.
 
-				Power on downshift CASE >>
+				Power ON DOWN-shift CASE >>
 				 (1) Nt_min와 Ne_min은 SB 시점값이고, 
 				 (2) Nt_max과 Ne_max는 FF 시점값을 취합니다.
 				 (3) j1 >> G_max는 SB~FF사이에서 G_최대값을 취하고, 
@@ -1909,22 +1919,37 @@ int ShiftQualData(short aiPATs05, int shiDir03, int iPwrOnOff04, unsigned int *S
 					{
 
 					}
-
+					else
+					{
+					}
 				}
 				else
 				{
-					MaxNe = 0.0f; /* default Ne min value because of compare it */
-					MaxNt = 0.0f; /* default Nt min value because of compare it */
+					if(SHIFT_UP==shiDir03)
+					{
+						MaxNe = 0.0f; /* default Ne min value because of compare it */
+						MaxNt = 0.0f; /* default Nt min value because of compare it */
 
-			#ifdef PWR_ON_UP_SHIFT_SSPOINT_START
-					minAcc = GMAX_RVALUE; /* default g_min value because of compare it */
-					MaxAcc = 0.0f; /* default g_Max value because of compare it */
-			#endif
-			
+				#ifdef PWR_ON_UP_SHIFT_SSPOINT_START
+						minAcc = GMAX_RVALUE; /* default g_min value because of compare it */
+						MaxAcc = 0.0f; /* default g_Max value because of compare it */
+				#endif
+					}
+					else if(SHIFT_DN==shiDir03)
+					{
+
+					}
+					else
+					{
+					}
+
 				}
 				/* ----------------------------------------------------- */
 				/* Max Ne and Max Nt   --------------------------------- */
 				/* ----------------------------------------------------- */
+
+
+
 
 
 			#if SAVEMODE
@@ -1936,8 +1961,8 @@ int ShiftQualData(short aiPATs05, int shiDir03, int iPwrOnOff04, unsigned int *S
 						iShift, 		 sq[0].ShiTy12, arrGear[sq[0].ShiTy12].sGear, sq[0].TqFr13, sq[0].ShiPh14, 
 						sq[0].Ne15, 	 sq[0].Nt16, sq[0].LAcc17, 
 						sTimePos, gearRatio, gearShiftOne, gearShiftTwo, fJerk1, MaxNe, MaxNt, MaxAcc, minAcc );
-				fprintf(shiFile, "\n");
 
+				fprintf(shiFile, "\n");
 				}
 			#endif
 
@@ -1980,13 +2005,15 @@ int ShiftQualData(short aiPATs05, int shiDir03, int iPwrOnOff04, unsigned int *S
 	*SBcnt = iSBcount;
 	*SPcnt = iSPcount;
 
+	iavgTime = (int)(avgTime/avgCount);
+
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 	fprintf(stderr,">>ModeID %s files are saved as below! \n", arrPATs_ModeID[aiPATs05].ModeID);
 	fprintf(stderr,"  Sorted file: %s \n", shift_out);
 	//fprintf(stderr,"  ModeID file: %s \n", shift_file );
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
-
+	return iavgTime;
 }
 
 
@@ -2024,7 +2051,7 @@ int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsig
 
 	if( SScnt==SBcnt && SBcnt==SPcnt && SScnt==SPcnt)
 	{
-		fprintf(stderr,"Counter checking %s SS(%d) SB(%d) SP(%d) - OK!! \n", arrPATs_ModeID[aiPATs05].ModeID, SScnt, SBcnt, SPcnt);
+		fprintf(stderr,">>Counter checking %s SS(%d) SB(%d) SP(%d) - OK!! \n", arrPATs_ModeID[aiPATs05].ModeID, SScnt, SBcnt, SPcnt);
 	}
 	else
 	{
@@ -2074,10 +2101,11 @@ int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsig
 		{
 			// FAIL
 			fprintf(stderr,"\r\n++ERROR++[%s]:Can not read file (%s) \n\n", __FUNCTION__, shi_inp );
+			AllFilesClosed();
 			exit(0);
 		}
 
-		fprintf(stderr,"Counter Checking %s ........... SS(%d) SB(%d) SP(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, SScnt, SBcnt, SPcnt);
+		fprintf(stderr,">>Counter Checking %s ........... SS(%d) SB(%d) SP(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, SScnt, SBcnt, SPcnt);
 
 
 		if( SScnt > SBcnt )
@@ -2203,6 +2231,7 @@ int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsig
 		{
 			// FAIL
 			fprintf(stderr,"\r\n++ERROR++[%s]:Can not create file (%s) \n\n", __FUNCTION__, chk_out );
+			AllFilesClosed();
 			exit(0);
 		}
 
@@ -2471,6 +2500,7 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 		{
 			// FAIL
 			fprintf(stderr,"\r\n++ERROR++[%s]:Can not read file (%s) \n\n", __FUNCTION__, shi_inp );
+			AllFilesClosed();
 			exit(0);
 		}
 
@@ -2480,6 +2510,12 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 		{
 			// FAIL
 			fprintf(stderr,"\r\nCan not create file (%s) \n\n", shiNtMax );
+			AllFilesClosed();
+			if(fp2gmin) fclose(fp2gmin); 
+			if(fp2gMax) fclose(fp2gMax);
+			if(fp2NeMax) fclose(fp2NeMax);
+			if(fp2NtMax) fclose(fp2NtMax);
+
 			exit(0);
 		}
 
@@ -2487,6 +2523,11 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 		{
 			// FAIL
 			fprintf(stderr,"\r\nCan not create file (%s) \n\n", shiNeMax );
+			AllFilesClosed();
+			if(fp2gmin) fclose(fp2gmin); 
+			if(fp2gMax) fclose(fp2gMax);
+			if(fp2NeMax) fclose(fp2NeMax);
+			if(fp2NtMax) fclose(fp2NtMax);
 			exit(0);
 		}
 
@@ -2494,6 +2535,11 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 		{
 			// FAIL
 			fprintf(stderr,"\r\nCan not create file (%s) \n\n", shigMax );
+			AllFilesClosed();
+			if(fp2gmin) fclose(fp2gmin); 
+			if(fp2gMax) fclose(fp2gMax);
+			if(fp2NeMax) fclose(fp2NeMax);
+			if(fp2NtMax) fclose(fp2NtMax);
 			exit(0);
 		}
 
@@ -2501,6 +2547,11 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 		{
 			// FAIL
 			fprintf(stderr,"\r\nCan not create file (%s) \n\n", shigmin );
+			AllFilesClosed();
+			if(fp2gmin) fclose(fp2gmin); 
+			if(fp2gMax) fclose(fp2gMax);
+			if(fp2NeMax) fclose(fp2NeMax);
+			if(fp2NtMax) fclose(fp2NtMax);
 			exit(0);
 		}
 		// ==================================================================
@@ -2509,7 +2560,12 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 	else
 	{
 		// FAIL
-		fprintf(stderr,"\r\n++ERROR++: There is no file. Check plz... \n\n");
+		fprintf(stderr,"\r\n++ERROR++: There is no file. Check plz... (%d) [%s] \n\n", aiPATs05, shi_inp );
+		AllFilesClosed();
+		if(fp2gmin) fclose(fp2gmin); 
+		if(fp2gMax) fclose(fp2gMax);
+		if(fp2NeMax) fclose(fp2NeMax);
+		if(fp2NtMax) fclose(fp2NtMax);
 		exit(0);
 	}
 	/* ===================================================================================== */
@@ -3104,7 +3160,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 	int ci=0;
 	unsigned int iloop = 0;
 
-#define MAX_TABLE_SIZ 		2000
+#define MAX_TABLE_SIZ 		1000 //2000
 
 	int iNum[MAX_TABLE_SIZ] = {0,};
 	double  msTime[MAX_TABLE_SIZ] = {0.0,};
@@ -3121,6 +3177,10 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 	{
 		// FAIL
 		fprintf(stderr,"\r\n++ERROR++[%s]:Can not read file (%s) \n\n", __FUNCTION__, infile );
+		AllFilesClosed();
+		if(fpinput) { fclose(fpinput); fpinput=NULL; }
+		if(fp2out) { fclose(fp2out); fp2out=NULL; }
+		if(fp2in) { fclose(fp2in); fp2in=NULL; }
 		exit(0);
 	}
 
@@ -3130,6 +3190,10 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 	{
 		// FAIL
 		fprintf(stderr,"\r\n++ERROR++[%s]:Can not create file (%s) \n\n", shi_out );
+		AllFilesClosed();
+		if(fpinput) { fclose(fpinput); fpinput=NULL; }
+		if(fp2out) { fclose(fp2out); fp2out=NULL; }
+		if(fp2in) { fclose(fp2in); fp2in=NULL; }
 		exit(0);
 	}
 	// ==================================================================
@@ -3162,6 +3226,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 	{
 		// FAIL
 		fprintf(stderr,"\r\nCan not open file (%s) --- \n\n", shi_inp );
+		AllFilesClosed();
 		exit(0);
 	}
 
@@ -3196,9 +3261,9 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 	fclose(fp2in);
 	// ----- open MAX file OK ------------------------------
 	
-	iSScount = 0;
-	iSBcount = 0;
-	iSPcount = 0;
+	iSScount = 0U;
+	iSBcount = 0U;
+	iSPcount = 0U;
 
 	do
 	{
@@ -3211,7 +3276,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 		{
 			ierr = ferror(fpinput);
 			fclose(fpinput);
-			fprintf(stderr,"  [%s] Max Table Check completed!! \r\n", shi_inp);
+			fprintf(stderr,"  min/Max Table %s is applied!!! (%s) \r\n", maxType, shi_inp);
 			break;
 		}
 
@@ -3273,6 +3338,18 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 				{
 					is2File = 1;
 					isSBpoint = TRUE;
+				}
+
+
+				if( iSScount > MAX_TABLE_SIZ )
+				{
+					fprintf(stderr,"\n\n++ERROR++ Max Table over!!! (%d/%d) \n\n", iSScount, MAX_TABLE_SIZ );
+					
+					if(fpinput) { fclose(fpinput); fpinput=NULL; }
+					if(fp2out) { fclose(fp2out); fp2out=NULL; }
+
+					AllFilesClosed();
+					exit(0);
 				}
 
 				switch(mType)
@@ -3454,7 +3531,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 
 
 
-int ShiftData_LastSorting(char *shi_inp, short aiPATs05)
+int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
 {
 	FILE *fp2in = NULL;
 	FILE *fp2out = NULL;
@@ -3498,7 +3575,10 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05)
 	short isSPpoint = 0;
 
 	short ig_Max = 0, ig_min = 0;
-	//AllFilesClosed();
+	int 	DeltaTime = 0;
+	double	DeltaValu = 0.0f;
+					
+
 
 	if(inpfile) { fclose(inpfile);	inpfile=NULL;  }
 
@@ -3508,6 +3588,7 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05)
 	{
 		// FAIL
 		fprintf(stderr,"\r\n++ERROR++[%s]:Can not read file (%s) \n\n", __FUNCTION__, shi_inp );
+		AllFilesClosed();
 		exit(0);
 	}
 	/* ===================================================================================== */
@@ -3533,7 +3614,7 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05)
 
 #if SAVEMODE
 	if(outfile)
-	fprintf(outfile,"     time   iPAT  ModeID   cG tG   vsp    tqi      Aps      No    ct iShi txt        TqFr ShiPh Ne       Nt     LAccel DiffTime TimPos    Ratio  Jerk1    Jerk2 \n");
+	fprintf(outfile,"     time   iPAT  ModeID   cG tG   vsp    tqi      Aps      No    ct iShi txt        TqFr ShiPh Ne       Nt     LAccel DiffTime TimPos    Ratio Jerk1_%dms  Jerk2 (msec)\n", avgTime);
 //	fprintf(outfile,"     time   iPAT  ModeID   cG tG   vsp    tqi      Aps      No    ct iShi txt        TqFr ShiPh Ne       Nt     LAccel DiffTime TimPos    Ratio  Jerk1  MaxNe    MaxNt    g_Max   g_min  Jerk2\n");
 #endif
 
@@ -3723,11 +3804,15 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05)
 			/* ----------------------------------------------------- */
 
 			fJerk2 = 0.0f;
+			DeltaTime = 0;
 			if( ig_Max && ig_min )
 			{
-				if( (gminTime*1000-gMaxTime*1000) > 0.0f || (gminTime*1000-gMaxTime*1000) < 0.0f  )
+				DeltaTime = (int)(gminTime*1000*10 - gMaxTime*1000*10);
+				DeltaValu = (gminVal*1000.0f - gMaxVal*1000.0f);
+				
+				if( DeltaTime > 0 || DeltaTime < 0 )
 				{
-					fJerk2 = (gminVal*1000 - gMaxVal*1000)/(gminTime*1000 - gMaxTime*1000);
+					fJerk2 = DeltaValu*10/DeltaTime;
 					ig_Max = 0;
 					ig_min = 0;
 				}
@@ -3745,7 +3830,7 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05)
 						sq3[0].Time01,  sq3[0].iPATs05,	   sq3[0].iPATs05S,	  sq3[0].curGear08, sq3[0].tgtGear11,  sq3[0].VSP03, 
 						sq3[0].tqi07,   sq3[0].APS09,      sq3[0].No10,       sq3[0].ShiNew12,	sq3[0].ShiTy12,    sq3[0].arrGear, 
 						sq3[0].TqFr13,  sq3[0].ShiPh14,	   sq3[0].Ne15,       sq3[0].Nt16,      sq3[0].LAcc17,     gTimeDiff, sq3[0].sTimePos,
-						sq3[0].gearRat, sq3[0].fJerk1,	   fJerk2 );
+						sq3[0].gearRat, sq3[0].fJerk1,	   fJerk2,            DeltaTime/10 );
 
 				if(1==is2File) fprintf(outfile, "\n");
 				if(2==is2File) fprintf(outfile, "\n\n");
@@ -3763,7 +3848,7 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05)
 	if(fp2out) fclose(fp2out);
 
 
-	fprintf(stderr,">>Sorted result: %s \n", shift_file );
+	fprintf(stderr,">>Sorted result file: %s \n", shift_file );
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
 #if 0
@@ -4022,6 +4107,8 @@ int main(int argc, char *argv[])
 	int isUpShift=0, isDownShift=0;	
 
 	int iEidx=0, iTCnt=0;
+
+	short iPwrOnOff = -1; /* POWER ON, POWER OFF*/
 #endif //SHIFT_QUALITY_DATA_SORTING /* 2022-11-13 */
 
 
@@ -6496,11 +6583,11 @@ int main(int argc, char *argv[])
 							// 1>> APS POWER ON/OFF Level
 							olen = strlen(str_ShiftOp[kk]);
 							fAPSpwrLvl = atof( str_ShiftOp[kk] ); 
-							if(fAPSpwrLvl >= 3.0f) iPwrOnOff = PWR_ON;
-							else iPwrOnOff = PWR_OFF;
+							if(fAPSpwrLvl >= 3.0f) iPwrOnOff = SHI_PWR_ON;
+							else iPwrOnOff = SHI_PWR_OFF;
 							fprintf(stderr,"\n");
-							fprintf(stderr,">>APS Percent Lvl : <<%d>> %.2lf%% -- default(3\%~5\%) \n", kk, fAPSpwrLvl ); 
-							fprintf(stderr,">>POWER ON/OFF    :  %s", (iPwrOnOff==PWR_ON?"PWR On":(iPwrOnOff==PWR_OFF?"PWR Off":"Unknown")) ); 
+							fprintf(stderr,">>APS Percent lvl : <<%d>> %.2lf%% -- default(3\%~5\%) \n", kk, fAPSpwrLvl ); 
+							fprintf(stderr,">>POWER ON/OFF    :  %s", (iPwrOnOff==SHI_PWR_ON?"PWR On":(iPwrOnOff==SHI_PWR_OFF?"PWR Off":(iPwrOnOff==SHI_STATIC?"Static":(iPwrOnOff==SHI_N_STOP_DN?"Stop Dn":"Unknown")))) ); 
 							break;
 							
 						case 2:
@@ -6523,9 +6610,9 @@ int main(int argc, char *argv[])
 						case 5:
 							apstep = atof( str_ShiftOp[kk] ); 
 							fprintf(stderr,"\n");
-							fprintf(stderr,">>APS Table step  : <<%d>> %.1lf -- APS Table updated...", kk, apstep ); 
+							fprintf(stderr,">>APS Table Step  : <<%d>> %.1lf -- APS Table updated...", kk, apstep ); 
 
-							for(ll=0, aps=aps1; (aps<=aps2 && ll<APS_TABLE_NUM); aps+=apstep, ll++)
+							for(ll=0, aps=aps1; ((aps<=aps2) && (ll<APS_TABLE_NUM)); aps+=apstep, ll++)
 							{
 								ApsTble[ll] = aps;
 							}
@@ -10598,7 +10685,7 @@ int main(int argc, char *argv[])
 	else if( (1==isUpShift) && (1==isShift) )
 	{
 		unsigned int SScnt=0, SBcnt=0, SPcnt=0;
-		int ii=0, ichk=0;
+		int ii=0, ichk=0, iavgtm=0;
 		short isNaming = 0;
 		char shi_ori[MAX_CHARS*LENGTH_OF_FILENAME+1];
 		char shi_inp[MAX_CHARS*LENGTH_OF_FILENAME+1];
@@ -10619,19 +10706,22 @@ int main(int argc, char *argv[])
 		fprintf(stderr,"---------------------------------------------------------------\n" );
 
 
-		ShiftQualData(iModeID, SHIFT_UP, iPwrOnOff, &SScnt, &SBcnt, &SPcnt);
+		// --------------------------------------------------------
+		// 1st STEP -----------------------------------------------
+		iavgtm = ShiftQualData(iModeID, iPwrOnOff, SHIFT_UP, &SScnt, &SBcnt, &SPcnt);
 	    //rewind(inpfile);
 
-		//printf(" SScnt(%u), SBcnt(%u), SPcnt(%u) \n", SScnt, SBcnt, SPcnt );
-
+		// --------------------------------------------------------
+		// 2nd STEP -----------------------------------------------
 		ichk = SSCounterCheck(iModeID, SScnt, SBcnt, SPcnt);
 
+		// --------------------------------------------------------
+		// 3rd STEP -----------------------------------------------
 		Find2nd_minMaxShiftData(iModeID, ichk, SScnt, SBcnt, SPcnt);
 
 
-
 		// --------------------------------------------------------
-		// --------------------------------------------------------
+		// 4th STEP -----------------------------------------------
 		// --------------------------------------------------------
 		// Nt Max -------------------------------------------------
 		strcpy(shi_ori, shift_file);
@@ -10645,10 +10735,7 @@ int main(int argc, char *argv[])
 				break;
 			}
 		}
-		if( 0==isNaming )
-		{
-			strcat(shi_ori, ".");
-		}
+		if( 0==isNaming ) strcat(shi_ori, ".");
 
 
 		// Nt Max -------------------------------------------------
@@ -10681,7 +10768,7 @@ int main(int argc, char *argv[])
 
 		ShiftData_MAXLocationCheck(infile, shi_inp, shi_out, TXT_MaxNe, TYPE_MAX_NE, iModeID, SScnt, SBcnt, SPcnt);
 		// Ne Max -------------------------------------------------
-#if 1
+	#if 1
 		if(iFileDeleted)
 		{
 			ii = remove( infile );
@@ -10690,7 +10777,7 @@ int main(int argc, char *argv[])
 			else
 				fprintf(stderr,"  Deleted temp file [%s] -> Failed(%d) \n", infile, ii );
 		}
-#endif
+	#endif
 		// ------------------------------------------------------------------------------------
 
 
@@ -10708,7 +10795,7 @@ int main(int argc, char *argv[])
 
 		ShiftData_MAXLocationCheck(infile, shi_inp, shi_out, TXT_gMAX, TYPE_MAX_G, iModeID, SScnt, SBcnt, SPcnt);
 		// gMax ---------------------------------------------------
-#if 1
+	#if 1
 		if(iFileDeleted)
 		{
 			ii = remove( infile );
@@ -10718,7 +10805,7 @@ int main(int argc, char *argv[])
 				fprintf(stderr,"  Deleted temp file [%s] -> Failed(%d) \n", infile, ii );
 			fprintf(stderr,"---------------------------------------------------------------\n" );
 		}
-#endif
+	#endif
 		// ------------------------------------------------------------------------------------
 
 		// ------------------------------------------------------------------------------------
@@ -10734,7 +10821,7 @@ int main(int argc, char *argv[])
 
 		ShiftData_MAXLocationCheck(infile, shi_inp, shi_out, TXT_gmin, TYPE_Min_G, iModeID, SScnt, SBcnt, SPcnt);
 		// g_min --------------------------------------------------
-#if 1
+	#if 1
 		if(iFileDeleted)
 		{
 			ii = remove( infile );
@@ -10744,14 +10831,16 @@ int main(int argc, char *argv[])
 				fprintf(stderr,"  Deleted temp file [%s] -> Failed(%d) \n", infile, ii );
 			fprintf(stderr,"---------------------------------------------------------------\n" );
 		}
-#endif
-		// ------------------------------------------------------------------------------------
+	#endif
+		// -----------------------------------------------------------------
 
 
-		ShiftData_LastSorting(shi_out, iModeID);
+		// --------------------------------------------------------
+		// 5th STEP -----------------------------------------------
+		ShiftData_LastSorting(shi_out, iModeID, iavgtm);
 
 
-	#if 1
+		#if 1
 		if(iFileDeleted)
 		{
 			// -------------------------------------------------------------
@@ -10790,7 +10879,7 @@ int main(int argc, char *argv[])
 
 			fprintf(stderr,"---------------------------------------------------------------\n" );
 		}
-	#endif
+		#endif
 
 
 	}
