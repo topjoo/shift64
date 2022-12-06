@@ -681,18 +681,30 @@ void AllFilesClosed(void)
 
 #if SHIFT_QUALITY_DATA_SORTING /* 2022-11-13 */
 
+/* -------------------------------------------------------
+   [ 변속의 정의] / 2022-12-06
+ SS : Shfit Signal (변속 신호)
+ SB : Shift Begin (변속 개시점)
+ SP : Shift Synchronise (변속 회전수 동기)
+ SF : Shift Finish (변속 종료)
+ --------------------------------------------------------- */
+
+#define MAX_TABLE_SIZ 		1000 //2000
+
+
+
 #define MODE_NOR 		8  /* 8: (md_NOR) */
 #define MODE_ECO 		9  /* 9: (md_ECO) */
 #define MODE_SPT 		25 /* 25 : (md_SPT) */
 #define MODE_UNKOWN 	-1
-#define MODE_FILE_SAVE 	999 /* Mode ID별로 file saving */
+#define MODE_FILE_SAVE 	999 /* Mode ID?? file saving */
 
 	
 #define SHIFT_UP 		11 /* SEQ_UP, sequential up shift */
 #define SHIFT_DN 		12 /* SEQ_DN */
 #define SHIFT_SKIP_UP 	21 /* SKIP_UP skip up shift */
 #define SHIFT_SKIP_DN 	22 /* SKIP_DN */
-#define SHIFT_NDR 		33 /* D-N-R */
+#define SHIFT_PNDR 		33 /* P/N-D/R : (P-R), (P-D), (N-R), N-D) */
 
 
 #define SHI_STATIC 		10 /* Static */
@@ -701,12 +713,14 @@ void AllFilesClosed(void)
 #define SHI_N_STOP_DN 	15 /* Near Stop Down Shift */
 
 
-#define TYPE_MAX_NT 	11
-#define TYPE_MAX_NE 	12
-#define TYPE_Min_NT 	13
-#define TYPE_Min_NE 	14
-#define TYPE_MAX_G 		22
-#define TYPE_Min_G 		23
+#define TYPE_MAX_NT 	0x11
+#define TYPE_MAX_NE 	0x12
+#define TYPE_Min_NT 	0x13
+#define TYPE_Min_NE 	0x14
+#define TYPE_MAX_G 		0x22
+#define TYPE_Min_G 		0x23
+#define TYPE_MinLAST_G 	(0x80 | TYPE_Min_G)
+#define TYPE_MAXLAST_G 	(0x80 | TYPE_MAX_G)
 
 
 #define LEN_POS 		10
@@ -752,8 +766,14 @@ float gearTable[11] = {
 		3.510f, /* 종감속 */
 };
 
-#define APS_PWR_ON_VAL 		3.0f /* APS >= 3%, 4% or 5% and then POWER On, else POWER OFF */
 
+/* ------------------------------------------------------ */
+/* ------------------------------------------------------ */
+/* 1) Power ON  + UP Shift -> APS Table                -- */
+/* ------------------------------------------------------ */
+/* ------------------------------------------------------ */
+
+#define APS_PWR_ON_VAL 		3.0f /* APS >= 3%, 4% or 5% and then POWER On, else POWER OFF */
 #define APS_TOLENANCE 		1.0f
 
 #define APS_TABLE_NUM 		10
@@ -771,19 +791,131 @@ static double  ApsTble[APS_TABLE_NUM] = {
 		};			
 
 
+
+/* ------------------------------------------------------ */
+/* ------------------------------------------------------ */
+/* 2) Power ON  + Down Shift -> VSkph Table            -- */
+/* 3) Power OFF + UP Shift   -> VSkph Table            -- */
+/* 4) Power OFF + Down Shift -> VSkph Table            -- */
+/* ------------------------------------------------------ */
+/* ------------------------------------------------------ */
+
 #define VS_TABLE_NUM 		10 
-static double  VSkphTble[VS_TABLE_NUM] = {
-		160.0f, /* 0 */
-		140.0f, /* 1 */
-		120.0f, /* 2 */
-		100.0f, /* 3 */
- 		 80.0f, /* 4 */
-		 -1.0f, /* 5 */
-		 -1.0f, /* 6 */
-		 -1.0f, /* 7 */
-		 -1.0f, /* 8 */
-		 -1.0f, /* 9 */
+
+/* Power On/Off + Down shift table and Index */
+#define DNShi_tg76 		0 /* When Down shift & tgtGear 7 and 6, VS(Vehicle Speed) index in VSkphTblDN */
+#define DNShi_tg54 		1 /* When Down shift & tgtGear 5 and 4, VS(Vehicle Speed) index in VSkphTblDN */
+#define DNShi_tg3 		2 /* When Down shift & tgtGear 3, VS(Vehicle Speed) index in VSkphTblDN */
+#define DNShi_tg2 		3 /* When Down shift & tgtGear 2, VS(Vehicle Speed) index in VSkphTblDN */
+#define DNShi_tg1 		5 /* When Down shift & tgtGear 1, VS(Vehicle Speed) index in VSkphTblDN */
+
+#define DNShi_NUM 		5 /* Down shift numner : 5ea*/
+static short  VSkphTblDN[VS_TABLE_NUM] = {
+		160, /* 0 <- Down shift Start position>> tgtGear : 7,6 (87Z, 86Z, 76Z), ------------------- (manual:87S, 76S) */
+		140, /* 1 <- Down shift Start position>> tgtGear : 5,4 (85Z, 75Z, 65Z, 84Z, 74Z, 64Z, 54Z), (manual:65S) */
+		120, /* 2 <- Down shift Start position>> tgtGear : 3   (83Z, 73Z, 63Z, 53Z, 43Z), --------- (manual:54S) */
+		100, /* 3 <- Down shift Start position>> tgtGear : 2   (82Z, 72Z, 62Z, 52Z, 42Z, 32Z), ---- (manual:43S) */
+ 		 80, /* 4 <- Down shift Start position>>               ------------------------------------ (manual:32S) */
+		 60, /* 5 <- Down shift Start position>> tgtGear : 1   (41Z, 31Z, 21Z), ------------------- (manual:21S) */
+		 40, /* 6 */
+		 30, /* 7 */
+		 20, /* 8 */
+		 10, /* 9 */
 		};	
+
+/* Power Off + Up shift table and Index */
+#define POff_UPShi_tg2 		0 /* When Power Off + Up shift & tgtGear 2, VS(Vehicle Speed) index in VSkphTblUP */
+#define POff_UPShi_tg3 		1 /* When Power Off + Up shift & tgtGear 3, VS(Vehicle Speed) index in VSkphTblUP */
+#define POff_UPShi_tg4 		2 /* When Power Off + Up shift & tgtGear 4, VS(Vehicle Speed) index in VSkphTblUP */
+#define POff_UPShi_tg5 		3 /* When Power Off + Up shift & tgtGear 5, VS(Vehicle Speed) index in VSkphTblUP */
+#define POff_UPShi_tg6 		4 /* When Power Off + Up shift & tgtGear 6, VS(Vehicle Speed) index in VSkphTblUP */
+#define POff_UPShi_tg78 	5 /* When Power Off + Up shift & tgtGear 7 and 8, VS(Vehicle Speed) index in VSkphTblUP */
+
+#define POff_UPShi_NUM 		5 /* Power Off Up shift numner : 5ea*/
+static short  VSkphTblUP[VS_TABLE_NUM] = {
+		 10, /* 0 <- Up shift Start position>> (manual: 12S) */
+		 20, /* 1 <- Up shift Start position>> (manual: 23S) */
+		 30, /* 2 <- Up shift Start position>> (manual: 34S) */
+		 40, /* 3 <- Up shift Start position>> (manual: 45S) */
+ 		 60, /* 4 <- Up shift Start position>> (manual: 56S) */
+		 80, /* 5 <- Up shift Start position>> (manual: 67S, 78S) */
+		100, /* 6 */
+		120, /* 7 */
+		140, /* 8 */
+		160, /* 9 */
+		};	
+
+
+
+/* ------------------------------------------------------ */
+/* ------------------------------------------------------ */
+/* 5) Static Shift -> Shift & A/C(On/Off) & Temperature - */
+/*                  P-R    A/C ON        Low (20deg)    - */
+/*                         A/C ON        Middle (20~60) - */
+/*                         A/C ON        High (60~)     - */
+/*                         A/C OFF       Low            - */
+/*                         A/C OFF       Middle         - */
+/*                         A/C OFF       High           - */
+/*                  P-D    A/C ON        Low            - */
+/*                         A/C ON        Middle         - */
+/*                         A/C ON        High           - */
+/*                         A/C OFF       Low            - */
+/*                         A/C OFF       Middle         - */
+/*                         A/C OFF       High           - */
+/*                  N-R    A/C ON        Low            - */
+/*                         A/C ON        Middle         - */
+/*                         A/C ON        High           - */
+/*                         A/C OFF       Low            - */
+/*                         A/C OFF       Middle         - */
+/*                         A/C OFF       High           - */
+/*                  N-D    A/C ON        Low            - */
+/*                         A/C ON        Middle         - */
+/*                         A/C ON        High           - */
+/*                         A/C OFF       Low            - */
+/*                         A/C OFF       Middle         - */
+/*                         A/C OFF       High           - */
+/* ------------------------------------------------------ */
+/* ------------------------------------------------------ */
+
+
+/* ------------------------------------------------------ */
+/* ------------------------------------------------------ */
+/* 6) Near to Stop Down Shift -> A/C(On/Off) & G Table -- */
+/*                         87R : A/C ON      0  ~0.2   -- */
+/*                               A/C OFF     0.2~0.5   -- */
+/*                               A/C ON      0  ~0.2   -- */
+/*                               A/C OFF     0.2~0.5   -- */
+/*                         76R : A/C ON      0  ~0.2   -- */
+/*                               A/C OFF     0.2~0.5   -- */
+/*                               A/C ON      0  ~0.2   -- */
+/*                               A/C OFF     0.2~0.5   -- */
+/*                         65R : A/C ON      0  ~0.2   -- */
+/*                               A/C OFF     0.2~0.5   -- */
+/*                               A/C ON      0  ~0.2   -- */
+/*                               A/C OFF     0.2~0.5   -- */
+/*                         54R : A/C ON      0  ~0.2   -- */
+/*                               A/C OFF     0.2~0.5   -- */
+/*                               A/C ON      0  ~0.2   -- */
+/*                               A/C OFF     0.2~0.5   -- */
+/*                         43R : A/C ON      0  ~0.2   -- */
+/*                               A/C OFF     0.2~0.5   -- */
+/*                               A/C ON      0  ~0.2   -- */
+/*                               A/C OFF     0.2~0.5   -- */
+/*                         32R : A/C ON      0  ~0.2   -- */
+/*                               A/C OFF     0.2~0.5   -- */
+/*                               A/C ON      0  ~0.2   -- */
+/*                               A/C OFF     0.2~0.5   -- */
+/*                         21R : A/C ON      0  ~0.2   -- */
+/*                               A/C OFF     0.2~0.5   -- */
+/*                               A/C ON      0  ~0.2   -- */
+/*                               A/C OFF     0.2~0.5   -- */
+/* ------------------------------------------------------ */
+/* ------------------------------------------------------ */
+
+
+
+
+
 
 
 static double fAPSpwrLvl = -1.0f;
@@ -794,7 +926,7 @@ static short iFileDeleted = 0;
 
 #define PWR_ON_UP_SHIFT_SSPOINT_START 		1
 
-#define GMAX_RVALUE 	9.999f
+#define GMAX_RVALUE 	99.990f
 
 typedef struct _sqdata_ {
 	double  Time01;
@@ -1376,7 +1508,7 @@ short vsKPHTableIndex(void)
 
 	for(kk=0; kk<VS_TABLE_NUM; kk++)
 	{
-		if( VSkphTble[kk] <= 0.0f )
+		if( VSkphTblDN[kk] <= 0.0f )
 		{
 			vs_index = kk;
 			break;
@@ -1386,9 +1518,9 @@ short vsKPHTableIndex(void)
 	fprintf(stderr,">>VS Table Nums   : %2d (", vs_index );
 	for(kk=0; kk<vs_index-1; kk++)
 	{
-		fprintf(stderr,"%d ", (int)VSkphTble[kk] );
+		fprintf(stderr,"%d ", VSkphTblDN[kk] );
 	}
-	fprintf(stderr,"%d) \n",(int)VSkphTble[kk]);	
+	fprintf(stderr,"%d) \n", VSkphTblDN[kk]);	
 	
 	return vs_index;
 }
@@ -1772,12 +1904,12 @@ int ShiftQualData(short aiPATs05, int iPwrOnOff04, int shiDir03, unsigned int *S
 				else
 				{
 
-					if( SHIFT_UP==shiDir03 )
+					if( SHIFT_UP==shiDir03 ) /* Power On, Power Off case */
 					{
-						/* ---------------------------------------------------------------------------------
-						※	1-2 : Shift Begin (SB) 점 판단식 : Nt - No x 1단 기어비 ≤ -30RPM 되는 싯점 
+						/* -------------------------------------------------------------------------------
+						※	1-2 : Shift Begin (SB) 점 판단식 : Nt - No x 1단 기어비 ≤-30RPM 되는 싯점 
 								  Synch Point (SP) 점 판단식 : Nt - No x 2단 기어비 ≤ 30RPM 되는 싯점	 
-						--------------------------------------------------------------------------------------- */
+						---------------------------------------------------------------------------------- */
 
 						if( iOnce_SB && (gearShiftOne <= -30.0) ) /* Shift Begin (SB) -30 rpm under */
 						{
@@ -1801,12 +1933,12 @@ int ShiftQualData(short aiPATs05, int iPwrOnOff04, int shiDir03, unsigned int *S
 						}
 
 					}
-					else if( SHIFT_DN==shiDir03 )
+					else if( SHIFT_DN==shiDir03 ) /* Power On, Power Off case */
 					{
-						/* ---------------------------------------------------------------------------------
+						/* ------------------------------------------------------------------------------
 						※ 2-1 : Shift Begin (SB) 점 판단식 : Nt - No x 1단 기어비 ≥ 30RPM 되는 싯점 
-								 Synch Point (SP) 점 판단식 : Nt - No x 2단 기어비 ≥ -30RPM 되는 싯점	 
-						--------------------------------------------------------------------------------------- */
+								 Synch Point (SP) 점 판단식 : Nt - No x 2단 기어비 ≥-30RPM 되는 싯점	 
+						--------------------------------------------------------------------------------- */
 
 						if( iOnce_SB && (gearShiftOne >= 30.0) ) /* Shift Begin (SB) -30 rpm under */
 						{
@@ -1835,7 +1967,7 @@ int ShiftQualData(short aiPATs05, int iPwrOnOff04, int shiDir03, unsigned int *S
 
 
 					}
-					else if( SHIFT_NDR==shiDir03 )
+					else if( SHIFT_PNDR==shiDir03 ) /* Static shift */
 					{
 						/* ---------------------------------------------------------------------------------
 							P/N-D/R : Shift Begin  (SB) 점 판단식 : Nt - Nt_max ≤ -30RPM 되는 싯점 
@@ -1899,6 +2031,7 @@ int ShiftQualData(short aiPATs05, int iPwrOnOff04, int shiDir03, unsigned int *S
 							if( MaxAcc <= sq[0].LAcc17 ) MaxAcc = sq[0].LAcc17; /* Find g_Max */
 							if( minAcc >= sq[0].LAcc17 ) minAcc = sq[0].LAcc17; /* Find g_mix */
 						}
+						
 				#else
 
 						/* gMax 와 gmix은 SB ~ SP 사이에서 */
@@ -2051,7 +2184,7 @@ int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsig
 
 	if( SScnt==SBcnt && SBcnt==SPcnt && SScnt==SPcnt)
 	{
-		fprintf(stderr,">>Counter checking %s SS(%d) SB(%d) SP(%d) - OK!! \n", arrPATs_ModeID[aiPATs05].ModeID, SScnt, SBcnt, SPcnt);
+		fprintf(stderr,">>Counter checking %s ...... SS(%d) SB(%d) SP(%d) - Same OK!!! \n", arrPATs_ModeID[aiPATs05].ModeID, SScnt, SBcnt, SPcnt);
 	}
 	else
 	{
@@ -2105,7 +2238,7 @@ int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsig
 			exit(0);
 		}
 
-		fprintf(stderr,">>Counter Checking %s ........... SS(%d) SB(%d) SP(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, SScnt, SBcnt, SPcnt);
+		fprintf(stderr,">>Counter Checking %s ...... SS(%d) SB(%d) SP(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, SScnt, SBcnt, SPcnt);
 
 
 		if( SScnt > SBcnt )
@@ -2189,7 +2322,7 @@ int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsig
 
 			}
 			while (!feof (inpfile));
-			fprintf(stderr,"---------------------------------------------------------------\n" );
+			//fprintf(stderr,"---------------------------------------------------------------\n" );
 
 		}
 
@@ -2340,6 +2473,7 @@ int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsig
 		}
 
 	}
+	fprintf(stderr,"---------------------------------------------------------------\n" );
 
 	if(fp2chk) fclose(fp2chk);
 	if(inpfile) fclose(inpfile);
@@ -2349,12 +2483,10 @@ int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsig
 }
 
 
-int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigned int SBcnt, unsigned int SPcnt)
+int Find2nd_NtNeminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigned int SScnt, unsigned int SBcnt, unsigned int SPcnt)
 {
 	FILE *fp2NtMax = NULL;
 	FILE *fp2NeMax = NULL;
-	FILE *fp2gMax = NULL;
-	FILE *fp2gmin = NULL;
 
 	unsigned int kkloop=0, KkLast;
 
@@ -2365,8 +2497,6 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 	char shi_inp[MAX_CHARS*LENGTH_OF_FILENAME+1];
 	char shiNtMax[MAX_CHARS*LENGTH_OF_FILENAME+1];
 	char shiNeMax[MAX_CHARS*LENGTH_OF_FILENAME+1];
-	char shigMax[MAX_CHARS*LENGTH_OF_FILENAME+1];
-	char shigmin[MAX_CHARS*LENGTH_OF_FILENAME+1];
 	char shiNtmin[MAX_CHARS*LENGTH_OF_FILENAME+1];
 	char shiNemin[MAX_CHARS*LENGTH_OF_FILENAME+1];
 
@@ -2376,6 +2506,8 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 	short iItemPreOK = 0;
 	short iSave = 0;
 
+	double gMaxSaveTime[MAX_TABLE_SIZ];
+	int igMaxIdx = 0;
 
 	/* line inputted from file */
 	char QualData[QUAL_DATA_MAX_SIZE]; 
@@ -2397,13 +2529,9 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 
 	double MaxNe = 0.0f;
 	double MaxNt = 0.0f;
-	double g_Max = 0.0f;
-	double g_min = GMAX_RVALUE;
 
 	unsigned int NeCnt = 0;
 	unsigned int NtCnt = 0;
-	unsigned int gMaxCnt = 0;
-	unsigned int gminCnt = 0;
 	unsigned int irollback = 0U;
 	
 	short isAbnorOp = 0; // ABNORMAL opeation
@@ -2428,16 +2556,15 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 	memset(shi_inp, 0x00, sizeof(shi_inp)); // 2022.11.22
 	memset(shiNtMax, 0x00, sizeof(shiNtMax)); // 2022.11.27
 	memset(shiNeMax, 0x00, sizeof(shiNeMax)); // 2022.11.27
-	memset(shigMax, 0x00, sizeof(shigMax)); 
-	memset(shigmin, 0x00, sizeof(shigmin)); 
 	memset(shiNtmin, 0x00, sizeof(shiNtmin));  
 	memset(shiNemin, 0x00, sizeof(shiNemin));  
+
+	memset(gMaxSaveTime, 0x00, sizeof(gMaxSaveTime));  
+
 
 	strcpy(shi_inp, shift_file);
 	strcpy(shiNtMax, shi_inp);
 	strcpy(shiNeMax, shi_inp);
-	strcpy(shigMax, shi_inp);
-	strcpy(shigmin, shi_inp);
 	strcpy(shiNtmin, shi_inp);
 	strcpy(shiNemin, shi_inp);
 
@@ -2451,8 +2578,6 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 				shi_inp[ii+1] = '\0';
 				shiNtMax[ii+1] = '\0';
 				shiNeMax[ii+1] = '\0';
-				shigMax[ii+1]  = '\0';
-				shigmin[ii+1]  = '\0';
 				shiNtmin[ii+1] = '\0';
 				shiNemin[ii+1] = '\0';
 
@@ -2461,8 +2586,6 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 
 				strcat(shiNtMax, FILE_EXT_NtMAX );
 				strcat(shiNeMax, FILE_EXT_NeMAX );
-				strcat(shigMax,  FILE_EXT_gMAX );
-				strcat(shigmin,  FILE_EXT_gMin );
 
 				strcat(shiNtmin, FILE_EXT_NtMin );
 				strcat(shiNemin, FILE_EXT_NeMin );
@@ -2483,10 +2606,6 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 			strcat(shiNtMax, FILE_EXT_NtMAX );
 			strcat(shiNeMax, "."); 
 			strcat(shiNeMax, FILE_EXT_NeMAX );
-			strcat(shigMax, "."); 
-			strcat(shigMax,  FILE_EXT_gMAX );
-			strcat(shigmin, "."); 
-			strcat(shigmin,  FILE_EXT_gMin );
 
 			strcat(shiNtmin, "."); 
 			strcat(shiNtmin, FILE_EXT_NtMin );
@@ -2504,55 +2623,33 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 			exit(0);
 		}
 
+
 		// ==================================================================
 		// Write file OK
-		if( NULL == (fp2NtMax = fopen( shiNtMax, "wb")) )	
+		if( TYPE_MAX_NT == minMaxType )
 		{
-			// FAIL
-			fprintf(stderr,"\r\nCan not create file (%s) \n\n", shiNtMax );
-			AllFilesClosed();
-			if(fp2gmin) fclose(fp2gmin); 
-			if(fp2gMax) fclose(fp2gMax);
-			if(fp2NeMax) fclose(fp2NeMax);
-			if(fp2NtMax) fclose(fp2NtMax);
+			if( NULL == (fp2NtMax = fopen( shiNtMax, "wb")) )	
+			{
+				// FAIL
+				fprintf(stderr,"\r\nCan not create file (%s) \n\n", shiNtMax );
+				AllFilesClosed();
+				if(fp2NeMax) fclose(fp2NeMax);
+				if(fp2NtMax) fclose(fp2NtMax);
 
-			exit(0);
+				exit(0);
+			}
 		}
-
-		if( NULL == (fp2NeMax = fopen( shiNeMax, "wb")) )	
+		else if( TYPE_MAX_NE == minMaxType )
 		{
-			// FAIL
-			fprintf(stderr,"\r\nCan not create file (%s) \n\n", shiNeMax );
-			AllFilesClosed();
-			if(fp2gmin) fclose(fp2gmin); 
-			if(fp2gMax) fclose(fp2gMax);
-			if(fp2NeMax) fclose(fp2NeMax);
-			if(fp2NtMax) fclose(fp2NtMax);
-			exit(0);
-		}
-
-		if( NULL == (fp2gMax = fopen( shigMax, "wb")) )	
-		{
-			// FAIL
-			fprintf(stderr,"\r\nCan not create file (%s) \n\n", shigMax );
-			AllFilesClosed();
-			if(fp2gmin) fclose(fp2gmin); 
-			if(fp2gMax) fclose(fp2gMax);
-			if(fp2NeMax) fclose(fp2NeMax);
-			if(fp2NtMax) fclose(fp2NtMax);
-			exit(0);
-		}
-
-		if( NULL == (fp2gmin = fopen( shigmin, "wb")) )	
-		{
-			// FAIL
-			fprintf(stderr,"\r\nCan not create file (%s) \n\n", shigmin );
-			AllFilesClosed();
-			if(fp2gmin) fclose(fp2gmin); 
-			if(fp2gMax) fclose(fp2gMax);
-			if(fp2NeMax) fclose(fp2NeMax);
-			if(fp2NtMax) fclose(fp2NtMax);
-			exit(0);
+			if( NULL == (fp2NeMax = fopen( shiNeMax, "wb")) )	
+			{
+				// FAIL
+				fprintf(stderr,"\r\nCan not create file (%s) \n\n", shiNeMax );
+				AllFilesClosed();
+				if(fp2NeMax) fclose(fp2NeMax);
+				if(fp2NtMax) fclose(fp2NtMax);
+				exit(0);
+			}
 		}
 		// ==================================================================
 
@@ -2562,8 +2659,6 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 		// FAIL
 		fprintf(stderr,"\r\n++ERROR++: There is no file. Check plz... (%d) [%s] \n\n", aiPATs05, shi_inp );
 		AllFilesClosed();
-		if(fp2gmin) fclose(fp2gmin); 
-		if(fp2gMax) fclose(fp2gMax);
 		if(fp2NeMax) fclose(fp2NeMax);
 		if(fp2NtMax) fclose(fp2NtMax);
 		exit(0);
@@ -2588,8 +2683,6 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 
 	NeCnt = 0U;
 	NtCnt = 0U;
-	gMaxCnt = 0U;
-	gminCnt = 0U;
 	irollback = 0U;
 
 
@@ -2607,119 +2700,124 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 	/* ======================================================= */
 
 	KkLast = SBcnt;
-	/* ======================================================= */
-	for(kkloop=1; kkloop<=KkLast; kkloop++)
+
+	if( TYPE_MAX_NT == minMaxType )
 	{
-		fprintf(stderr,">>Searching Nt Max %s -- SS(%d)...  \r", arrPATs_ModeID[aiPATs05].ModeID, kkloop );
-
-		iSScount = 0U;
-		iSBcount = 0U;
-		iSPcount = 0U;
-
-		iNGcount   = 0ULL;
-		iOKcount   = 0ULL;
-
-		do
+		/* ======================================================= */
+		fprintf(stderr,">>Searching Nt Max %s...  \r", arrPATs_ModeID[aiPATs05].ModeID  );
+		for(kkloop=1; kkloop<=KkLast; kkloop++)
 		{
-			unsigned int i=0;
+			//fprintf(stderr,">>Searching Nt Max %s -- SS(%d)...  \r", arrPATs_ModeID[aiPATs05].ModeID, kkloop );
 
-			/* Read a line from input file. */
-			memset( QualData, 0x00, sizeof(QualData) );
+			iSScount = 0U;
+			iSBcount = 0U;
+			iSPcount = 0U;
 
-			if( NULL == fgets( QualData, QUAL_DATA_MAX_SIZE, inpfile ) )
+			iNGcount   = 0ULL;
+			iOKcount   = 0ULL;
+
+			do
 			{
-				ierr = ferror(inpfile);
-				fclose(inpfile);
-				fprintf(stderr,">>Searched Nt Max %s -- [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp ); 			
-				break;
-			}
+				unsigned int i=0;
 
-			RecordCnt++;
+				/* Read a line from input file. */
+				memset( QualData, 0x00, sizeof(QualData) );
+
+				if( NULL == fgets( QualData, QUAL_DATA_MAX_SIZE, inpfile ) )
+				{
+					ierr = ferror(inpfile);
+					fclose(inpfile);
+					fprintf(stderr,">>Searched Nt Max %s -- [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp ); 			
+					break;
+				}
+
+				RecordCnt++;
 
 
-			/* Remove carriage return/line feed at the end of line. */
-			i = strlen(QualData);
-			
-			if(i >= QUAL_DATA_MAX_SIZE)
-			{
-				fprintf(stderr,"\n[%s]: ++ERROR++:%6d: Not enough Buffer length (%d) \r\n", __FUNCTION__, RecordCnt, i );
-			}
-
-			if (--i > 0)
-			{
-				if (QualData[i] == '\n') QualData[i] = '\0';
-				if (QualData[i] == '\r') QualData[i] = '\0'; 
-
-				result = sscanf(QualData, RD_2ndFMT,
-						&sq2[0].Time01,	 &sq2[0].iPATs05,    &sq2[0].iPATs05S,   &sq2[0].VSP03,     &sq2[0].tqi07,   &sq2[0].curGear08, 
-						&sq2[0].APS09,   &sq2[0].No10,       &sq2[0].tgtGear11,  &sq2[0].ShiNew12,  &sq2[0].ShiTy12, &sq2[0].arrGear, 
-						&sq2[0].TqFr13,  &sq2[0].ShiPh14,    &sq2[0].Ne15,       &sq2[0].Nt16,      &sq2[0].LAcc17,  &sq2[0].sTimePos, 
-						&sq2[0].gearRat, &sq2[0].gearShiOne, &sq2[0].gearShiTwo, &sq2[0].fJerk1,    &sq2[0].MaxNe,   &sq2[0].MaxNt, 
-						&sq2[0].MaxAcc,  &sq2[0].minAcc );
+				/* Remove carriage return/line feed at the end of line. */
+				i = strlen(QualData);
 				
-
-				/* === 1 STEP : record (17 items check) =============== */
-				iSave = 0;
-				iItemCurOK = 0; /* NG - FAIL */
-				if(QUAL_2ND_DATA_ITEM_NUM==result)
+				if(i >= QUAL_DATA_MAX_SIZE)
 				{
-					iItemCurOK = 1; /* OK */
-					iOKcount ++;
+					fprintf(stderr,"\n[%s]: ++ERROR++:%6d: Not enough Buffer length (%d) \r\n", __FUNCTION__, RecordCnt, i );
 				}
-				else if( (QUAL_2ND_DATA_ITEM_NUM!=result) && (result!=-1 && i>0) ) 
+
+				if (--i > 0)
 				{
-					iNGcount ++;
-					continue; // reading Next item because of FAIL item
-				}
-				/* === 1 STEP : record (17 items check) =============== */
+					if (QualData[i] == '\n') QualData[i] = '\0';
+					if (QualData[i] == '\r') QualData[i] = '\0'; 
 
-
-				if( (sq2[0].iPATs05 == aiPATs05) && (sq2[0].curGear08 != sq2[0].tgtGear11) )
-				{
-
-					if( 0==strcmp( sq2[0].sTimePos, TXT_SSTIME) ) iSScount++;
-					if( 0==strncmp( sq2[0].sTimePos, TXT_SBTIME, 4) ) iSBcount++;
-					if( 0==strncmp( sq2[0].sTimePos, TXT_SPTIME, 4) ) iSPcount++;
-
-					if( iSPcount && (kkloop==iSPcount) /* && (0==strcmp( sq2[0].sTimePos, TXT_SPTIME)) */ ) /* SP point */
-					{
-						//fprintf(stderr,"Searched Max Nt = %8.2lf \n", MaxNt );
-						iSScount++;
-
-						if(fp2NtMax)
-						{
-							fprintf(fp2NtMax, NtMAX_FORMAT,
-									iSScount-1, sq2[0].Time01, sq2[0].MaxNt);
-
-							fprintf(fp2NtMax, "\n");
-						}
-
-						rewind(inpfile);
-						break;
-					}
+					result = sscanf(QualData, RD_2ndFMT,
+							&sq2[0].Time01,	 &sq2[0].iPATs05,    &sq2[0].iPATs05S,   &sq2[0].VSP03,     &sq2[0].tqi07,   &sq2[0].curGear08, 
+							&sq2[0].APS09,   &sq2[0].No10,       &sq2[0].tgtGear11,  &sq2[0].ShiNew12,  &sq2[0].ShiTy12, &sq2[0].arrGear, 
+							&sq2[0].TqFr13,  &sq2[0].ShiPh14,    &sq2[0].Ne15,       &sq2[0].Nt16,      &sq2[0].LAcc17,  &sq2[0].sTimePos, 
+							&sq2[0].gearRat, &sq2[0].gearShiOne, &sq2[0].gearShiTwo, &sq2[0].fJerk1,    &sq2[0].MaxNe,   &sq2[0].MaxNt, 
+							&sq2[0].MaxAcc,  &sq2[0].minAcc );
 					
-					if( kkloop==iSScount ) /* SS point */
+
+					/* === 1 STEP : record (17 items check) =============== */
+					iSave = 0;
+					iItemCurOK = 0; /* NG - FAIL */
+					if(QUAL_2ND_DATA_ITEM_NUM==result)
 					{
-						// Find Record NtMax
-						if( ((sq2[0].Nt16 >= sq2[0].MaxNt) || (MaxNt <= sq2[0].Nt16)) ) /* Nt_Max point */
+						iItemCurOK = 1; /* OK */
+						iOKcount ++;
+					}
+					else if( (QUAL_2ND_DATA_ITEM_NUM!=result) && (result!=-1 && i>0) ) 
+					{
+						iNGcount ++;
+						continue; // reading Next item because of FAIL item
+					}
+					/* === 1 STEP : record (17 items check) =============== */
+
+
+					if( (sq2[0].iPATs05 == aiPATs05) && (sq2[0].curGear08 != sq2[0].tgtGear11) )
+					{
+
+						if( 0==strcmp( sq2[0].sTimePos, TXT_SSTIME) ) iSScount++;
+						if( 0==strncmp( sq2[0].sTimePos, TXT_SBTIME, 4) ) iSBcount++;
+						if( 0==strncmp( sq2[0].sTimePos, TXT_SPTIME, 4) ) iSPcount++;
+
+						if( iSPcount && (kkloop==iSPcount) /* && (0==strcmp( sq2[0].sTimePos, TXT_SPTIME)) */ ) /* SP point */
 						{
-							MaxNt = sq2[0].Nt16;
-							NtCnt++;
+							//fprintf(stderr,"Searched Max Nt = %8.2lf \n", MaxNt );
+							iSScount++;
+
+							if(fp2NtMax)
+							{
+								fprintf(fp2NtMax, NtMAX_FORMAT,
+										iSScount-1, sq2[0].Time01, sq2[0].MaxNt);
+
+								fprintf(fp2NtMax, "\n");
+							}
+
+							rewind(inpfile);
+							break;
 						}
-						continue;
+						
+						if( kkloop==iSScount ) /* SS point */
+						{
+							// Find Record NtMax
+							if( ((sq2[0].Nt16 >= sq2[0].MaxNt) || (MaxNt <= sq2[0].Nt16)) ) /* Nt_Max point */
+							{
+								MaxNt = sq2[0].Nt16;
+								NtCnt++;
+							}
+							continue;
+						}
+
 					}
 
 				}
 
 			}
+			while (!feof (inpfile));
 
 		}
-		while (!feof (inpfile));
+		fprintf(stderr,">>Searched Nt Max %s [%s] -- SS(%d), SB(%d), SP(%d) \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, SScnt,SBcnt,SPcnt );
 
+		fclose(fp2NtMax);
 	}
-	fprintf(stderr,">>Searched Nt Max %s [%s] -- SS(%d), SB(%d), SP(%d) \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, SScnt,SBcnt,SPcnt );
-
-	fclose(fp2NtMax);
 
 
 	// ======================================================================
@@ -2731,118 +2829,355 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 	fprintf(fp2NeMax,"    nm  time      NeMax \n");
 #endif
 
-	for(kkloop=1; kkloop<=KkLast; kkloop++)
+	if( TYPE_MAX_NE == minMaxType )
 	{
-		fprintf(stderr,">>Searching Ne Max %s -- SS(%d)...  \r", arrPATs_ModeID[aiPATs05].ModeID, kkloop );
-
-		iSScount = 0;
-		iSBcount = 0;
-		iSPcount = 0;
-
-		iNGcount   = 0ULL;
-		iOKcount   = 0ULL;
-
-		do
+		fprintf(stderr,">>Searching Ne Max %s...  \r", arrPATs_ModeID[aiPATs05].ModeID );
+		for(kkloop=1; kkloop<=KkLast; kkloop++)
 		{
-			unsigned int i=0;
+			//fprintf(stderr,">>Searching Ne Max %s -- SS(%d)...  \r", arrPATs_ModeID[aiPATs05].ModeID, kkloop );
 
-			/* Read a line from input file. */
-			memset( QualData, 0x00, sizeof(QualData) );
+			iSScount = 0;
+			iSBcount = 0;
+			iSPcount = 0;
 
-			if( NULL == fgets( QualData, QUAL_DATA_MAX_SIZE, inpfile ) )
+			iNGcount   = 0ULL;
+			iOKcount   = 0ULL;
+
+			do
 			{
-				ierr = ferror(inpfile);
-				fclose(inpfile);
-				fprintf(stderr,">>Searched Ne Max %s -- [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp ); 			
-				break;
-			}
+				unsigned int i=0;
 
-			RecordCnt++;
+				/* Read a line from input file. */
+				memset( QualData, 0x00, sizeof(QualData) );
+
+				if( NULL == fgets( QualData, QUAL_DATA_MAX_SIZE, inpfile ) )
+				{
+					ierr = ferror(inpfile);
+					fclose(inpfile);
+					fprintf(stderr,">>Searched Ne Max %s -- [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp ); 			
+					break;
+				}
+
+				RecordCnt++;
 
 
-			/* Remove carriage return/line feed at the end of line. */
-			i = strlen(QualData);
-			
-			if(i >= QUAL_DATA_MAX_SIZE)
-			{
-				fprintf(stderr,"ERROR:%6d: Not enough Buffer length Ne (%d) \r\n", RecordCnt, i );
-			}
-
-			if (--i > 0)
-			{
-				if (QualData[i] == '\n') QualData[i] = '\0';
-				if (QualData[i] == '\r') QualData[i] = '\0'; 
-
-				result = sscanf(QualData, RD_2ndFMT,
-						&sq2[0].Time01,  &sq2[0].iPATs05,	 &sq2[0].iPATs05S,	 &sq2[0].VSP03, 	&sq2[0].tqi07,	 &sq2[0].curGear08, 
-						&sq2[0].APS09,	 &sq2[0].No10,		 &sq2[0].tgtGear11,  &sq2[0].ShiNew12,	&sq2[0].ShiTy12, &sq2[0].arrGear, 
-						&sq2[0].TqFr13,  &sq2[0].ShiPh14,	 &sq2[0].Ne15,		 &sq2[0].Nt16,		&sq2[0].LAcc17,  &sq2[0].sTimePos, 
-						&sq2[0].gearRat, &sq2[0].gearShiOne, &sq2[0].gearShiTwo, &sq2[0].fJerk1,	&sq2[0].MaxNe,	 &sq2[0].MaxNt, 
-						&sq2[0].MaxAcc,  &sq2[0].minAcc );
+				/* Remove carriage return/line feed at the end of line. */
+				i = strlen(QualData);
 				
-
-				/* === 1 STEP : record (17 items check) =============== */
-				iSave = 0;
-				iItemCurOK = 0; /* NG - FAIL */
-				if(QUAL_2ND_DATA_ITEM_NUM==result)
+				if(i >= QUAL_DATA_MAX_SIZE)
 				{
-					iItemCurOK = 1; /* OK */
-					iOKcount ++;
+					fprintf(stderr,"ERROR:%6d: Not enough Buffer length Ne (%d) \r\n", RecordCnt, i );
 				}
-				else if( (QUAL_2ND_DATA_ITEM_NUM!=result) && (result!=-1 && i>0) ) 
+
+				if (--i > 0)
 				{
-					iNGcount ++;
-					continue; // reading Next item because of FAIL item
-				}
-				/* === 1 STEP : record (17 items check) =============== */
+					if (QualData[i] == '\n') QualData[i] = '\0';
+					if (QualData[i] == '\r') QualData[i] = '\0'; 
 
-
-				if( (sq2[0].iPATs05 == aiPATs05) && (sq2[0].curGear08 != sq2[0].tgtGear11) )
-				{
-
-					if( 0==strcmp( sq2[0].sTimePos, TXT_SSTIME) ) iSScount++;
-					if( 0==strncmp( sq2[0].sTimePos, TXT_SBTIME, 4) ) iSBcount++;
-					if( 0==strncmp( sq2[0].sTimePos, TXT_SPTIME, 4) ) iSPcount++;
-
-					if( iSPcount && (kkloop==iSPcount) /* && (0==strcmp( sq2[0].sTimePos, TXT_SPTIME)) */ ) /* SP point */
-					{
-						//fprintf(stderr,"Searched Max Nt = %8.2lf \n", MaxNt );
-						iSScount++;
-
-						if(fp2NeMax)
-						{
-							fprintf(fp2NeMax, NtMAX_FORMAT,
-									iSScount-1, sq2[0].Time01, sq2[0].MaxNe);
-
-							fprintf(fp2NeMax, "\n");
-						}
-
-						rewind(inpfile);
-						break;
-					}
+					result = sscanf(QualData, RD_2ndFMT,
+							&sq2[0].Time01,  &sq2[0].iPATs05,	 &sq2[0].iPATs05S,	 &sq2[0].VSP03, 	&sq2[0].tqi07,	 &sq2[0].curGear08, 
+							&sq2[0].APS09,	 &sq2[0].No10,		 &sq2[0].tgtGear11,  &sq2[0].ShiNew12,	&sq2[0].ShiTy12, &sq2[0].arrGear, 
+							&sq2[0].TqFr13,  &sq2[0].ShiPh14,	 &sq2[0].Ne15,		 &sq2[0].Nt16,		&sq2[0].LAcc17,  &sq2[0].sTimePos, 
+							&sq2[0].gearRat, &sq2[0].gearShiOne, &sq2[0].gearShiTwo, &sq2[0].fJerk1,	&sq2[0].MaxNe,	 &sq2[0].MaxNt, 
+							&sq2[0].MaxAcc,  &sq2[0].minAcc );
 					
-					if( kkloop==iSScount ) /* SS point */
+
+					/* === 1 STEP : record (17 items check) =============== */
+					iSave = 0;
+					iItemCurOK = 0; /* NG - FAIL */
+					if(QUAL_2ND_DATA_ITEM_NUM==result)
 					{
-						// Find Record NeMax
-						if( ((sq2[0].Ne15 >= sq2[0].MaxNe) || (MaxNe <= sq2[0].Ne15)) ) /* Nt_Max point */
+						iItemCurOK = 1; /* OK */
+						iOKcount ++;
+					}
+					else if( (QUAL_2ND_DATA_ITEM_NUM!=result) && (result!=-1 && i>0) ) 
+					{
+						iNGcount ++;
+						continue; // reading Next item because of FAIL item
+					}
+					/* === 1 STEP : record (17 items check) =============== */
+
+
+					if( (sq2[0].iPATs05 == aiPATs05) && (sq2[0].curGear08 != sq2[0].tgtGear11) )
+					{
+
+						if( 0==strcmp( sq2[0].sTimePos, TXT_SSTIME) ) iSScount++;
+						if( 0==strncmp( sq2[0].sTimePos, TXT_SBTIME, 4) ) iSBcount++;
+						if( 0==strncmp( sq2[0].sTimePos, TXT_SPTIME, 4) ) iSPcount++;
+
+						if( iSPcount && (kkloop==iSPcount) /* && (0==strcmp( sq2[0].sTimePos, TXT_SPTIME)) */ ) /* SP point */
 						{
-							MaxNe = sq2[0].Ne15;
-							NeCnt++;
+							//fprintf(stderr,"Searched Max Nt = %8.2lf \n", MaxNt );
+							iSScount++;
+
+							if(fp2NeMax)
+							{
+								fprintf(fp2NeMax, NtMAX_FORMAT,
+										iSScount-1, sq2[0].Time01, sq2[0].MaxNe);
+
+								fprintf(fp2NeMax, "\n");
+							}
+
+							rewind(inpfile);
+							break;
 						}
-						continue;
+						
+						if( kkloop==iSScount ) /* SS point */
+						{
+							// Find Record NeMax
+							if( ((sq2[0].Ne15 >= sq2[0].MaxNe) || (MaxNe <= sq2[0].Ne15)) ) /* Nt_Max point */
+							{
+								MaxNe = sq2[0].Ne15;
+								NeCnt++;
+							}
+							continue;
+						}
+
 					}
 
 				}
 
 			}
+			while (!feof (inpfile));
 
 		}
-		while (!feof (inpfile));
+		fprintf(stderr,">>Searched Ne Max %s [%s] -- SS(%d), SB(%d), SP(%d) \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, SScnt,SBcnt,SPcnt );
+
+		fclose(fp2NeMax);
+	}
+
+	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
+
+}
+
+
+
+
+int Find2nd_gminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigned int SScnt, unsigned int SBcnt, unsigned int SPcnt)
+{
+	FILE *fp2gMax = NULL;
+	FILE *fp2gmin = NULL;
+
+	unsigned int kkloop=0, KkLast;
+
+	#define RCSZ 		2
+	sqd2nd_type sq2[RCSZ];  /* 0:SS, 1:SB, 2:MaxNt, 3:MaxNe, 4:g_Max, 5:g_min, 6:SP */
+	
+	unsigned int rc =0;
+	char shi_inp[MAX_CHARS*LENGTH_OF_FILENAME+1];
+	char shigMax[MAX_CHARS*LENGTH_OF_FILENAME+1];
+	char shigmin[MAX_CHARS*LENGTH_OF_FILENAME+1];
+
+	unsigned int ii=0U, kk=0U;
+	int  ierr = -1;
+	short iItemCurOK = 0; /* 1: OK, 0: NG */
+	short iItemPreOK = 0;
+	short iSave = 0;
+
+	double gMaxSaveTime[MAX_TABLE_SIZ];
+	int igMaxIdx = 0;
+
+	/* line inputted from file */
+	char QualData[QUAL_DATA_MAX_SIZE]; 
+	int result;
+	unsigned long long RecordCnt=0ULL;
+
+	unsigned long long iNGcount = 0ULL;
+	unsigned long long iOKcount = 0ULL;
+	unsigned long long iSortCount = 0ULL;
+
+	double gearRatio = 0.0f;
+	int isNaming = 0;
+	short isFindSS = 1;
+	int curPreGear = -1, tgtPreGear = 1;
+	double fJerk1 = 0.0f;
+	double preLAcc = 0.0f;
+	unsigned int DiffTime = 0;
+	unsigned int preTime = 0;
+
+	double g_Max = 0.0f;
+	double g_min = GMAX_RVALUE;
+
+	unsigned int gMaxCnt = 0;
+	unsigned int gminCnt = 0;
+
+	unsigned int iSScount = 0U;
+	unsigned int iSBcount = 0U;
+	unsigned int iSPcount = 0U;
+	
+	short isSSOnce = 0;
+	short isSBOnce = 0;
+	short isSPOnce = 0;
+	
+	/* ===================================================================================== */
+	/* ===================================================================================== */
+
+	//AllFilesClosed();
+	if(inpfile) { fclose(inpfile);	inpfile=NULL;  }
+
+	/* ===================================================================================== */
+	memset(shi_inp, 0x00, sizeof(shi_inp)); // 2022.11.22
+	memset(shigMax, 0x00, sizeof(shigMax)); 
+	memset(shigmin, 0x00, sizeof(shigmin)); 
+
+	memset(gMaxSaveTime, 0x00, sizeof(gMaxSaveTime));  
+
+
+	strcpy(shi_inp, shift_file);
+	strcpy(shigMax, shi_inp);
+	strcpy(shigmin, shi_inp);
+
+	if( (aiPATs05>=0 && aiPATs05<MODE_ID_NUMS-1) && (strlen(shi_inp)>0) )
+	{
+		if( 0x80 != (0x80 & minMaxType) )
+		{
+			isNaming = 0;
+			for(ii=strlen(shi_inp)-1; ii>0; ii--)
+			{
+				if( shi_inp[ii]=='.' ) 
+				{
+					shi_inp[ii+1] = '\0';
+					shigMax[ii+1]  = '\0';
+					shigmin[ii+1]  = '\0';
+
+					if(chk) { strcat(shi_inp, "c"); }
+					strcat(shi_inp, arrPATs_ModeID[aiPATs05].ModeNm);
+
+					strcat(shigMax,  FILE_EXT_gMAX );
+					strcat(shigmin,  FILE_EXT_gMin );
+
+					isNaming = 1;
+					break;
+				}
+			}
+
+			if( 0==isNaming )
+			{
+				if(chk) { strcat(shi_inp, ".c"); }
+				else strcat(shi_inp, "."); /* 1st create file name ".1ECO"*/
+				strcat(shi_inp, arrPATs_ModeID[aiPATs05].ModeNm);
+
+				strcat(shigMax, "."); 
+				strcat(shigMax,  FILE_EXT_gMAX );
+				strcat(shigmin, "."); 
+				strcat(shigmin,  FILE_EXT_gMin );
+			}
+		}
+		else // Last
+		{
+			isNaming = 0;
+			for(ii=strlen(shi_inp)-1; ii>0; ii--)
+			{
+				if( shi_inp[ii]=='.' ) 
+				{
+					shi_inp[ii+1] = '\0';
+					shigMax[ii+1]  = '\0';
+					shigmin[ii+1]  = '\0';
+
+					strcat(shi_inp, "3"); 
+					strcat(shi_inp, arrPATs_ModeID[aiPATs05].ModeNm);
+
+					strcat(shigMax,  FILE_EXT_gMAX );
+					strcat(shigmin,  FILE_EXT_gMin );
+
+					isNaming = 1;
+					break;
+				}
+			}
+
+			if( 0==isNaming )
+			{
+				strcat(shi_inp, ".3"); 
+				strcat(shi_inp, arrPATs_ModeID[aiPATs05].ModeNm);
+
+				strcat(shigMax, "."); 
+				strcat(shigMax,  FILE_EXT_gMAX );
+				strcat(shigmin, "."); 
+				strcat(shigmin,  FILE_EXT_gMin );
+			}
+		}
+
+
+		// read file OK
+		if( NULL == (inpfile = fopen( shi_inp, "rb")) )	
+		{
+			// FAIL
+			fprintf(stderr,"\r\n++ERROR++[%s]:Can not read file (%s) \n\n", __FUNCTION__, shi_inp );
+			AllFilesClosed();
+			exit(0);
+		}
+
+		if( (TYPE_MAX_G == minMaxType) || (TYPE_MAXLAST_G == minMaxType) )
+		{
+			if( NULL == (fp2gMax = fopen( shigMax, "wb")) )	
+			{
+				// FAIL
+				fprintf(stderr,"\r\nCan not create file (%s) \n\n", shigMax );
+				AllFilesClosed();
+				if(fp2gmin) fclose(fp2gmin); 
+				if(fp2gMax) fclose(fp2gMax);
+				exit(0);
+			}
+		}
+		else if( (TYPE_Min_G == minMaxType) || (TYPE_MinLAST_G == minMaxType) )
+		{
+			if( NULL == (fp2gmin = fopen( shigmin, "wb")) )	
+			{
+				// FAIL
+				fprintf(stderr,"\r\nCan not create file (%s) \n\n", shigmin );
+				AllFilesClosed();
+				if(fp2gmin) fclose(fp2gmin); 
+				if(fp2gMax) fclose(fp2gMax);
+				exit(0);
+			}
+		}
+		else
+		{
+			fprintf(stderr,"\r\nCan not create file (%s) === \n\n", shigmin );
+			AllFilesClosed();
+			if(fp2gmin) fclose(fp2gmin); 
+			if(fp2gMax) fclose(fp2gMax);
+			exit(0);
+		}
+		// ==================================================================
 
 	}
-	fprintf(stderr,">>Searched Ne Max %s [%s] -- SS(%d), SB(%d), SP(%d) \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, SScnt,SBcnt,SPcnt );
+	else
+	{
+		// FAIL
+		fprintf(stderr,"\r\n++ERROR++: There is no file. Check plz... (%d) [%s] \n\n", aiPATs05, shi_inp );
+		AllFilesClosed();
+		if(fp2gmin) fclose(fp2gmin); 
+		if(fp2gMax) fclose(fp2gMax);
+		exit(0);
+	}
+	/* ===================================================================================== */
 
-	fclose(fp2NeMax);
+
+	/* ===================================================================================== */
+	/* ===================================================================================== */
+	/* ------------ min / Max Table Creation ----------------------------------------------- */
+	/* ===================================================================================== */
+	/* ===================================================================================== */
+
+	memset(QualData, 0x00, sizeof(QualData) );
+	memset(sq2, 0x00, sizeof(sq2) );
+
+
+	RecordCnt	= 0ULL;
+
+	iNGcount   = 0ULL;
+	iOKcount   = 0ULL;
+
+	gMaxCnt = 0U;
+	gminCnt = 0U;
+
+
+	/* ======================================================= */
+	/* ======================================================= */
+
+	KkLast = SBcnt;
+	/* ======================================================= */
 
 
 	// ======================================================================
@@ -2854,142 +3189,147 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 	fprintf(fp2gMax,"    nm  time      g_Max  \n");
 #endif
 
-	for(kkloop=1; kkloop<=KkLast; kkloop++)
+	if( (TYPE_MAX_G == minMaxType) || (TYPE_MAXLAST_G == minMaxType) )
 	{
-		fprintf(stderr,">>Searching g_Max %s -- SS(%d)...  \r", arrPATs_ModeID[aiPATs05].ModeID, kkloop );
-
-		iSScount = 0;
-		iSBcount = 0;
-		iSPcount = 0;
-
-		iNGcount   = 0ULL;
-		iOKcount   = 0ULL;
-
-		do
+		fprintf(stderr,">>Searching g_Max %s...  \r", arrPATs_ModeID[aiPATs05].ModeID  );
+		for(kkloop=1; kkloop<=KkLast; kkloop++)
 		{
-			unsigned int i=0;
+			//fprintf(stderr,">>Searching g_Max %s -- SS(%d)...  \r", arrPATs_ModeID[aiPATs05].ModeID, kkloop );
 
-			/* Read a line from input file. */
-			memset( QualData, 0x00, sizeof(QualData) );
+			iSScount = 0;
+			iSBcount = 0;
+			iSPcount = 0;
 
-			if( NULL == fgets( QualData, QUAL_DATA_MAX_SIZE, inpfile ) )
+			iNGcount   = 0ULL;
+			iOKcount   = 0ULL;
+
+			do
 			{
-				ierr = ferror(inpfile);
-				fclose(inpfile);
-				fprintf(stderr,">>Searched g_Max %s -- [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp ); 			
-				break;
-			}
+				unsigned int i=0;
 
-			RecordCnt++;
+				/* Read a line from input file. */
+				memset( QualData, 0x00, sizeof(QualData) );
+
+				if( NULL == fgets( QualData, QUAL_DATA_MAX_SIZE, inpfile ) )
+				{
+					ierr = ferror(inpfile);
+					fclose(inpfile);
+					fprintf(stderr,">>Searched g_Max %s -- [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp ); 			
+					break;
+				}
+
+				RecordCnt++;
 
 
-			/* Remove carriage return/line feed at the end of line. */
-			i = strlen(QualData);
-			
-			if(i >= QUAL_DATA_MAX_SIZE)
-			{
-				fprintf(stderr,"ERROR:%6d: Not enough Buffer length gMax (%d) \r\n", RecordCnt, i );
-			}
-
-			if (--i > 0)
-			{
-				if (QualData[i] == '\n') QualData[i] = '\0';
-				if (QualData[i] == '\r') QualData[i] = '\0'; 
-
-				result = sscanf(QualData, RD_2ndFMT,
-						&sq2[0].Time01,  &sq2[0].iPATs05,	 &sq2[0].iPATs05S,	 &sq2[0].VSP03, 	&sq2[0].tqi07,	 &sq2[0].curGear08, 
-						&sq2[0].APS09,	 &sq2[0].No10,		 &sq2[0].tgtGear11,  &sq2[0].ShiNew12,	&sq2[0].ShiTy12, &sq2[0].arrGear, 
-						&sq2[0].TqFr13,  &sq2[0].ShiPh14,	 &sq2[0].Ne15,		 &sq2[0].Nt16,		&sq2[0].LAcc17,  &sq2[0].sTimePos, 
-						&sq2[0].gearRat, &sq2[0].gearShiOne, &sq2[0].gearShiTwo, &sq2[0].fJerk1,	&sq2[0].MaxNe,	 &sq2[0].MaxNt, 
-						&sq2[0].MaxAcc,  &sq2[0].minAcc );
+				/* Remove carriage return/line feed at the end of line. */
+				i = strlen(QualData);
 				
-
-				/* === 1 STEP : record (17 items check) =============== */
-				iSave = 0;
-				iItemCurOK = 0; /* NG - FAIL */
-				if(QUAL_2ND_DATA_ITEM_NUM==result)
+				if(i >= QUAL_DATA_MAX_SIZE)
 				{
-					iItemCurOK = 1; /* OK */
-					iOKcount ++;
+					fprintf(stderr,"ERROR:%6d: Not enough Buffer length gMax (%d) \r\n", RecordCnt, i );
 				}
-				else if( (QUAL_2ND_DATA_ITEM_NUM!=result) && (result!=-1 && i>0) ) 
+
+				if (--i > 0)
 				{
-					iNGcount ++;
-					continue; // reading Next item because of FAIL item
-				}
-				/* === 1 STEP : record (17 items check) =============== */
+					if (QualData[i] == '\n') QualData[i] = '\0';
+					if (QualData[i] == '\r') QualData[i] = '\0'; 
 
-
-				if( (sq2[0].iPATs05 == aiPATs05) && (sq2[0].curGear08 != sq2[0].tgtGear11) )
-				{
-
-					if( 0==strcmp( sq2[0].sTimePos, TXT_SSTIME) ) 
-					{
-						isSSOnce = 1;
-						iSScount++;
-
-						isSBOnce = 0;
-						isSPOnce = 0;
-					}
-					if( 0==strncmp( sq2[0].sTimePos, TXT_SBTIME, 4) ) 
-					{
-						isSBOnce = 1;
-						iSBcount++;
-
-						isSSOnce = 0;
-						isSPOnce = 0;
-					}
-					if( 0==strncmp( sq2[0].sTimePos, TXT_SPTIME, 4) ) 
-					{
-						isSPOnce = 1;
-						iSPcount++;
-
-						isSSOnce = 0;
-						isSBOnce = 0;
-					}
+					result = sscanf(QualData, RD_2ndFMT,
+							&sq2[0].Time01,  &sq2[0].iPATs05,	 &sq2[0].iPATs05S,	 &sq2[0].VSP03, 	&sq2[0].tqi07,	 &sq2[0].curGear08, 
+							&sq2[0].APS09,	 &sq2[0].No10,		 &sq2[0].tgtGear11,  &sq2[0].ShiNew12,	&sq2[0].ShiTy12, &sq2[0].arrGear, 
+							&sq2[0].TqFr13,  &sq2[0].ShiPh14,	 &sq2[0].Ne15,		 &sq2[0].Nt16,		&sq2[0].LAcc17,  &sq2[0].sTimePos, 
+							&sq2[0].gearRat, &sq2[0].gearShiOne, &sq2[0].gearShiTwo, &sq2[0].fJerk1,	&sq2[0].MaxNe,	 &sq2[0].MaxNt, 
+							&sq2[0].MaxAcc,  &sq2[0].minAcc );
 					
-					//if( (isSSOnce && 0==isSBOnce) && (kkloop==iSPcount)  ) /* SP point */
-					if( iSPcount && (kkloop==iSPcount)  /* && (0==strcmp( sq2[0].sTimePos, TXT_SPTIME)) */ ) /* SP point */
-					//if( iSBcount && (kkloop==iSBcount) && (0==strcmp( sq2[0].sTimePos, TXT_SBTIME)) ) /* SB point */
+
+					/* === 1 STEP : record (17 items check) =============== */
+					iSave = 0;
+					iItemCurOK = 0; /* NG - FAIL */
+					if(QUAL_2ND_DATA_ITEM_NUM==result)
 					{
-						//fprintf(stderr,"Searched Max Nt = %8.2lf \n", MaxNt );
-						iSScount++;
+						iItemCurOK = 1; /* OK */
+						iOKcount ++;
+					}
+					else if( (QUAL_2ND_DATA_ITEM_NUM!=result) && (result!=-1 && i>0) ) 
+					{
+						iNGcount ++;
+						continue; // reading Next item because of FAIL item
+					}
+					/* === 1 STEP : record (17 items check) =============== */
 
-						if(fp2gMax)
+
+					if( (sq2[0].iPATs05 == aiPATs05) && (sq2[0].curGear08 != sq2[0].tgtGear11) )
+					{
+
+						if( 0==strcmp( sq2[0].sTimePos, TXT_SSTIME) ) 
 						{
-							fprintf(fp2gMax, gMAX_FORMAT,
-									iSScount-1, sq2[0].Time01, sq2[0].MaxAcc);
+							isSSOnce = 1;
+							iSScount++;
 
-							fprintf(fp2gMax, "\n");
+							isSBOnce = 0;
+							isSPOnce = 0;
+						}
+						if( 0==strncmp( sq2[0].sTimePos, TXT_SBTIME, 4) ) 
+						{
+							isSBOnce = 1;
+							iSBcount++;
+
+							isSSOnce = 0;
+							isSPOnce = 0;
+						}
+						if( 0==strncmp( sq2[0].sTimePos, TXT_SPTIME, 4) ) 
+						{
+							isSPOnce = 1;
+							iSPcount++;
+
+							isSSOnce = 0;
+							isSBOnce = 0;
+						}
+						
+						//if( (isSSOnce && 0==isSBOnce) && (kkloop==iSPcount)  ) /* SP point */
+						if( iSPcount && (kkloop==iSPcount)  /* && (0==strcmp( sq2[0].sTimePos, TXT_SPTIME)) */ ) /* SP point */
+						//if( iSBcount && (kkloop==iSBcount) && (0==strcmp( sq2[0].sTimePos, TXT_SBTIME)) ) /* SB point */
+						{
+							//fprintf(stderr,"Searched Max Nt = %8.2lf \n", MaxNt );
+							iSScount++;
+
+							if(fp2gMax)
+							{
+								fprintf(fp2gMax, gMAX_FORMAT,
+										iSScount-1, sq2[0].Time01, sq2[0].MaxAcc);
+
+								fprintf(fp2gMax, "\n");
+
+								gMaxSaveTime[iSScount] = sq2[0].Time01;
+							}
+
+							rewind(inpfile);
+							break;
+						}
+						
+						if( kkloop==iSScount ) /* SS point */
+						{
+							// Find Record gMax
+							if( ((sq2[0].LAcc17 >= sq2[0].MaxAcc) || (g_Max <= sq2[0].LAcc17)) ) /* g_Max point */
+							{
+								g_Max = sq2[0].MaxAcc;
+								gMaxCnt++;
+							}
+							continue;
 						}
 
-						rewind(inpfile);
-						break;
-					}
-					
-					if( kkloop==iSScount ) /* SS point */
-					{
-						// Find Record gMax
-						if( ((sq2[0].LAcc17 >= sq2[0].MaxAcc) || (g_Max <= sq2[0].LAcc17)) ) /* Nt_Max point */
-						{
-							g_Max = sq2[0].MaxAcc;
-							gMaxCnt++;
-						}
-						continue;
 					}
 
 				}
 
 			}
+			while (!feof (inpfile));
 
 		}
-		while (!feof (inpfile));
+		fprintf(stderr,">>Searched g_Max  %s [%s] -- SS(%d), SB(%d), SP(%d) \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, SScnt,SBcnt,SPcnt );
 
+		fclose(fp2gMax);
 	}
-	fprintf(stderr,">>Searched g_Max  %s [%s] -- SS(%d), SB(%d), SP(%d) \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, SScnt,SBcnt,SPcnt );
-
-	fclose(fp2gMax);
-
 
 	// ======================================================================
 	// Searching g min
@@ -3000,119 +3340,135 @@ int Find2nd_minMaxShiftData(short aiPATs05, int chk, unsigned int SScnt, unsigne
 	fprintf(fp2gmin,"    nm  time      g_min  \n");
 #endif
 
-	for(kkloop=1; kkloop<=KkLast; kkloop++)
+	if( (TYPE_Min_G == minMaxType) || (TYPE_MinLAST_G == minMaxType) )
 	{
-		fprintf(stderr,">>Searching g_min %s -- SS(%d)...  \r", arrPATs_ModeID[aiPATs05].ModeID, kkloop );
-
-		iSScount = 0;
-		iSBcount = 0;
-		iSPcount = 0;
-
-		iNGcount   = 0ULL;
-		iOKcount   = 0ULL;
-
-		do
+		fprintf(stderr,">>Searching g_min %s...  \r", arrPATs_ModeID[aiPATs05].ModeID );
+		for(kkloop=1; kkloop<=KkLast; kkloop++)
 		{
-			unsigned int i=0;
+			//fprintf(stderr,">>Searching g_min %s -- SS(%d)...  \r", arrPATs_ModeID[aiPATs05].ModeID, kkloop );
 
-			/* Read a line from input file. */
-			memset( QualData, 0x00, sizeof(QualData) );
+			iSScount = 0;
+			iSBcount = 0;
+			iSPcount = 0;
 
-			if( NULL == fgets( QualData, QUAL_DATA_MAX_SIZE, inpfile ) )
+			iNGcount   = 0ULL;
+			iOKcount   = 0ULL;
+
+			do
 			{
-				ierr = ferror(inpfile);
-				fclose(inpfile);
-				fprintf(stderr,">>Searched g_min %s -- [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp ); 			
-				break;
-			}
+				unsigned int i=0;
 
-			RecordCnt++;
+				/* Read a line from input file. */
+				memset( QualData, 0x00, sizeof(QualData) );
+
+				if( NULL == fgets( QualData, QUAL_DATA_MAX_SIZE, inpfile ) )
+				{
+					ierr = ferror(inpfile);
+					fclose(inpfile);
+					fprintf(stderr,">>Searched g_min %s -- [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp ); 			
+					break;
+				}
+
+				RecordCnt++;
 
 
-			/* Remove carriage return/line feed at the end of line. */
-			i = strlen(QualData);
-			
-			if(i >= QUAL_DATA_MAX_SIZE)
-			{
-				fprintf(stderr,"ERROR:%6d: Not enough Buffer length gMax (%d) \r\n", RecordCnt, i );
-			}
-
-			if (--i > 0)
-			{
-				if (QualData[i] == '\n') QualData[i] = '\0';
-				if (QualData[i] == '\r') QualData[i] = '\0'; 
-
-				result = sscanf(QualData, RD_2ndFMT,
-						&sq2[0].Time01,  &sq2[0].iPATs05,	 &sq2[0].iPATs05S,	 &sq2[0].VSP03, 	&sq2[0].tqi07,	 &sq2[0].curGear08, 
-						&sq2[0].APS09,	 &sq2[0].No10,		 &sq2[0].tgtGear11,  &sq2[0].ShiNew12,	&sq2[0].ShiTy12, &sq2[0].arrGear, 
-						&sq2[0].TqFr13,  &sq2[0].ShiPh14,	 &sq2[0].Ne15,		 &sq2[0].Nt16,		&sq2[0].LAcc17,  &sq2[0].sTimePos, 
-						&sq2[0].gearRat, &sq2[0].gearShiOne, &sq2[0].gearShiTwo, &sq2[0].fJerk1,	&sq2[0].MaxNe,	 &sq2[0].MaxNt, 
-						&sq2[0].MaxAcc,  &sq2[0].minAcc );
+				/* Remove carriage return/line feed at the end of line. */
+				i = strlen(QualData);
 				
-
-				/* === 1 STEP : record (17 items check) =============== */
-				iSave = 0;
-				iItemCurOK = 0; /* NG - FAIL */
-				if(QUAL_2ND_DATA_ITEM_NUM==result)
+				if(i >= QUAL_DATA_MAX_SIZE)
 				{
-					iItemCurOK = 1; /* OK */
-					iOKcount ++;
+					fprintf(stderr,"ERROR:%6d: Not enough Buffer length gMax (%d) \r\n", RecordCnt, i );
 				}
-				else if( (QUAL_2ND_DATA_ITEM_NUM!=result) && (result!=-1 && i>0) ) 
+
+				if (--i > 0)
 				{
-					iNGcount ++;
-					continue; // reading Next item because of FAIL item
-				}
-				/* === 1 STEP : record (17 items check) =============== */
+					if (QualData[i] == '\n') QualData[i] = '\0';
+					if (QualData[i] == '\r') QualData[i] = '\0'; 
 
+					result = sscanf(QualData, RD_2ndFMT,
+							&sq2[0].Time01,  &sq2[0].iPATs05,	 &sq2[0].iPATs05S,	 &sq2[0].VSP03, 	&sq2[0].tqi07,	 &sq2[0].curGear08, 
+							&sq2[0].APS09,	 &sq2[0].No10,		 &sq2[0].tgtGear11,  &sq2[0].ShiNew12,	&sq2[0].ShiTy12, &sq2[0].arrGear, 
+							&sq2[0].TqFr13,  &sq2[0].ShiPh14,	 &sq2[0].Ne15,		 &sq2[0].Nt16,		&sq2[0].LAcc17,  &sq2[0].sTimePos, 
+							&sq2[0].gearRat, &sq2[0].gearShiOne, &sq2[0].gearShiTwo, &sq2[0].fJerk1,	&sq2[0].MaxNe,	 &sq2[0].MaxNt, 
+							&sq2[0].MaxAcc,  &sq2[0].minAcc );
+					
 
-				if( (sq2[0].iPATs05 == aiPATs05) && (sq2[0].curGear08 != sq2[0].tgtGear11) )
-				{
-
-					if( 0==strcmp( sq2[0].sTimePos, TXT_SSTIME) ) iSScount++;
-					if( 0==strncmp( sq2[0].sTimePos, TXT_SBTIME, 4) ) iSBcount++;
-					if( 0==strncmp( sq2[0].sTimePos, TXT_SPTIME, 4) ) iSPcount++;
-
-					if( iSPcount && (kkloop==iSPcount) /* && (0==strcmp( sq2[0].sTimePos, TXT_SPTIME)) */ ) /* SP point */
+					/* === 1 STEP : record (17 items check) =============== */
+					iSave = 0;
+					iItemCurOK = 0; /* NG - FAIL */
+					if(QUAL_2ND_DATA_ITEM_NUM==result)
 					{
-						//fprintf(stderr,"Searched Max Nt = %8.2lf \n", MaxNt );
-						iSScount++;
-
-						if(fp2gmin)
-						{
-							fprintf(fp2gmin, gmin_FORMAT,
-									iSScount-1, sq2[0].Time01, sq2[0].minAcc);
-
-							fprintf(fp2gmin, "\n");
-						}
-
-						rewind(inpfile);
-						break;
+						iItemCurOK = 1; /* OK */
+						iOKcount ++;
 					}
-
-					if( kkloop==iSScount ) /* SS point */
+					else if( (QUAL_2ND_DATA_ITEM_NUM!=result) && (result!=-1 && i>0) ) 
 					{
-						// Find Record g_min
-						if( ((sq2[0].LAcc17 >= sq2[0].minAcc) || (g_min >= sq2[0].LAcc17)) ) /* g_min point */
+						iNGcount ++;
+						continue; // reading Next item because of FAIL item
+					}
+					/* === 1 STEP : record (17 items check) =============== */
+
+					if( (sq2[0].iPATs05 == aiPATs05) && (sq2[0].curGear08 != sq2[0].tgtGear11) )
+					{
+
+						if( 0==strcmp( sq2[0].sTimePos, TXT_SSTIME) ) 
 						{
-							g_min = sq2[0].minAcc;
-							gminCnt++;
+							iSScount++;
 						}
-						continue;
+						/* if( 0==strncmp( sq2[0].sTimePos, TXT_SBTIME, 4) ) iSBcount++; */
+						if( /* 0==strcmp( sq2[0].sTimePos, TXT_SBTIME) || */
+							0==strcmp( sq2[0].sTimePos, TXT_gMAX) ||
+							0==strcmp( sq2[0].sTimePos, TXT_SBMXgX) ||
+							0==strcmp( sq2[0].sTimePos, TXT_MXNtgX) ||
+							0==strcmp( sq2[0].sTimePos, TXT_MXNegX) ) 
+						{
+							iSBcount++; 
+						}
+						
+						if( (kkloop==iSScount) && (0==strncmp( sq2[0].sTimePos, TXT_SPTIME, 4)) ) 
+						{
+							iSPcount++;
+
+							if(fp2gmin)
+							{
+								fprintf(fp2gmin, gmin_FORMAT,
+										iSScount-1, sq2[0].Time01, g_min /* sq2[0].minAcc */);
+
+								fprintf(fp2gmin, "\n");
+							}
+
+							g_min = GMAX_RVALUE;
+							rewind(inpfile);
+							break;
+						}
+
+						if( kkloop==iSScount ) /* SS point */
+						{
+							// Find Record g_min
+							if( (sq2[0].LAcc17 <= sq2[0].minAcc) && (g_min >= sq2[0].LAcc17)  ) /* g_min point */
+							{
+								g_min = sq2[0].minAcc;
+								gminCnt++;
+							}
+							continue;
+						}
+
+						//if( (int)(gMaxSaveTime[iSScount+1]*10000) >= (int)(sq2[0].Time01*10000) ) /* g_min time은 g_Max time보다 커야 한다. */
+						//	continue;
+
 					}
 
 				}
 
 			}
+			while (!feof (inpfile));
 
 		}
-		while (!feof (inpfile));
+		fprintf(stderr,">>Searched g_min  %s [%s] -- SS(%d), SB(%d), SP(%d) \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, SScnt,SBcnt,SPcnt );
 
+		fclose(fp2gmin);
 	}
-	fprintf(stderr,">>Searched g_min  %s [%s] -- SS(%d), SB(%d), SP(%d) \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, SScnt,SBcnt,SPcnt );
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
-	fclose(fp2gmin);
-
 }
 
 
@@ -3156,12 +3512,12 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 	short isSBpoint = 0;
 	short isSPpoint = 0;
 
-
+	short isgMaxPoint = 0;
+	short isgMax = 0;
 	int ci=0;
 	unsigned int iloop = 0;
-
-#define MAX_TABLE_SIZ 		1000 //2000
-
+	double minAcc = GMAX_RVALUE;
+	
 	int iNum[MAX_TABLE_SIZ] = {0,};
 	double  msTime[MAX_TABLE_SIZ] = {0.0,};
 	double  mValue[MAX_TABLE_SIZ] = {0.0,};
@@ -3206,6 +3562,9 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 
 	memset(QualData, 0x00, sizeof(QualData) );
 	memset(sq2, 0x00, sizeof(sq2) );
+
+	//memset(gMaxSaveTime, 0x00, sizeof(gMaxSaveTime) );
+	//igMaxIdx = 0;
 
 	RecordCnt	= 0ULL;
 
@@ -3328,6 +3687,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 					is2File = 1;
 					isSSpoint = TRUE;
 					iSScount ++;
+					isgMax = 0;
 
 					gSStime = sq2[0].Time01;
 
@@ -3340,6 +3700,22 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 					isSBpoint = TRUE;
 				}
 
+
+				if( 0==strcmp( sq2[0].sTimePos, TXT_SBMXgX) ||
+					0==strcmp( sq2[0].sTimePos, TXT_MXNtgX) ||
+					0==strcmp( sq2[0].sTimePos, TXT_MXNegX) ||
+					0==strcmp( sq2[0].sTimePos, TXT_gMAX) ) /* g_Max point for g_min time position */
+				{
+					isgMaxPoint = TRUE;
+					minAcc = GMAX_RVALUE;
+				}
+
+				if( 0==strcmp( sq2[0].sTimePos, TXT_SPTIME) ) /* SP point */
+				{
+					is2File = 2;
+					isgMax = 0;
+					isgMaxPoint = 0;
+				}
 
 				if( iSScount > MAX_TABLE_SIZ )
 				{
@@ -3416,12 +3792,15 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 				case TYPE_MAX_G:
 					if( isSSpoint && (int)((sq2[0].LAcc17)*10000) == (int)(mValue[iSScount]*10000) )
 					{
-						if( 0==strcmp(sq2[0].sTimePos, TXT_gmin) || 
-							0==strcmp(sq2[0].sTimePos, TXT_SSTIME) || 
+						isgMax = 1;
+						sq2[0].minAcc = GMAX_RVALUE; /* For g_mix */
+
+						if( 0==strcmp(sq2[0].sTimePos, TXT_SSTIME) || 
 							/* 0==strcmp(sq2[0].sTimePos, TXT_SBTIME) ||  */
 							0==strcmp(sq2[0].sTimePos, TXT_SPTIME)  )
 						{
 							isSSpoint = 1;
+							//isgMax = 0;
 							fprintf(stderr,"  g_MAX: There is same record[ %s/ %d ], so next record location!!! \n", sq2[0].sTimePos, iSScount );
 						}
 						else
@@ -3435,17 +3814,37 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 							else							
 								strcpy( sq2[0].sTimePos, maxType);
 
+							//gMaxSaveTime[igMaxIdx] = sq2[0].Time01;
+							//igMaxIdx++;
+
 							isSSpoint = 0;
 							//fprintf(stderr,"  g_Max: Same record[ %s/ %d ], location updated!!! \n", sq2[0].sTimePos, iSScount );
 						}
 					}
+
+					if(0==isgMax)
+					{
+						minAcc = sq2[0].minAcc = GMAX_RVALUE; /* For g_mix */
+					}
+					else
+					{
+						if( (minAcc >= sq2[0].LAcc17) ) 
+						{
+							minAcc = sq2[0].LAcc17; /* Find g_mix */
+							sq2[0].minAcc = minAcc;
+						}
+						else
+						{
+							sq2[0].minAcc = minAcc;
+						}
+					}
+				
 					break;
 
 				case TYPE_Min_G: /* g_min은 SB point 이후 ~~*/
-					if( /*isSBpoint && */ isSSpoint && (int)((sq2[0].LAcc17)*10000) == (int)(mValue[iSScount]*10000) )
+					if( /*isSBpoint &&*/ isgMaxPoint && /*isSSpoint &&*/ (int)((sq2[0].LAcc17)*10000) == (int)(mValue[iSScount]*10000) )
 					{
-						if( 0==strcmp(sq2[0].sTimePos, TXT_gMAX) || 
-							0==strcmp(sq2[0].sTimePos, TXT_SSTIME) || 
+						if( 0==strcmp(sq2[0].sTimePos, TXT_SSTIME) || 
 							/* 0==strcmp(sq2[0].sTimePos, TXT_SBTIME) || */
 							0==strcmp(sq2[0].sTimePos, TXT_SPTIME)  )
 						{
@@ -3466,6 +3865,10 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 
 							isSSpoint = 0;
 							isSBpoint = 0;
+
+							isgMaxPoint = 0;
+							//isgMaxPoint = 0;
+							//igMaxIdx ++;
 							//fprintf(stderr,"  g_min: Same record[ %s/ %d ], location updated!!! \n", sq2[0].sTimePos, iSScount );
 						}
 					}
@@ -3478,11 +3881,14 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 
 				}
 
-				
+			#if 0
 				if( 0==strcmp( sq2[0].sTimePos, TXT_SPTIME) ) /* SP point */
 				{
 					is2File = 2;
+					isgMax = 0;
 				}
+			#endif
+
 
 			}
 
@@ -3514,6 +3920,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 
 	if(fpinput) { fclose(fpinput); fpinput=NULL; }
 	if(fp2out) { fclose(fp2out); fp2out=NULL; }
+	if(fp2in) { fclose(fp2in); fp2in=NULL; }
 
 #if 1
 	if(iFileDeleted)
@@ -3525,8 +3932,8 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 			fprintf(stderr,"  Deleted Max Table file [%s] -> Failed (%d) \n", shi_inp, ci );
 		fprintf(stderr,"---------------------------------------------------------------\n" );
 	}
-	
 #endif
+
 }
 
 
@@ -3679,35 +4086,71 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
 			{
 				continue;
 			}
-			else if( 0==strncmp( sq3[0].sTimePos, TXT_SSTIME, 4) ) /* SS point */
+			else if( 0==strcmp( sq3[0].sTimePos, TXT_SSTIME) ) /* SS point */
 			{
+				ig_Max = 0;
+				ig_min = 0;
+
 				is2File = 1;
 				isSSpoint = TRUE;
 				gSStime = sq3[0].Time01;
 
 				gTimeDiff = gSStime;
+				//fprintf(stderr, "%s - \n", TXT_SSTIME );
 			}
-			else if( 0==strncmp( sq3[0].sTimePos, TXT_SBTIME, 4) ) /* SB point */
+			else if( 0==strcmp( sq3[0].sTimePos, TXT_SBTIME) ) /* SB point */
 			{
 				is2File = 1;
 				isSBpoint = TRUE;
 				gSBtime = sq3[0].Time01;
 
 				gTimeDiff = (gSBtime - gSStime);
+				//fprintf(stderr, "%s - %lf \n", TXT_SBTIME, gTimeDiff );
+			}
+			else if( 0==strcmp( sq3[0].sTimePos, TXT_SBMXgX) ) /* SB & gX */
+			{
+				ig_Max = 1;
+				gMaxTime = sq3[0].Time01;
+				gMaxVal  = sq3[0].LAcc17;
 
-				if( 0==strcmp( sq3[0].sTimePos, TXT_SBMXgX) ) /* SB & gX */
-				{
-					ig_Max = 1;
-					gMaxTime = sq3[0].Time01;
-					gMaxVal  = sq3[0].LAcc17;
-				}
-				else if( 0==strcmp( sq3[0].sTimePos, TXT_SBmigm) ) /* SB & g_min */
-				{
-					ig_min = 1;
-					gminTime = sq3[0].Time01;
-					gminVal  = sq3[0].LAcc17;
-				}
+				is2File = 1;
+				isSBpoint = TRUE;
+				gSBtime = sq3[0].Time01;
 
+				gTimeDiff = (gSBtime - gSStime);
+				//fprintf(stderr, "%s - %lf \n", TXT_SBMXgX, gTimeDiff );
+			}
+			else if( 0==strcmp( sq3[0].sTimePos, TXT_SBmigm) ) /* SB & gmin */
+			{
+				ig_min = 1;
+				gminTime = sq3[0].Time01;
+				gminVal  = sq3[0].LAcc17;
+				
+				is2File = 1;
+				isSBpoint = TRUE;
+				gSBtime = sq3[0].Time01;
+
+				gTimeDiff = (gSBtime - gSStime);
+				//fprintf(stderr, "%s - %lf %d \n", TXT_SBmigm, gTimeDiff, 1000*(gminTime-gMaxTime) );
+
+			}
+			else if( 0==strcmp( sq3[0].sTimePos, TXT_SBMXNt) ) /* SB & Max Nt */
+			{
+				is2File = 1;
+				isSBpoint = TRUE;
+				gSBtime = sq3[0].Time01;
+
+				gTimeDiff = (gSBtime - gSStime);
+				//fprintf(stderr, "%s - %lf \n", TXT_SBMXNt, gTimeDiff  );
+			}
+			else if( 0==strcmp( sq3[0].sTimePos, TXT_SBMXNe) ) /* SB & Max Ne */
+			{
+				is2File = 1;
+				isSBpoint = TRUE;
+				gSBtime = sq3[0].Time01;
+
+				gTimeDiff = (gSBtime - gSStime);
+				//fprintf(stderr, "%s - %lf \n", TXT_SBMXNe, gTimeDiff  );
 			}
 			else if( 0==strncmp( sq3[0].sTimePos, TXT_SPTIME, 4) ) /* SP point */
 			{
@@ -3724,9 +4167,13 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
 				isSSpoint = 0;
 				isSBpoint = 0;
 				isSPpoint = 0;
+				//fprintf(stderr, "%s - %lf \n", TXT_SPTIME, gTimeDiff  );
 			}
 			else //if( isSSpoint )
 			{
+
+				//fprintf(stderr, "else[%s] - %lf \n", sq3[0].sTimePos, gTimeDiff  );
+
 				is2File = 1;
 				gTimeDiff = (sq3[0].Time01 - gSStime);
 
@@ -3739,6 +4186,7 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
 					ig_Max = 1;
 					gMaxTime = sq3[0].Time01;
 					gMaxVal  = sq3[0].LAcc17;
+					//fprintf(stderr, "= MAX>>TXT_gMAX ++++ %u %d \n", 1000*gMaxTime, ig_min);
 				}
 				else if( 0==strcmp( sq3[0].sTimePos, TXT_SBMXgX) ) /* SB & gX */
 				{
@@ -3751,12 +4199,14 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
 					ig_Max = 1;
 					gMaxTime = sq3[0].Time01;
 					gMaxVal  = sq3[0].LAcc17;
+					//fprintf(stderr, "==TXT_MXNtgX +++++ %u %d \n", 1000*gMaxTime, ig_min);
 				}
 				else if( 0==strcmp( sq3[0].sTimePos, TXT_MXNegX) ) /* MX Nt & gX */
 				{
 					ig_Max = 1;
 					gMaxTime = sq3[0].Time01;
 					gMaxVal  = sq3[0].LAcc17;
+					//fprintf(stderr, "==TXT_MXNegX +++++ %u %d \n", 1000*gMaxTime, ig_min);
 				}			
 				//else
 				//{
@@ -3772,24 +4222,28 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
 					ig_min = 1;
 					gminTime = sq3[0].Time01;
 					gminVal  = sq3[0].LAcc17;
+					//fprintf(stderr, "min>>TXT_gmin ++++ %u %d \n", 1000*(gminTime-gMaxTime), ig_Max);
 				}
 				else if( 0==strcmp( sq3[0].sTimePos, TXT_SBmigm) ) /* SB & g_min */
 				{
 					ig_min = 1;
 					gminTime = sq3[0].Time01;
 					gminVal  = sq3[0].LAcc17;
+					//fprintf(stderr, "min +++TXT_SBmigm++++++ %u %d \n", 1000*(gminTime-gMaxTime), ig_Max);
 				}
 				else if( 0==strcmp( sq3[0].sTimePos, TXT_MXNtgm) ) /* MX Nt & g_min */
 				{
 					ig_min = 1;
 					gminTime = sq3[0].Time01;
 					gminVal  = sq3[0].LAcc17;
+					//fprintf(stderr, "min TXT_MXNtgm ++++ %u %d \n", 1000*(gminTime-gMaxTime), ig_Max);
 				}
 				else if( 0==strcmp( sq3[0].sTimePos, TXT_MXNegm) ) /* MX Ne & g_min */
 				{
 					ig_min = 1;
 					gminTime = sq3[0].Time01;
 					gminVal  = sq3[0].LAcc17;
+					//fprintf(stderr, "min TXT_MXNegm ++++ %u %d \n", 1000*(gminTime-gMaxTime), ig_Max);
 				}
 				//else
 				//{
@@ -3807,14 +4261,15 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
 			DeltaTime = 0;
 			if( ig_Max && ig_min )
 			{
+				ig_Max = 0;
+				ig_min = 0;
+
 				DeltaTime = (int)(gminTime*1000*10 - gMaxTime*1000*10);
 				DeltaValu = (gminVal*1000.0f - gMaxVal*1000.0f);
-				
+
 				if( DeltaTime > 0 || DeltaTime < 0 )
 				{
-					fJerk2 = DeltaValu*10/DeltaTime;
-					ig_Max = 0;
-					ig_min = 0;
+					fJerk2 = DeltaValu*10.0/DeltaTime;
 				}
 			}
 			/* ----------------------------------------------------- */
@@ -10698,7 +11153,6 @@ int main(int argc, char *argv[])
 		memset(shi_out, 0x00, sizeof(shi_out) );
 		memset(infile, 0x00, sizeof(infile) );
 		
-		
 
 		printf("\r\n");
 		fprintf(stderr,"---------------------------------------------------------------\n" );
@@ -10716,9 +11170,14 @@ int main(int argc, char *argv[])
 		ichk = SSCounterCheck(iModeID, SScnt, SBcnt, SPcnt);
 
 		// --------------------------------------------------------
-		// 3rd STEP -----------------------------------------------
-		Find2nd_minMaxShiftData(iModeID, ichk, SScnt, SBcnt, SPcnt);
+		// 3rd-1 STEP -----------------------------------------------
+		Find2nd_NtNeminMaxShiftData(iModeID, ichk, TYPE_MAX_NT, SScnt, SBcnt, SPcnt);
 
+		// 3rd-2 STEP -----------------------------------------------
+		Find2nd_NtNeminMaxShiftData(iModeID, ichk, TYPE_MAX_NE, SScnt, SBcnt, SPcnt);
+
+		// 3rd-3 STEP -----------------------------------------------
+		Find2nd_gminMaxShiftData(iModeID, ichk, TYPE_MAX_G, SScnt, SBcnt, SPcnt);
 
 		// --------------------------------------------------------
 		// 4th STEP -----------------------------------------------
@@ -10808,6 +11267,11 @@ int main(int argc, char *argv[])
 	#endif
 		// ------------------------------------------------------------------------------------
 
+	
+		// 3rd-3 STEP -----------------------------------------------
+		Find2nd_gminMaxShiftData(iModeID, ichk, TYPE_MinLAST_G, SScnt, SBcnt, SPcnt);
+
+
 		// ------------------------------------------------------------------------------------
 		// g_min --------------------------------------------------
 		strcpy(shi_inp, shi_ori);
@@ -10821,17 +11285,6 @@ int main(int argc, char *argv[])
 
 		ShiftData_MAXLocationCheck(infile, shi_inp, shi_out, TXT_gmin, TYPE_Min_G, iModeID, SScnt, SBcnt, SPcnt);
 		// g_min --------------------------------------------------
-	#if 1
-		if(iFileDeleted)
-		{
-			ii = remove( infile );
-			if( 0 == ii )
-				fprintf(stderr,"  Deleted temp file [%s] -> OK \n", infile );
-			else
-				fprintf(stderr,"  Deleted temp file [%s] -> Failed(%d) \n", infile, ii );
-			fprintf(stderr,"---------------------------------------------------------------\n" );
-		}
-	#endif
 		// -----------------------------------------------------------------
 
 
@@ -10839,11 +11292,17 @@ int main(int argc, char *argv[])
 		// 5th STEP -----------------------------------------------
 		ShiftData_LastSorting(shi_out, iModeID, iavgtm);
 
-
 		#if 1
 		if(iFileDeleted)
 		{
 			// -------------------------------------------------------------
+			ii = remove( infile );
+			if( 0 == ii )
+				fprintf(stderr,"  Deleted temp file [%s] -> OK \n", infile );
+			else
+				fprintf(stderr,"  Deleted temp file [%s] -> Failed(%d) \n", infile, ii );
+			//fprintf(stderr,"---------------------------------------------------------------\n" );
+
 			if(ichk)
 			{
 				strcpy(shi_out, shi_ori);
@@ -10880,6 +11339,7 @@ int main(int argc, char *argv[])
 			fprintf(stderr,"---------------------------------------------------------------\n" );
 		}
 		#endif
+
 
 
 	}
