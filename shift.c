@@ -550,19 +550,20 @@ void help(void)
 	#if SHIFT_QUALITY_DATA_SORTING /* 2022-11-13 */
            " \n"
            "--[ Shift Quality Data Sorting ]-------- -------------------------------------------------------------------------\n"
-           "  -U or --upshift [ModeID] [APS Power Level] [APS tolerance] \n" 
+           "  -U or --upshift [ModeID] [APS lvl] [APS tol(1\%)] \n" 
            "\n"
-           " Ex) ah.exe --input 5ms_16select.tsv --output 5ms_sort.txt --upshift nor 3.5 1 \n"
-           "     ah.exe --input 5ms_16select.tsv --output 5ms_sort.txt --upshift ECO 4 1.5  \n"
-           "     ah.exe --input 5ms_16select.tsv --output 5ms_sort.txt --upshift ECO_delete 4 1.5  \n"
-           "              -> Result Sorted  : 5ms_sort.txt \n"
-           "              -> Generated file : 5ms_sort.NOR, 5ms_sort.ECO, 5ms_sort.SPT, ... \n"
+           " Ex) ah.exe --input 5ms_16select.tsv --output 5ms_eco.txt --upshift eco 3.5 1 \n"
+           "     ah.exe --input 5ms_16select.tsv --output 5ms_spt.txt --upshift spt 4 1.5  \n"
+           "     ah.exe --input 5ms_16select.tsv --output 5ms_nor.txt --upshift nor.used 4 1.5  \n"
+           "        -> Sorted result output : 5ms_eco.txt \n"
+           "        -> Generated temp files : 5ms_eco.ECO, 5ms_eco.cECO, 5ms_eco.zECO, ... \n"
            "\n" 
-           "  -D or --downshift [ModeID] [APS Power Level] [APS tolerance] \n" 
+           "  -D or --downshift [ModeID] [APS lvl] [APS tol(1\%)] [VS start] [VS end] [VS step] \n" 
            "\n"
-           " Ex) ah.exe --input 5ms_16select.tsv --output 5ms_sort.txt --downshift 5 1 \n"
-           "              -> Result Sorted  : 5ms_sort.txt \n"
-           "              -> Generated file : 5ms_sort.NOR, 5ms_sort.ECO, 5ms_sort.SPT, ... \n"
+           " Ex) ah.exe --input 5ms_16select.tsv --output 5ms_spt.txt --downshift SPT 5 1 160 60 -10 \n"
+           "        -> Sorted result output : 5ms_spt.txt \n"
+           "        -> Generated temp files : 5ms_spt.SPT, 5ms_spt.cSPT, 5ms_spt.zSPT, ... \n"
+           "\n"
            "  ModeID: HOT WUP MNL DN2 DN1 UP1 UP2 UP3 NOR ECO ECODN2 ECODN1 ECOUP1 ECOUP2 ECOUP3 \n" 
            "          CRZ CRZUP1 CRZUP2 BRK1 BRK2 HUP1 HUP2 HUP3 SPTDN2 SPTDN1 SPT SPTUP1 SPTUP2 \n" 
            "          SPTUP3 SS_XECO SS_ECODN2 SS_ECODN1 SS_ECO SS_ECOUP1 SS_ECOUP2 SS_ECOUP3  \n"
@@ -619,6 +620,38 @@ int arg_sum(int num_args, ...)
 //printf(" ==== %d  ==== ", arg_sum(3,3,3,3,3) );
 #endif
 
+#if 0
+#include <sys/ioctl.h>
+#include <net/if.h>
+
+int ttmain(void)
+{
+    int sock;
+    struct ifreq ifr;
+    unsigned char *mac = NULL;
+
+    memset(&ifr, 0x00, sizeof(ifr));
+    strcpy(ifr.ifr_name, "eth0");
+
+    int fd=socket(AF_UNIX, SOCK_DGRAM, 0);
+
+    if((sock=socket(AF_UNIX, SOCK_DGRAM, 0))<0){
+        perror("socket ");
+        return 1;
+    }
+
+    if(ioctl(fd,SIOCGIFHWADDR,&ifr)<0){
+        perror("ioctl ");
+        return 1;
+    }
+
+    mac = ifr.ifr_hwaddr.sa_data;
+
+    printf("%s: %02x:%02x:%02x:%02x:%02x:%02x\n", ifr.ifr_name, mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
+    close(sock);
+    return 0;
+}
+#endif
 
 
 int isFileExist(const char *file, int disp)
@@ -763,7 +796,7 @@ float gearTable[11] = {
 		0.790f, /* 7-DAN */
 		0.635f, /* 8-DAN */
 		3.239f, /* Rear */
-		3.510f, /* 종감속 */
+		3.510f, /* ??? */
 };
 
 
@@ -920,8 +953,6 @@ static short  VSkphTblUP[VS_TABLE_NUM] = {
 
 static double fAPSpwrLvl = -1.0f;
 static double fAPStol    = APS_TOLENANCE;  /* APS tolerance */
-static short iModeID = -1; /* 8:md_NOR */
-static short iFileDeleted = 0;
 
 
 #define PWR_ON_UP_SHIFT_SSPOINT_START 		1
@@ -3472,7 +3503,7 @@ int Find2nd_gminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigned i
 }
 
 
-int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char *maxType, int mType, short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsigned int SPcnt)
+int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char *maxType, int mType, short aiPATs05, short TmpFileDeleted) // unsigned int SScnt, unsigned int SBcnt, unsigned int SPcnt)
 {
 	FILE *fp2out = NULL;
 	FILE *fp2in = NULL;
@@ -3923,13 +3954,13 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 	if(fp2in) { fclose(fp2in); fp2in=NULL; }
 
 #if 1
-	if(iFileDeleted)
+	if(TmpFileDeleted)
 	{
 		ci = remove( shi_inp );
 		if( 0 == ci )
-			fprintf(stderr,"  Deleted Max Table file [%s] -> OK \n", shi_inp );
+			fprintf(stderr,"  Deleted min/Max temp Table file [%s] -> OK \n", shi_inp );
 		else
-			fprintf(stderr,"  Deleted Max Table file [%s] -> Failed (%d) \n", shi_inp, ci );
+			fprintf(stderr,"  Deleted min/Max temp Table file [%s] -> Failed (%d) \n", shi_inp, ci );
 		fprintf(stderr,"---------------------------------------------------------------\n" );
 	}
 #endif
@@ -4313,10 +4344,7 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
 	fprintf(stderr,"---------------------------------------------------------------\n" );
 #endif
 }
-
-
 #endif /* SHIFT_QUALITY_DATA_SORTING */
-
 
 
 
@@ -4562,8 +4590,9 @@ int main(int argc, char *argv[])
 	int isUpShift=0, isDownShift=0;	
 
 	int iEidx=0, iTCnt=0;
-
+	short iModeID = -1; /* 8:md_NOR */
 	short iPwrOnOff = -1; /* POWER ON, POWER OFF*/
+	short itmpFileDeleted = 1;
 #endif //SHIFT_QUALITY_DATA_SORTING /* 2022-11-13 */
 
 
@@ -6971,7 +7000,7 @@ int main(int argc, char *argv[])
 					isShift 	 = 1;
 					isUpShift	 = 1;
 					isDownShift  = 0;
-					iModeID      = 0;
+					iModeID      = -1;
 
 					memset(str_ShiftOp, 0x00, sizeof(str_ShiftOp) );
 
@@ -6986,17 +7015,17 @@ int main(int argc, char *argv[])
 					// ------------------------------------------------
 					// ------------------------------------------------
 
-					iFileDeleted = 0;
-					if( strstr(str_ShiftOp[0], "_del") || strstr(str_ShiftOp[0], "-del")  || strstr(str_ShiftOp[0], ".del") )
+					itmpFileDeleted = 1;
+					if( strstr(str_ShiftOp[0], "-used") || strstr(str_ShiftOp[0], ".used") )
 					{
 					int i, len;
 
-						iFileDeleted = 1;
+						itmpFileDeleted = 0; /* temp file Live ~~~ */
 
 						len = strlen( str_ShiftOp[0] );
 						for(i=0; i<len; i++)
 						{
-							if( '_' == str_ShiftOp[0][i] || '-' == str_ShiftOp[0][i] || '.' == str_ShiftOp[0][i] ) str_ShiftOp[0][i]='\0';
+							if( '-' == str_ShiftOp[0][i] || '.' == str_ShiftOp[0][i] ) str_ShiftOp[0][i]='\0';
 						}
 					}
 
@@ -7018,7 +7047,7 @@ int main(int argc, char *argv[])
 						fprintf(stderr,">>PATs-ModeID	  : <<%d>> %d, Unknown ModeID +++", 0, iModeID ); 
 					}
 
-					if(iFileDeleted) 
+					if(itmpFileDeleted) 
 					{
 						//fprintf(stderr,"\n");
 						fprintf(stderr," -- Delete option added..."); 
@@ -11208,7 +11237,7 @@ int main(int argc, char *argv[])
 		strcat(shi_out, "1");
 		strcat(shi_out, arrPATs_ModeID[iModeID].ModeNm);	
 
-		ShiftData_MAXLocationCheck(infile, shi_inp, shi_out, TXT_MaxNt, TYPE_MAX_NT, iModeID, SScnt, SBcnt, SPcnt);
+		ShiftData_MAXLocationCheck(infile, shi_inp, shi_out, TXT_MaxNt, TYPE_MAX_NT, iModeID, itmpFileDeleted); // SScnt, SBcnt, SPcnt);
 		// Nt Max -------------------------------------------------
 		// --------------------------------------------------------
 
@@ -11225,10 +11254,10 @@ int main(int argc, char *argv[])
 		strcat(shi_out, "2");
 		strcat(shi_out, arrPATs_ModeID[iModeID].ModeNm);	
 
-		ShiftData_MAXLocationCheck(infile, shi_inp, shi_out, TXT_MaxNe, TYPE_MAX_NE, iModeID, SScnt, SBcnt, SPcnt);
+		ShiftData_MAXLocationCheck(infile, shi_inp, shi_out, TXT_MaxNe, TYPE_MAX_NE, iModeID, itmpFileDeleted); // SScnt, SBcnt, SPcnt);
 		// Ne Max -------------------------------------------------
 	#if 1
-		if(iFileDeleted)
+		if(itmpFileDeleted)
 		{
 			ii = remove( infile );
 			if( 0 == ii )
@@ -11252,10 +11281,10 @@ int main(int argc, char *argv[])
 		strcat(shi_out, "3");
 		strcat(shi_out, arrPATs_ModeID[iModeID].ModeNm);	
 
-		ShiftData_MAXLocationCheck(infile, shi_inp, shi_out, TXT_gMAX, TYPE_MAX_G, iModeID, SScnt, SBcnt, SPcnt);
+		ShiftData_MAXLocationCheck(infile, shi_inp, shi_out, TXT_gMAX, TYPE_MAX_G, iModeID, itmpFileDeleted); // SScnt, SBcnt, SPcnt);
 		// gMax ---------------------------------------------------
 	#if 1
-		if(iFileDeleted)
+		if(itmpFileDeleted)
 		{
 			ii = remove( infile );
 			if( 0 == ii )
@@ -11283,7 +11312,7 @@ int main(int argc, char *argv[])
 		strcat(infile,  arrPATs_ModeID[iModeID].ModeNm);
 		strcat(shi_out, arrPATs_ModeID[iModeID].FileNm);	
 
-		ShiftData_MAXLocationCheck(infile, shi_inp, shi_out, TXT_gmin, TYPE_Min_G, iModeID, SScnt, SBcnt, SPcnt);
+		ShiftData_MAXLocationCheck(infile, shi_inp, shi_out, TXT_gmin, TYPE_Min_G, iModeID, itmpFileDeleted); // SScnt, SBcnt, SPcnt);
 		// g_min --------------------------------------------------
 		// -----------------------------------------------------------------
 
@@ -11293,7 +11322,7 @@ int main(int argc, char *argv[])
 		ShiftData_LastSorting(shi_out, iModeID, iavgtm);
 
 		#if 1
-		if(iFileDeleted)
+		if(itmpFileDeleted)
 		{
 			// -------------------------------------------------------------
 			ii = remove( infile );
@@ -11491,124 +11520,124 @@ int main(int argc, char *argv[])
 		BITMAPFILEHEADER fileHeader;	// 비트맵 파일 헤더 구조체 변수
 		BITMAPINFOHEADER infoHeader;	// 비트맵 정보 헤더 구조체 변수
 	
-		unsigned char *image;	 // 픽셀 데이터 포인터
-		int size;				 // 픽셀 데이터 크기
-		int width, height;		 // 비트맵 이미지의 가로, 세로 크기
-		int padding;			 // 픽셀 데이터의 가로 크기가 4의 배수가 아닐 때 남는 공간의 크기
+		unsigned char *image;	 // ?? ??? ???
+		int size;				 // ?? ??? ??
+		int width, height;		 // ??? ???? ??, ?? ??
+		int padding;			 // ?? ???? ?? ??? 4? ??? ?? ? ?? ??? ??
 	
-		// 각 픽셀을 표현할 ASCII 문자. 인덱스가 높을 수록 밝아지는 것을 표현
-		char ascii[] = { '#', '#', '@', '%', '=', '+', '*', ':', '-', '.', ' ' };	// 11개
+		// ? ??? ??? ASCII ??. ???? ?? ?? ???? ?? ??
+		char ascii[] = { '#', '#', '@', '%', '=', '+', '*', ':', '-', '.', ' ' };	// 11?
 	
-		fpBmp = fopen("Peppers80x80.bmp", "rb");	// 비트맵 파일을 바이너리 모드로 열기
-		if (fpBmp == NULL)	  // 파일 열기에 실패하면
-			return 0;		  // 프로그램 종료
+		fpBmp = fopen("Peppers80x80.bmp", "rb");	// ??? ??? ???? ??? ??
+		if (fpBmp == NULL)	  // ?? ??? ????
+			return 0;		  // ???? ??
 	
-		// 비트맵 파일 헤더 읽기. 읽기에 실패하면 파일 포인터를 닫고 프로그램 종료
+		// ??? ?? ?? ??. ??? ???? ?? ???? ?? ???? ??
 		if (fread(&fileHeader, sizeof(BITMAPFILEHEADER), 1, inpfile) < 1)
 		{
 			fclose(inpfile);
 			return 0;
 		}
 	
-		// 매직 넘버가 MB가 맞는지 확인(2바이트 크기의 BM을 리틀 엔디언으로 읽었으므로 MB가 됨)
-		// 매직 넘버가 맞지 않으면 프로그램 종료
+		// ?? ??? MB? ??? ??(2??? ??? BM? ?? ????? ????? MB? ?)
+		// ?? ??? ?? ??? ???? ??
 		if (fileHeader.bfType != 'MB')
 		{
 			fclose(inpfile);
 			return 0;
 		}
 	
-		// 비트맵 정보 헤더 읽기. 읽기에 실패하면 파일 포인터를 닫고 프로그램 종료
+		// ??? ?? ?? ??. ??? ???? ?? ???? ?? ???? ??
 		if (fread(&infoHeader, sizeof(BITMAPINFOHEADER), 1, inpfile) < 1)
 		{
 			fclose(inpfile);
 			return 0;
 		}
 	
-		// 24비트 비트맵이 아니면 프로그램 종료
+		// 24?? ???? ??? ???? ??
 		if (infoHeader.biBitCount != 24)
 		{
 			fclose(inpfile);
 			return 0;
 		}
 	
-		size = infoHeader.biSizeImage;	  // 픽셀 데이터 크기
-		width = infoHeader.biWidth; 	  // 비트맵 이미지의 가로 크기
-		height = infoHeader.biHeight;	  // 비트맵 이미지의 세로 크기
+		size = infoHeader.biSizeImage;	  // ?? ??? ??
+		width = infoHeader.biWidth; 	  // ??? ???? ?? ??
+		height = infoHeader.biHeight;	  // ??? ???? ?? ??
 	
-		// 이미지의 가로 크기에 픽셀 크기를 곱하여 가로 한 줄의 크기를 구하고 4로 나머지를 구함
-		// 그리고 4에서 나머지를 빼주면 남는 공간을 구할 수 있음.
-		// 만약 남는 공간이 0이라면 최종 결과가 4가 되므로 여기서 다시 4로 나머지를 구함
+		// ???? ?? ??? ?? ??? ??? ?? ? ?? ??? ??? 4? ???? ??
+		// ??? 4?? ???? ??? ?? ??? ?? ? ??.
+		// ?? ?? ??? 0??? ?? ??? 4? ??? ??? ?? 4? ???? ??
 		padding = (PIXEL_ALIGN - ((width * PIXEL_SIZE) % PIXEL_ALIGN)) % PIXEL_ALIGN;
 	
-		if (size == 0)	  // 픽셀 데이터 크기가 0이라면
+		if (size == 0)	  // ?? ??? ??? 0???
 		{
-			// 이미지의 가로 크기 * 픽셀 크기에 남는 공간을 더해주면 완전한 가로 한 줄 크기가 나옴
-			// 여기에 이미지의 세로 크기를 곱해주면 픽셀 데이터의 크기를 구할 수 있음
+			// ???? ?? ?? * ?? ??? ?? ??? ???? ??? ?? ? ? ??? ??
+			// ??? ???? ?? ??? ???? ?? ???? ??? ?? ? ??
 			size = (width * PIXEL_SIZE + padding) * height;
 		}
 	
-		image = malloc(size);	 // 픽셀 데이터의 크기만큼 동적 메모리 할당
+		image = malloc(size);	 // ?? ???? ???? ?? ??? ??
 	
-		// 파일 포인터를 픽셀 데이터의 시작 위치로 이동
+		// ?? ???? ?? ???? ?? ??? ??
 		fseek(inpfile, fileHeader.bfOffBits, SEEK_SET);
 	
-		// 파일에서 픽셀 데이터 크기만큼 읽음. 읽기에 실패하면 파일 포인터를 닫고 프로그램 종료
+		// ???? ?? ??? ???? ??. ??? ???? ?? ???? ?? ???? ??
 		if (fread(image, size, 1, inpfile) < 1)
 		{
 			fclose(inpfile);
 			return 0;
 		}
 	
-		fclose(inpfile);	  // 비트맵 파일 닫기
+		fclose(inpfile);	  // ??? ?? ??
 	
-		outfile = fopen("ascii.txt", "w");	// 결과 출력용 텍스트 파일 열기
-		if (outfile == NULL)	  // 파일 열기에 실패하면
+		outfile = fopen("ascii.txt", "w");	// ?? ??? ??? ?? ??
+		if (outfile == NULL)	  // ?? ??? ????
 		{
-			free(image);	  // 픽셀 데이터를 저장한 동적 메모리 해제
-			return 0;		  // 프로그램 종료
+			free(image);	  // ?? ???? ??? ?? ??? ??
+			return 0;		  // ???? ??
 		}
 	
-		// 픽셀 데이터는 아래 위가 뒤집혀서 저장되므로 아래쪽부터 반복
-		// 세로 크기만큼 반복
+		// ?? ???? ?? ?? ???? ????? ????? ??
+		// ?? ???? ??
 		for (int y = height - 1; y >= 0; y--)
 		{
-			// 가로 크기만큼 반복
+			// ?? ???? ??
 			for (int x = 0; x < width; x++)
 			{
-				// 일렬로 된 배열에 접근하기 위해 인덱스를 계산
-				// (x * 픽셀 크기)는 픽셀의 가로 위치
-				// (y * (세로 크기 * 픽셀 크기))는 픽셀이 몇 번째 줄인지 계산
-				// 남는 공간 * y는 줄별로 누적된 남는 공간
+				// ??? ? ??? ???? ?? ???? ??
+				// (x * ?? ??)? ??? ?? ??
+				// (y * (?? ?? * ?? ??))? ??? ? ?? ??? ??
+				// ?? ?? * y? ??? ??? ?? ??
 				int index = (x * PIXEL_SIZE) + (y * (width * PIXEL_SIZE)) + (padding * y);
 	
-				// 현재 픽셀의 주소를 RGBTRIPLE 포인터로 변환하여 RGBTRIPLE 포인터에 저장
+				// ?? ??? ??? RGBTRIPLE ???? ???? RGBTRIPLE ???? ??
 				RGBTRIPLE *pixel = (RGBTRIPLE *)&image[index];
 	
-				// RGBTRIPLE 구조체로 파랑, 초록, 빨강값을 가져옴
+				// RGBTRIPLE ???? ??, ??, ???? ???
 				unsigned char blue = pixel->rgbtBlue;
 				unsigned char green = pixel->rgbtGreen;
 				unsigned char red = pixel->rgbtRed;
 	
-				// 파랑, 초록, 빨강값의 평균을 구하면 흑백 이미지를 얻을 수 있음
+				// ??, ??, ???? ??? ??? ?? ???? ?? ? ??
 				unsigned char gray = (red + green + blue) / PIXEL_SIZE;
 	
-				// 흑백값에 ASCII 문자의 개수를 곱한 뒤 256으로 나누면 흑백값에 따라 
-				// ASCII 문자의 인덱스를 얻을 수 있음
+				// ???? ASCII ??? ??? ?? ? 256?? ??? ???? ?? 
+				// ASCII ??? ???? ?? ? ??
 				char c = ascii[gray * sizeof(ascii) / 256];
 	
-				// 비트맵 이미지에서는 픽셀의 가로, 세로 크기가 똑같지만
-				// 보통 ASCII 문자는 세로로 길쭉한 형태이므로 정사각형 모양과 비슷하게 보여주기 위해
-				// 같은 문자를 두 번 저장해줌
-				fprintf(outfile, "%c%c", c, c);	 // 텍스트 파일에 문자 출력
+				// ??? ?????? ??? ??, ?? ??? ????
+				// ?? ASCII ??? ??? ??? ????? ???? ??? ???? ???? ??
+				// ?? ??? ? ? ????
+				fprintf(outfile, "%c%c", c, c);	 // ??? ??? ?? ??
 			}
 	
-			fprintf(outfile, "\n");	 // 가로 픽셀 저장이 끝났으면 줄바꿈을 해줌
+			fprintf(outfile, "\n");	 // ?? ?? ??? ???? ???? ??
 		}
 	
-		fclose(outfile);	  // 텍스트 파일 닫기
+		fclose(outfile);	  // ??? ?? ??
 	
-		free(image);	  // 픽셀 데이터를 저장한 동적 메모리 해제
+		free(image);	  // ?? ???? ??? ?? ??? ??
 	
 		return 0;
 	}
