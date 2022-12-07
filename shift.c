@@ -4549,12 +4549,14 @@ int CheckLicense(void)
 		}
 		#endif
 
+		#if 0
 		if( iret ) 
 		{
 			fprintf(stderr," ------->> Licensed OK on the PC. (%#x)\n", iret);
 			fprintf(stderr,"---------------------------------------------------------------\n" );
 		}
-
+		#endif
+		
 		return iret; /* License OK */
 	}
 	else
@@ -4623,11 +4625,13 @@ int CheckLicense(void)
 		if(fo) fclose(fo);
 		if(fr) fclose(fr);
 
+	#if 0
 		if( iret ) 
 		{
 			fprintf(stderr," ------->> Licensed OK on the PC.. (%#x) \n", iret);
 			fprintf(stderr,"---------------------------------------------------------------\n" );
 		}
+	#endif
 		return iret; /* License OK */
 	}
 
@@ -4668,7 +4672,8 @@ int main(int argc, char *argv[])
 
 	// index file merged
 	int istartIdx=-1, iEndIdx=0, iTotcnt=0;
-
+	int iret = 0;
+	
 	//char mergefile[50][128];
 #define MERGE_TOTAL_CNT 			16
 #define MERGE_INDEX_SIZ 			6 // 16
@@ -5122,14 +5127,24 @@ int main(int argc, char *argv[])
 	help_brief();
 
 
-	if( 0==CheckLicense() )
+	// ========================================
+	if( iret = CheckLicense() )
+	{
+		// License OK~~
+		//fprintf(stderr,"\n");		
+		fprintf(stderr," ------->> Licensed OK on the PC.. (%#x) \n", iret);
+		fprintf(stderr,"---------------------------------------------------------------\n" );
+	}
+	else
 	{
 		beep(700,100);
 		AllFilesClosed();
-		
+		fprintf(stderr,"\r\n\n [LICENSED] License is required... \n\n");
 		exit(0);
 		return 0;
 	}
+	// ========================================
+	
 
 	/* ---------------------------------------------------------------------
 	A (MOTOROLA) : convert hex to Motorola bin
@@ -7469,16 +7484,10 @@ int main(int argc, char *argv[])
 
 	g_iUpper = iUpper; // uppercase for crc16/crc32/crc64/crc16c or CRC16/CRC32/CRC64/CRC16C
 
-	//printf("OPTIND  ============ %d \n", optind);
-
 
 	if( argc < 2 )
 	{
-		//char ch;
-		
 		help();
-		//ch = getch();
-		//if( ch=='q' || ch=='Q' || ch==27) ClearScreen();
 
 		beep(700,100);
 		AllFilesClosed();
@@ -7489,9 +7498,9 @@ int main(int argc, char *argv[])
 
 
 	
-	/* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
-	/* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
-	/* ========== INPUT FILE ================= */
+	/* =========================================== */
+	/* ============== INPUT FILE ================= */
+	/* =========================================== */
 
 #if MD5_MULTI_INPUT_FILES
 	if(1==isIgnoreBothFile)
