@@ -4350,6 +4350,296 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
 
 
 
+
+int CheckLicense(void)
+{
+#define MAC_BUF_SIZ 		200
+#define MAC_ADDR_NUM 		6
+#define MAC_ADDR_LINE_SIZ 	10
+#define HOSTPC_MAC_FILE 	"C:/Temp/ahLic.mac"
+#define HOSTPC_MAC_TEMP 	"C:/Temp/111.tmp"
+#define LICENSE_LEN 		128
+
+	char tmpData[MAC_BUF_SIZ];
+	FILE *fi = NULL;
+	FILE *fo = NULL;
+	FILE *fr = NULL;
+	unsigned char macAdd[MAC_ADDR_LINE_SIZ][7];
+	
+	unsigned char	LicFile[10][MAC_BUF_SIZ] = {0,};
+	int result;
+	int re = 0, fres, ii=0, licOk=0;
+	unsigned int iOKc=0, iNGc=0, lloop=0;
+	int iret = -10;
+
+
+	///////////////////////////////////////////////////////////
+	if( NULL == (fr = fopen( "./shift.lic", "rb")) ) 
+	{
+		fprintf(stderr,"\r\nCan not read License file (./shift.lic) \r\n");
+		//fclose(fr);
+		//exit(0);
+	}
+	else
+	{
+		ii=0;
+		memset( LicFile, 0x00, sizeof(LicFile) );	
+		do {
+			fscanf(fr, "%s", LicFile[ii] );
+			if( strlen(LicFile[ii] ) < 1 ) break;
+			//fprintf(stderr, "%d -> %s\n", ii, LicFile[ii]);
+			if(ii++ > MAC_ADDR_LINE_SIZ) break;
+		} while (!feof (fr));
+		fclose(fr);
+	}
+	///////////////////////////////////////////////////////////
+
+	fres = isFileExist(HOSTPC_MAC_FILE, 0 );
+	//fprintf(stderr, "fres = %d \n", fres );
+	if(0==fres)
+	{				
+		re = system("getmac > C:/Temp/111.tmp");
+		if( 0!=re )
+		{
+			fprintf(stderr,"License temp check needed.. \n\n");
+			exit(0);
+		}
+
+		if( NULL == (fi = fopen( HOSTPC_MAC_TEMP, "rb")) ) 
+		{
+			fprintf(stderr,"\nCan not read temp file... \n\n");
+			exit(0);
+		}
+		else
+		{
+			if( NULL == (fo = fopen( HOSTPC_MAC_FILE, "wb")) ) 
+			{
+				fprintf(stderr,"\nCan not write alLic.mac temp file.. \n\n");
+				if(fi) fclose(fi);
+				if(fo) fclose(fo);
+				exit(0);
+			}
+		}
+		memset(macAdd, 0x00, sizeof(macAdd) );
+		lloop = 0;
+		do
+		{
+			unsigned int i=0;
+
+			/* Read a line from input file. */
+			memset( tmpData, 0x00, sizeof(tmpData) );
+
+			if( NULL == fgets( tmpData, MAC_BUF_SIZ, fi ) )
+			{
+				//fprintf(stderr,"temp Lic ended.. \n" );
+				break;
+			}
+
+			/* Remove carriage return/line feed at the end of line. */
+			i = strlen(tmpData);
+			
+			if(i >= MAC_BUF_SIZ)
+			{
+				fprintf(stderr,"ERROR:%6d: Not enough Buffer length---(%d) \r\n", i );
+			}
+
+			if (--i > 0)
+			{
+				if (tmpData[i] == '\n') tmpData[i] = '\0';
+				if (tmpData[i] == '\r') tmpData[i] = '\0'; 
+				if (tmpData[i-1] == '\n') tmpData[i-1] = '\0';
+				if (tmpData[i-1] == '\r') tmpData[i-1] = '\0'; 
+
+				result = sscanf(tmpData, "%x-%x-%x-%x-%x-%x",
+							&macAdd[lloop][0], &macAdd[lloop][1], &macAdd[lloop][2], &macAdd[lloop][3], &macAdd[lloop][4], &macAdd[lloop][5] );
+
+				
+				/* === 1 STEP : record (17 items check) =============== */
+				if(MAC_ADDR_NUM==result)
+				{
+					//fprintf(stderr, "%d [%02x-%02x-%02x-%02x-%02x-%02x] \n", lloop, macAdd[lloop][0], macAdd[lloop][1], macAdd[lloop][2], macAdd[lloop][3], macAdd[lloop][4], macAdd[lloop][5] );
+
+					if(fo) fprintf(fo, "%02x-%02x-%02x-%02x-%02x-%02x\n", 
+								macAdd[lloop][0], macAdd[lloop][1], macAdd[lloop][2], macAdd[lloop][3], macAdd[lloop][4], macAdd[lloop][5] );
+					iOKc ++;
+					lloop ++;
+				}
+				else if( (MAC_ADDR_NUM!=result) && (result!=-1 && i>0) ) 
+				{
+					iNGc ++;
+					continue; // reading Next item because of FAIL item
+				}
+
+				if( lloop > MAC_ADDR_LINE_SIZ ) break;
+				/* === 1 STEP : record (17 items check) =============== */
+			}
+		}
+		while (!feof (fi));
+			
+		if(fi) { fclose(fi); fi=NULL; }
+		if(fo) { fclose(fo); fo=NULL; }
+		if(fr) { fclose(fr); fr=NULL; }
+
+		if( 0 != remove( HOSTPC_MAC_TEMP ) )
+		{
+			//fprintf(stderr,"  Deleted temp file -> Failed \n");
+		}
+
+		#if 1
+		{
+			char	sha3Buf[20] = {0,};
+			char	sha3digestTxt[SHA3_OUTPUT_SIZ] = {0,};
+			unsigned char sha3out[SHA3_OUTPUT_SIZ] = { 0, };
+			
+			unsigned __int64 	kll=0;
+			size_t		ll=0;
+			int 		ret, ii;
+
+			memset( sha3Buf, 0x00, sizeof(sha3Buf) );
+			memset( sha3out, 0x00, sizeof(sha3out) );
+			memset( sha3digestTxt, 0x00, sizeof(sha3digestTxt) );
+
+			if( NULL == (fi = fopen( HOSTPC_MAC_FILE, "rb")) ) 
+			{
+				fprintf(stderr,"\n++ERROR++:Can not read temp Lic file \n\n");
+				exit(0);
+			}
+
+
+			iret = 0; 
+			kll = 0UL;
+			licOk = 0;
+			//while((ll = fread(sha3Buf, 15, sizeof(sha3Buf), fi)) > 0) 
+			do {
+				// Initialize the SHA3-512 context
+				sha3_init(SHA3_512_HASH_BIT, SHA3_SHAKE_NONE);	
+
+				fscanf(fi, "%s", sha3Buf );
+				ll = strlen(sha3Buf);
+				{
+					//printf("[ll=%d[%s]]\n", ll, sha3Buf	);
+					kll += ll;
+					sha3_update(sha3Buf, ll);
+				}
+				
+				ret = sha3_final(sha3out, SHA3_OUT_512);
+				
+				for (ii = 0; ii < SHA3_OUT_512; ii++)
+				{
+					sprintf(&sha3digestTxt[ii*2], "%02x", sha3out[ii]);
+				}
+
+				//if(outfile) fprintf(outfile,"%s", sha3digestTxt);
+				//printf("[%s] \r\n", sha3digestTxt  );
+
+				for(ii=0; ii<MAC_ADDR_LINE_SIZ; ii++)
+				{
+					if( 0==strncmp(sha3digestTxt, &LicFile[ii][4], LICENSE_LEN ) ) 
+					{
+						licOk ++;
+						iret=0x8000;
+						//printf("1St -- Same OK index: %d \n", ii);
+					}
+				}
+				iret += licOk;
+			} while (!feof (fi));
+			if(fi) fclose(fi);
+			if(fo) fclose(fo);
+			if(fr) fclose(fr);
+		}
+		#endif
+
+		if( iret ) 
+		{
+			fprintf(stderr," ------->> Licensed OK on the PC. (%#x)\n", iret);
+			fprintf(stderr,"---------------------------------------------------------------\n" );
+		}
+
+		return iret; /* License OK */
+	}
+	else
+	{
+		char	sha3Buf[20] = {0,};
+		char	sha3digestTxt[SHA3_OUTPUT_SIZ] = {0,};
+		unsigned char sha3out[SHA3_OUTPUT_SIZ] = { 0, };
+		
+		unsigned __int64 	kll=0;
+		size_t		ll=0;
+		int 		ret, ii;
+
+		memset( sha3Buf, 0x00, sizeof(sha3Buf) );
+		memset( sha3out, 0x00, sizeof(sha3out) );
+		memset( sha3digestTxt, 0x00, sizeof(sha3digestTxt) );
+
+		if( NULL == (fi = fopen( HOSTPC_MAC_FILE, "rb")) ) 
+		{
+			fprintf(stderr,"\n++ERROR++:Can not read temp Lic file \n\n");
+			if(fi) fclose(fi);
+			if(fo) fclose(fo);
+			if(fr) fclose(fr);
+			exit(0);
+		}
+
+
+		iret = 0; 
+		kll = 0UL;
+		licOk = 0;
+		//while((ll = fread(sha3Buf, 15, sizeof(sha3Buf), fi)) > 0) 
+		do {
+			// Initialize the SHA3-512 context
+			sha3_init(SHA3_512_HASH_BIT, SHA3_SHAKE_NONE);	
+
+			fscanf(fi, "%s", sha3Buf );
+			ll = strlen(sha3Buf);
+			if(ll<1) break;
+			{
+				//printf("[ll=%d[%s]]\n", ll,sha3Buf	);
+				kll += ll;
+				sha3_update(sha3Buf, ll);
+			}
+			
+			ret = sha3_final(sha3out, SHA3_OUT_512);
+			
+			for (ii = 0; ii < SHA3_OUT_512; ii++)
+			{
+				sprintf(&sha3digestTxt[ii*2], "%02x", sha3out[ii]);
+			}
+
+			//if(outfile) fprintf(outfile,"%s", sha3digestTxt);
+			//printf("[%s] \r\n", sha3digestTxt  );
+
+			for(ii=0; ii<MAC_ADDR_LINE_SIZ; ii++)
+			{
+				if( 0==strncmp(sha3digestTxt, &LicFile[ii][4], LICENSE_LEN) ) 
+				{
+					licOk++;
+					iret=0x4000;
+					//printf("2nd -- Same OK index: %d \n", ii);
+				}
+			}
+			iret += licOk;			
+		} while (!feof (fi));
+		if(fi) fclose(fi);
+		if(fo) fclose(fo);
+		if(fr) fclose(fr);
+
+		if( iret ) 
+		{
+			fprintf(stderr," ------->> Licensed OK on the PC.. (%#x) \n", iret);
+			fprintf(stderr,"---------------------------------------------------------------\n" );
+		}
+		return iret; /* License OK */
+	}
+
+	if(fi) fclose(fi);
+	if(fo) fclose(fo);
+	if(fr) fclose(fr);
+	return 0;
+}
+
+
+
+
 /* ---------------------------------------------------------------------------------------
  * main() function
  *
@@ -4831,6 +5121,15 @@ int main(int argc, char *argv[])
 
 	help_brief();
 
+
+	if( 0==CheckLicense() )
+	{
+		beep(700,100);
+		AllFilesClosed();
+		
+		exit(0);
+		return 0;
+	}
 
 	/* ---------------------------------------------------------------------
 	A (MOTOROLA) : convert hex to Motorola bin
@@ -7016,7 +7315,7 @@ int main(int argc, char *argv[])
 					// ------------------------------------------------
 
 					itmpFileDeleted = 1;
-					if( strstr(str_ShiftOp[0], "-used") || strstr(str_ShiftOp[0], ".used") )
+					if( strstr(str_ShiftOp[0], ".used") )
 					{
 					int i, len;
 
@@ -7025,7 +7324,7 @@ int main(int argc, char *argv[])
 						len = strlen( str_ShiftOp[0] );
 						for(i=0; i<len; i++)
 						{
-							if( '-' == str_ShiftOp[0][i] || '.' == str_ShiftOp[0][i] ) str_ShiftOp[0][i]='\0';
+							if( '.' == str_ShiftOp[0][i] ) str_ShiftOp[0][i]='\0';
 						}
 					}
 
@@ -7050,7 +7349,7 @@ int main(int argc, char *argv[])
 					if(itmpFileDeleted) 
 					{
 						//fprintf(stderr,"\n");
-						fprintf(stderr," -- Delete option added..."); 
+						fprintf(stderr," -- temp files to be deleted..."); 
 					}
 					
 					for(kk=1; kk<iTCnt; kk++)
@@ -7118,7 +7417,7 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
-					fprintf(stderr,"\n\n[++ERROR++] up shift option error. \r\n" );
+					fprintf(stderr,"\n\n[++ERROR++] up shift option error. %s \r\n", optarg );
 
 					beep(700,100);
 					AllFilesClosed();
@@ -7234,7 +7533,7 @@ int main(int argc, char *argv[])
 		if( NULL == (inpfile = fopen( infile_name, "rb")) ) 
 		{
 			beep(700,100);
-			printf("\n\n[++ERROR++] Can not open input file[%s]. \n",infile_name);
+			printf("\n\n[++ERROR++] Can not open input file[%s]. Use --input option! \n",infile_name);
 
 			AllFilesClosed();
 
@@ -7743,14 +8042,18 @@ int main(int argc, char *argv[])
 				kll = RunCRC16(infile_name, NULL, 0, 0, insertCRC, iVerbosType, str_hash);
 
 				if( iUpper ) // 2017.04.27
-					fprintf(outfile,"%04X", g_calcCrc16);
+				{
+					if(outfile) fprintf(outfile,"%04X", g_calcCrc16);
+				}
 				else
-					fprintf(outfile,"%04x", g_calcCrc16);
-
+				{
+					if(outfile) fprintf(outfile,"%04x", g_calcCrc16);
+				}
+				
 				len_build_date = 4;
 				while( len_build_date < MAX_CRC_LEN_CODE )
 				{
-					fprintf(outfile,"%c",SPACE_FILL3);
+					if(outfile) fprintf(outfile,"%c",SPACE_FILL3);
 					len_build_date++;
 				}
 
@@ -7763,14 +8066,18 @@ int main(int argc, char *argv[])
 				kll = RunKSC_CRC16(infile_name, NULL, 0, 0, insertCRC, iVerbosType, str_hash);
 
 				if( iUpper ) // 2017.04.27
-					fprintf(outfile,"%04X", g_calcCrc16);
+				{
+					if(outfile) fprintf(outfile,"%04X", g_calcCrc16);
+				}
 				else
-					fprintf(outfile,"%04x", g_calcCrc16);
+				{
+					if(outfile) fprintf(outfile,"%04x", g_calcCrc16);
+				}
 
 				len_build_date = 4;
 				while( len_build_date < MAX_CRC_LEN_CODE )
 				{
-					fprintf(outfile,"%c",SPACE_FILL3);
+					if(outfile) fprintf(outfile,"%c",SPACE_FILL3);
 					len_build_date++;
 				}
 
@@ -7783,14 +8090,18 @@ int main(int argc, char *argv[])
  				kll = RunCRC16CCITT(infile_name, NULL, 0, 0, insertCRC, iVerbosType, str_hash);
 
 				if( iUpper ) // 2017.04.27
-					fprintf(outfile,"%04X", g_calcCrc16);
+				{
+					if(outfile) fprintf(outfile,"%04X", g_calcCrc16);
+				}
 				else
-					fprintf(outfile,"%04x", g_calcCrc16);
+				{
+					if(outfile) fprintf(outfile,"%04x", g_calcCrc16);
+				}
 
 				len_build_date = 4;
 				while( len_build_date < MAX_CRC_LEN_CODE )
 				{
-					fprintf(outfile,"%c",SPACE_FILL3);
+					if(outfile) fprintf(outfile,"%c",SPACE_FILL3);
 					len_build_date++;
 				}
 
@@ -7803,14 +8114,18 @@ int main(int argc, char *argv[])
  				kll = RunCRC32(infile_name, NULL, 0, 0, insertCRC, iVerbosType, str_hash);
 
 				if( iUpper ) // 2017.04.27
-					fprintf(outfile,"%08X", g_calcCrc32);
+				{
+					if(outfile) fprintf(outfile,"%08X", g_calcCrc32);
+				}
 				else
-					fprintf(outfile,"%08x", g_calcCrc32);
-
+				{
+					if(outfile) fprintf(outfile,"%08x", g_calcCrc32);
+				}
+				
 				len_build_date = 8;
 				while( len_build_date < MAX_CRC_LEN_CODE )
 				{
-					fprintf(outfile,"%c",SPACE_FILL3);
+					if(outfile) fprintf(outfile,"%c",SPACE_FILL3);
 					len_build_date++;
 				}
 
@@ -7823,14 +8138,18 @@ int main(int argc, char *argv[])
 				kll = RunCRC64(infile_name, NULL, 0, 0, insertCRC, iVerbosType, str_hash);
 
 				if( iUpper ) // 2017.04.27
-					fprintf(outfile,"%016llX", g_calcCrc64);
+				{
+					if(outfile) fprintf(outfile,"%016llX", g_calcCrc64);
+				}
 				else
-					fprintf(outfile,"%016llx", g_calcCrc64);
-
+				{
+					if(outfile) fprintf(outfile,"%016llx", g_calcCrc64);
+				}
+				
 				len_build_date = 16;
 				while( len_build_date < MAX_CRC_LEN_CODE )
 				{
-					fprintf(outfile,"%c",SPACE_FILL3);
+					if(outfile) fprintf(outfile,"%c",SPACE_FILL3);
 					len_build_date++;
 				}
 
@@ -7843,14 +8162,18 @@ int main(int argc, char *argv[])
 				kll = RunCRC64_isc(infile_name, NULL, 0, 0, insertCRC, iVerbosType, str_hash);
 
 				if( iUpper ) // 2020.07.16
-					fprintf(outfile,"%016llX", g_calcCrc64);
+				{
+					if(outfile) fprintf(outfile,"%016llX", g_calcCrc64);
+				}
 				else
-					fprintf(outfile,"%016llx", g_calcCrc64);
-
+				{
+					if(outfile) fprintf(outfile,"%016llx", g_calcCrc64);
+				}
+				
 				len_build_date = 16;
 				while( len_build_date < MAX_CRC_LEN_CODE )
 				{
-					fprintf(outfile,"%c",SPACE_FILL3);
+					if(outfile) fprintf(outfile,"%c",SPACE_FILL3);
 					len_build_date++;
 				}
 
@@ -7863,14 +8186,18 @@ int main(int argc, char *argv[])
  				kll = RunAdler32(infile_name, NULL, 0, 0, insertCRC, iVerbosType, str_hash);
 
 				if( iUpper ) // 2017.04.27
-					fprintf(outfile,"%08X", g_calcAdler32);
+				{
+					if(outfile) fprintf(outfile,"%08X", g_calcAdler32);
+				}
 				else
-					fprintf(outfile,"%08x", g_calcAdler32);
-
+				{
+					if(outfile) fprintf(outfile,"%08x", g_calcAdler32);
+				}
+				
 				len_build_date = 8;
 				while( len_build_date < MAX_CRC_LEN_CODE )
 				{
-					fprintf(outfile,"%c",SPACE_FILL3);
+					if(outfile) fprintf(outfile,"%c",SPACE_FILL3);
 					len_build_date++;
 				}
 
@@ -7883,10 +8210,14 @@ int main(int argc, char *argv[])
  				kll = RunJoaat(infile_name, NULL, 0, 0, insertCRC, iVerbosType, str_hash);
 
 				if( iUpper )
-					fprintf(outfile,"%08X", g_calcJoaat);
+				{
+					if(outfile) fprintf(outfile,"%08X", g_calcJoaat);
+				}
 				else
-					fprintf(outfile,"%08x", g_calcJoaat);
-
+				{
+					if(outfile) fprintf(outfile,"%08x", g_calcJoaat);
+				}
+				
 				len_build_date = 8;
 				while( len_build_date < MAX_CRC_LEN_CODE )
 				{
@@ -8854,7 +9185,7 @@ int main(int argc, char *argv[])
 			if( NULL == (inpfile = fopen( infile_name, "rb")) ) 
 			{
 				beep(700,100);
-				printf("\n\n[++ERROR++] Can not open input file[%s] \n",infile_name);
+				printf("\n\n[++ERROR++] Can not open input file[%s]. Use --input option!! \n",infile_name);
 				if( NULL == infile_name || infile_name[0] == 0x00)
 					printf("[++ERROR++] Must be input file with -i or --input option. \n" );
 			
@@ -8897,7 +9228,7 @@ int main(int argc, char *argv[])
 
 				while( len_build_date < MAX_CHARS )
 				{
-					fprintf(outfile,"%c",SPACE_FILL3);
+					if(outfile) fprintf(outfile,"%c",SPACE_FILL3);
 					len_build_date++;
 				}
 			}
@@ -8906,7 +9237,7 @@ int main(int argc, char *argv[])
 				count=0;
 				while( count < MAX_CHARS )
 				{
-					fprintf(outfile,"%c", str_abuild_date[count] );
+					if(outfile) fprintf(outfile,"%c", str_abuild_date[count] );
 					count++;
 				}
 			}
@@ -9071,9 +9402,12 @@ int main(int argc, char *argv[])
 
 			if( (1==iVerbosType || 3==iVerbosType) && (TRUE == verbose) && outfile ) /// 2014.08.05
 			{
-				fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
-				fprintf(outfile, "CRC16 checksum is created at %s by %s \n", cdate, EmailText );
-				fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+				if(outfile) 
+				{
+					fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+					fprintf(outfile, "CRC16 checksum is created at %s by %s \n", cdate, EmailText );
+					fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+				}
 			}
 		}
 		else if( HDR_KSC_CRC16==isCRCtype )
@@ -9082,9 +9416,12 @@ int main(int argc, char *argv[])
 
 			if( (1==iVerbosType || 3==iVerbosType) && (TRUE == verbose) && outfile ) /// 2014.08.05
 			{
-				fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
-				fprintf(outfile, "KSC-CRC16 checksum is created at %s by %s \n", cdate, EmailText );
-				fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+				if(outfile) 
+				{
+					fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+					fprintf(outfile, "KSC-CRC16 checksum is created at %s by %s \n", cdate, EmailText );
+					fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+				}
 			}
 		}
 		else if( HDR_CRC16CCITT==isCRCtype )
@@ -9092,9 +9429,12 @@ int main(int argc, char *argv[])
 			printf("CRC16CCITT>> ");
 			if( (1==iVerbosType || 3==iVerbosType) && (TRUE == verbose) && outfile ) /// 2014.08.05
 			{
-				fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
-				fprintf(outfile, "CRC16CCITT checksum is created at %s by %s \n", cdate, EmailText );
-				fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+				if(outfile) 
+				{
+					fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+					fprintf(outfile, "CRC16CCITT checksum is created at %s by %s \n", cdate, EmailText );
+					fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+				}
 			}
 		}
 		else if( HDR_CRC32==isCRCtype )
@@ -9102,10 +9442,13 @@ int main(int argc, char *argv[])
 			printf("CRC32>> ");
 			if( (1==iVerbosType || 3==iVerbosType) && (TRUE == verbose) && outfile ) /// 2014.08.05
 			{
-				fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
-				fprintf(outfile, "CRC32 checksum is created at %04d/%02d/%02d/%s %02d:%02d:%02d by %s \n", pTime->tm_year, pTime->tm_mon, pTime->tm_mday,  
-													WeekTXT[pTime->tm_wday], pTime->tm_hour, pTime->tm_min, pTime->tm_sec, EmailText );
-				fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+				if(outfile) 
+				{
+					fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+					fprintf(outfile, "CRC32 checksum is created at %04d/%02d/%02d/%s %02d:%02d:%02d by %s \n", pTime->tm_year, pTime->tm_mon, pTime->tm_mday,  
+														WeekTXT[pTime->tm_wday], pTime->tm_hour, pTime->tm_min, pTime->tm_sec, EmailText );
+					fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+				}
 			}
 		}
 		else if( HDR_CRC64==isCRCtype )
@@ -9113,10 +9456,13 @@ int main(int argc, char *argv[])
 			printf("CRC64>> ");
 			if( (1==iVerbosType || 3==iVerbosType) && (TRUE == verbose) && outfile ) /// 2014.08.05
 			{
-				fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
-				fprintf(outfile, "CRC64 checksum is created at %04d/%02d/%02d/%s %02d:%02d:%02d by %s \n", pTime->tm_year, pTime->tm_mon, pTime->tm_mday,  
-													WeekTXT[pTime->tm_wday], pTime->tm_hour, pTime->tm_min, pTime->tm_sec, EmailText );
-				fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+				if(outfile) 
+				{
+					fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+					fprintf(outfile, "CRC64 checksum is created at %04d/%02d/%02d/%s %02d:%02d:%02d by %s \n", pTime->tm_year, pTime->tm_mon, pTime->tm_mday,  
+														WeekTXT[pTime->tm_wday], pTime->tm_hour, pTime->tm_min, pTime->tm_sec, EmailText );
+					fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+				}
 			}
 		}
 		else if( HDR_CRC64_ISC==isCRCtype )
@@ -9124,10 +9470,13 @@ int main(int argc, char *argv[])
 			printf("CRC64ISC>> ");
 			if( (1==iVerbosType || 3==iVerbosType) && (TRUE == verbose) && outfile ) /// 2014.08.05
 			{
-				fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
-				fprintf(outfile, "CRC64ISC checksum is created at %04d/%02d/%02d/%s %02d:%02d:%02d by %s \n", pTime->tm_year, pTime->tm_mon, pTime->tm_mday,  
-													WeekTXT[pTime->tm_wday], pTime->tm_hour, pTime->tm_min, pTime->tm_sec, EmailText );
-				fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+				if(outfile) 
+				{
+					fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+					fprintf(outfile, "CRC64ISC checksum is created at %04d/%02d/%02d/%s %02d:%02d:%02d by %s \n", pTime->tm_year, pTime->tm_mon, pTime->tm_mday,  
+														WeekTXT[pTime->tm_wday], pTime->tm_hour, pTime->tm_min, pTime->tm_sec, EmailText );
+					fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+				}
 			}
 		}
 		else if( HDR_ADLER32==isCRCtype )
@@ -9135,10 +9484,13 @@ int main(int argc, char *argv[])
 			printf("ADLER32>> ");
 			if( (1==iVerbosType || 3==iVerbosType) && (TRUE == verbose) && outfile ) /// 2014.08.05
 			{
-				fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
-				fprintf(outfile, "ADLER32 checksum is created at %04d/%02d/%02d/%s %02d:%02d:%02d by %s \n", pTime->tm_year, pTime->tm_mon, pTime->tm_mday,  
-													WeekTXT[pTime->tm_wday], pTime->tm_hour, pTime->tm_min, pTime->tm_sec, EmailText );
-				fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+				if(outfile) 
+				{
+					fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+					fprintf(outfile, "ADLER32 checksum is created at %04d/%02d/%02d/%s %02d:%02d:%02d by %s \n", pTime->tm_year, pTime->tm_mon, pTime->tm_mday,  
+														WeekTXT[pTime->tm_wday], pTime->tm_hour, pTime->tm_min, pTime->tm_sec, EmailText );
+					fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+				}
 			}
 		}
 		else if( HDR_JOAAT==isCRCtype )
@@ -9146,10 +9498,13 @@ int main(int argc, char *argv[])
 			printf("JOAAT>> ");
 			if( (1==iVerbosType || 3==iVerbosType) && (TRUE == verbose) && outfile )  
 			{
-				fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
-				fprintf(outfile, "JOAAT checksum is created at %04d/%02d/%02d/%s %02d:%02d:%02d by %s \n", pTime->tm_year, pTime->tm_mon, pTime->tm_mday,  
-													WeekTXT[pTime->tm_wday], pTime->tm_hour, pTime->tm_min, pTime->tm_sec, EmailText );
-				fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+				if(outfile) 
+				{
+					fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+					fprintf(outfile, "JOAAT checksum is created at %04d/%02d/%02d/%s %02d:%02d:%02d by %s \n", pTime->tm_year, pTime->tm_mon, pTime->tm_mday,  
+														WeekTXT[pTime->tm_wday], pTime->tm_hour, pTime->tm_min, pTime->tm_sec, EmailText );
+					fprintf(outfile, "----------------------------------------------------------------------------------\r\n" );
+				}
 			}
 		}
 		else					
@@ -9496,9 +9851,12 @@ int main(int argc, char *argv[])
 
 		printf("WinCE BIN Information...... FileName : %s \r\n", infile_name);
 		printf("------------------------------------------------------------------------- \r\n");
-		fprintf(outfile, "WinCE BIN Information...... FileName : %s \r\n", infile_name);
-		fprintf(outfile,"------------------------------------------------------------------------- \r\n");
 
+		if(outfile) 
+		{
+			fprintf(outfile, "WinCE BIN Information...... FileName : %s \r\n", infile_name);
+			fprintf(outfile,"------------------------------------------------------------------------- \r\n");
+		}
 
 		data_buf = (unsigned char*)malloc( MAX_BUF_SIZ*sizeof(unsigned char) );
 
@@ -9508,27 +9866,27 @@ int main(int argc, char *argv[])
 		{
 			data_buf[NK_BIN_ID-1] = '\0';
 			printf("%s Inform> Standard BIN Format              : %s+0x0A \r\n", infile_name, data_buf);
-			fprintf(outfile,"%s Inform> Standard BIN Format              : %s+0x0A \r\n", infile_name, data_buf);
+			if(outfile) fprintf(outfile,"%s Inform> Standard BIN Format              : %s+0x0A \r\n", infile_name, data_buf);
 			is_BIN_OK = 1;	
 		}
 		else if( (0==strncmp(data_buf, (char*)"X000FF", NK_BIN_ID-1)) && (0x0A==data_buf[NK_BIN_ID-1]) )
 		{
 			data_buf[NK_BIN_ID-1] = '\0';
 			printf("%s Inform> Extended BIN Format              : %s+0x0A \r\n", infile_name, data_buf);
-			fprintf(outfile,"%s Inform> Extended BIN Format              : %s+0x0A \r\n", infile_name, data_buf);
+			if(outfile) fprintf(outfile,"%s Inform> Extended BIN Format              : %s+0x0A \r\n", infile_name, data_buf);
 			is_BIN_OK = 1;	
 		}
 		else
 		{
 			printf("%s Inform> Unknown BIN Format               :( ", infile_name);
-			fprintf(outfile,"%s Inform> Unknown BIN Format               :( ", infile_name);
+			if(outfile) fprintf(outfile,"%s Inform> Unknown BIN Format               :( ", infile_name);
 			for(idx=0; idx<NK_BIN_ID; idx++)
 			{
 				printf("%c", data_buf[idx] );
-				fprintf(outfile,"%c", data_buf[idx] );
+				if(outfile) fprintf(outfile,"%c", data_buf[idx] );
 			}
 			printf(") \n");
-			fprintf(outfile,") \r\n");
+			if(outfile) fprintf(outfile,") \r\n");
 			is_BIN_OK = 0;	
 		}
 
@@ -9541,10 +9899,10 @@ int main(int argc, char *argv[])
 			fr_size = fread(data_buf, sizeof(unsigned char), NK_BIN_LAUNCH_ADDR, inpfile );
 			load_addr = data_buf[3]<<24 | data_buf[2]<<16 | data_buf[1]<<8 | data_buf[0];
 			printf("%s Inform> Load Address (RAM start address) : 0x%X \r\n", infile_name, load_addr);
-			fprintf(outfile,"%s Inform> Load Address (RAM start address) : 0x%X \r\n", infile_name, load_addr);
+			if(outfile) fprintf(outfile,"%s Inform> Load Address (RAM start address) : 0x%X \r\n", infile_name, load_addr);
 			
 			printf("%s Inform> pTOC                             : 0x%X \r\n", infile_name, (load_addr+pTOC_OFFSET_ADDR) );
-			fprintf(outfile,"%s Inform> pTOC                             : 0x%X \r\n", infile_name, (load_addr+pTOC_OFFSET_ADDR) );
+			if(outfile) fprintf(outfile,"%s Inform> pTOC                             : 0x%X \r\n", infile_name, (load_addr+pTOC_OFFSET_ADDR) );
 
 
 			/* ------ bin image Size ---------------- */
@@ -9552,14 +9910,14 @@ int main(int argc, char *argv[])
 			fr_size = fread(data_buf, sizeof(unsigned char), NK_BIN_IMAGE_SIZE, inpfile );
 			image_size = data_buf[3]<<24 | data_buf[2]<<16 | data_buf[1]<<8 | data_buf[0];
 			printf("%s Inform> BIN Image size                   : 0x%08X (%.3fKB) \r\n", infile_name, image_size, (image_size/1024.0));
-			fprintf(outfile,"%s Inform> BIN Image size                   : 0x%08X (%.3fKB) \r\n", infile_name, image_size, (image_size/1024.0));
+			if(outfile) fprintf(outfile,"%s Inform> BIN Image size                   : 0x%08X (%.3fKB) \r\n", infile_name, image_size, (image_size/1024.0));
 	
 			/* Record Start */
 			prev_record_addr = -1;
 			prev_record_size = -1;
 
 			printf("------------------------------------------------------------------------- \r\n");
-			fprintf(outfile,"------------------------------------------------------------------------- \r\n");
+			if(outfile) fprintf(outfile,"------------------------------------------------------------------------- \r\n");
 			for(idx=1; is_BIN_OK ; idx++)
 			{
 				/* ------ Record 1 ~ N ---------------- */
@@ -9575,24 +9933,24 @@ int main(int argc, char *argv[])
 				tot_record_size += record_size;
 				
 				printf("    Record_%04d> Launch Address       : 0x%X ", idx, record_addr);
-				fprintf(outfile,"    Record_%04d> Launch Address       : 0x%X ", idx, record_addr);
+				if(outfile) fprintf(outfile,"    Record_%04d> Launch Address       : 0x%X ", idx, record_addr);
 
 				if( rom_header_addr==record_addr )
 				{
 					printf(" <-- *ROM Header Address* \r\n");
-					fprintf(outfile," <-- *ROM Header Address* \r\n");
+					if(outfile) fprintf(outfile," <-- *ROM Header Address* \r\n");
 				}
 				else
 				{
 					printf("\r\n");
-					fprintf(outfile,"\r\n");
+					if(outfile) fprintf(outfile,"\r\n");
 				}
 
 				printf("    Record_%04d> Payload Size         : (0x%-6X) %d Bytes (%.1f KB) \r\n", idx, record_size, record_size, record_size/1024.0 );
-				fprintf(outfile,"    Record_%04d> Payload Size         : (0x%-6X) %d Bytes (%.1f KB) \r\n", idx, record_size, record_size, record_size/1024.0 );
+				if(outfile) fprintf(outfile,"    Record_%04d> Payload Size         : (0x%-6X) %d Bytes (%.1f KB) \r\n", idx, record_size, record_size, record_size/1024.0 );
 
 				printf("    Record_%04d> CheckSum             : 0x%08X ", idx, record_crc);
-				fprintf(outfile,"    Record_%04d> CheckSum             : 0x%08X ", idx, record_crc);
+				if(outfile) fprintf(outfile,"    Record_%04d> CheckSum             : 0x%08X ", idx, record_crc);
 
 
 			#if 1
@@ -9602,7 +9960,7 @@ int main(int argc, char *argv[])
 					{
 						for(ii=0; ii < (record_addr - (prev_record_addr + prev_record_size)) ; ii++)
 						{
-							fprintf(BIN_nb0,"%c", 0x00);
+							if(BIN_nb0) fprintf(BIN_nb0,"%c", 0x00);
 						}
 					}
 				}
@@ -9624,17 +9982,17 @@ int main(int argc, char *argv[])
 				for(rcl=0; rcl<record_size; rcl++)
 					nk_calc_crc += data_buf[rcl];
 				printf(" (Calc_CRC: 0x%08X", nk_calc_crc);
-				fprintf(outfile," (Calc_CRC: 0x%08X", nk_calc_crc);
+				if(outfile) fprintf(outfile," (Calc_CRC: 0x%08X", nk_calc_crc);
 
 				if(nk_calc_crc==record_crc) 
 				{
 					printf(" - CRC OK) \n");
-					fprintf(outfile," - CRC OK) \r\n");
+					if(outfile) fprintf(outfile," - CRC OK) \r\n");
 				}
 				else
 				{
 					printf(" - CRC Failed) \n");
-					fprintf(outfile," - CRC Failed) \r\n");
+					if(outfile) fprintf(outfile," - CRC Failed) \r\n");
 				}
 				/// -----------------------------------------
 
@@ -9663,77 +10021,79 @@ int main(int argc, char *argv[])
 					printf("      MiscFlags           : 0x%08X \n", rom_hdr_s.usMiscFlags);
 					printf("      CPU                 : 0x%04x ", rom_hdr_s.usCPUType);
 
-					fprintf(outfile,"     ------------ ROMHDR --------------- \r\n");
-					fprintf(outfile,"      DLL First           : 0x%08X \r\n", rom_hdr_s.dllfirst);
-					fprintf(outfile,"      DLL Last            : 0x%08X \r\n", rom_hdr_s.dlllast);
-					fprintf(outfile,"      Physical First      : 0x%08X \r\n", rom_hdr_s.physfirst);
-					fprintf(outfile,"      Physical Last       : 0x%08X \r\n", rom_hdr_s.physlast);
-					fprintf(outfile,"      Num Modules         : %10d \r\n", rom_hdr_s.nummods);
-					fprintf(outfile,"      RAM Start           : 0x%08X \r\n", rom_hdr_s.ulRamStart);
-					fprintf(outfile,"      RAM Free            : 0x%08X \r\n", rom_hdr_s.ulRAMFree);
-					fprintf(outfile,"      RAM End             : 0x%08X \r\n", rom_hdr_s.ulRAMEnd);
-					fprintf(outfile,"      Num Copy Entries    : %10d \r\n", rom_hdr_s.ulCopyEntries);
-					fprintf(outfile,"      Copy Entries Offset : 0x%08X \r\n", rom_hdr_s.ulCopyOffset);
-					fprintf(outfile,"      Length of profile   : %10u \r\n", rom_hdr_s.ulProfileLen);
-					fprintf(outfile,"      Prof Symbol Offset  : 0x%08X \r\n", rom_hdr_s.ulProfileOffset);
-					fprintf(outfile,"      Num Files           : %10d \r\n", rom_hdr_s.numfiles);
-					fprintf(outfile,"      Kernel flags        : 0x%08X \r\n", rom_hdr_s.ulKernelFlags);
-					fprintf(outfile,"      MiscFlags           : 0x%08X \r\n", rom_hdr_s.usMiscFlags);
-					fprintf(outfile,"      CPU                 : 0x%04x ", rom_hdr_s.usCPUType);
-
+					if(outfile) 
+					{
+						fprintf(outfile,"     ------------ ROMHDR --------------- \r\n");
+						fprintf(outfile,"      DLL First           : 0x%08X \r\n", rom_hdr_s.dllfirst);
+						fprintf(outfile,"      DLL Last            : 0x%08X \r\n", rom_hdr_s.dlllast);
+						fprintf(outfile,"      Physical First      : 0x%08X \r\n", rom_hdr_s.physfirst);
+						fprintf(outfile,"      Physical Last       : 0x%08X \r\n", rom_hdr_s.physlast);
+						fprintf(outfile,"      Num Modules         : %10d \r\n", rom_hdr_s.nummods);
+						fprintf(outfile,"      RAM Start           : 0x%08X \r\n", rom_hdr_s.ulRamStart);
+						fprintf(outfile,"      RAM Free            : 0x%08X \r\n", rom_hdr_s.ulRAMFree);
+						fprintf(outfile,"      RAM End             : 0x%08X \r\n", rom_hdr_s.ulRAMEnd);
+						fprintf(outfile,"      Num Copy Entries    : %10d \r\n", rom_hdr_s.ulCopyEntries);
+						fprintf(outfile,"      Copy Entries Offset : 0x%08X \r\n", rom_hdr_s.ulCopyOffset);
+						fprintf(outfile,"      Length of profile   : %10u \r\n", rom_hdr_s.ulProfileLen);
+						fprintf(outfile,"      Prof Symbol Offset  : 0x%08X \r\n", rom_hdr_s.ulProfileOffset);
+						fprintf(outfile,"      Num Files           : %10d \r\n", rom_hdr_s.numfiles);
+						fprintf(outfile,"      Kernel flags        : 0x%08X \r\n", rom_hdr_s.ulKernelFlags);
+						fprintf(outfile,"      MiscFlags           : 0x%08X \r\n", rom_hdr_s.usMiscFlags);
+						fprintf(outfile,"      CPU                 : 0x%04x ", rom_hdr_s.usCPUType);
+					}
 					switch(rom_hdr_s.usCPUType) 
 					{
 					case IMAGE_FILE_MACHINE_SH3:
 					  printf("(SH3)\n");
-					  fprintf(outfile,"(SH3) \r\n");
+					  if(outfile) fprintf(outfile,"(SH3) \r\n");
 					  break;
 					case IMAGE_FILE_MACHINE_SH3E:
 					  printf("(SH3e)\n");
-					  fprintf(outfile,"(SH3e)\r\n");
+					  if(outfile) fprintf(outfile,"(SH3e)\r\n");
 					  break;
 					case IMAGE_FILE_MACHINE_SH3DSP:
 					  printf("(SH3-DSP)\n");
-					  fprintf(outfile,"(SH3-DSP)\r\n");
+					  if(outfile) fprintf(outfile,"(SH3-DSP)\r\n");
 					  break;
 					case IMAGE_FILE_MACHINE_SH4:
 					  printf("(SH4)\n");
-					  fprintf(outfile,"(SH4)\r\n");
+					  if(outfile) fprintf(outfile,"(SH4)\r\n");
 					  break;
 					case IMAGE_FILE_MACHINE_I386:
 					  printf("(x86)\n");
-					  fprintf(outfile,"(x86)\r\n");
+					  if(outfile) fprintf(outfile,"(x86)\r\n");
 					  break;
 					case IMAGE_FILE_MACHINE_THUMB:
 					  printf("(Thumb)\n");
-					  fprintf(outfile,"(Thumb)\r\n");
+					  if(outfile) fprintf(outfile,"(Thumb)\r\n");
 					  break;
 					case IMAGE_FILE_MACHINE_ARM:
 					  printf("(ARM)\n");
-					  fprintf(outfile,"(ARM)\r\n");
+					  if(outfile) fprintf(outfile,"(ARM)\r\n");
 					  break;
 					case IMAGE_FILE_MACHINE_POWERPC:
 					  printf("(PPC)\n");
-					  fprintf(outfile,"(PPC)\r\n");
+					  if(outfile) fprintf(outfile,"(PPC)\r\n");
 					  break;
 					case IMAGE_FILE_MACHINE_R4000:
 					  printf("(R4000)\n");
-					  fprintf(outfile,"(R4000)\r\n");
+					  if(outfile) fprintf(outfile,"(R4000)\r\n");
 					  break;
 					case IMAGE_FILE_MACHINE_MIPS16:
 					  printf("(MIPS16)\n");
-					  fprintf(outfile,"(MIPS16)\r\n");
+					  if(outfile) fprintf(outfile,"(MIPS16)\r\n");
 					  break;
 					case IMAGE_FILE_MACHINE_MIPSFPU:
 					  printf("(MIPSFPU)\n");
-					  fprintf(outfile,"(MIPSFPU)\r\n");
+					  if(outfile) fprintf(outfile,"(MIPSFPU)\r\n");
 					  break;
 					case IMAGE_FILE_MACHINE_MIPSFPU16:
 					  printf("(MIPSFPU16)\n");
-					  fprintf(outfile,"(MIPSFPU16)\r\n");
+					  if(outfile) fprintf(outfile,"(MIPSFPU16)\r\n");
 					  break; 
 					default:
 					  printf("(Unknown)\r\n");
-					  fprintf(outfile,"(Unknown)\r\n");
+					  if(outfile) fprintf(outfile,"(Unknown)\r\n");
 					  break;
 					}
 
@@ -9744,19 +10104,20 @@ int main(int argc, char *argv[])
 					printf("      ROM Header ext.     : 0x%08X \n", rom_hdr_s.pExtensions);
 					printf("      Tracking MEM start  : 0x%08X \n", rom_hdr_s.ulTrackingStart); /// Start Address
 					printf("      Tracking MEM end    : 0x%08X \n",rom_hdr_s.ulTrackingLen);
+					printf("	  Extensions		  : 0x%08X \n", rom_hdr_s.pExtensions );
 
-					fprintf(outfile,"      RAM -- FSRAMPERCENT : 0x%08X \r\n", rom_hdr_s.ulFSRamPercent);
-					fprintf(outfile,"      Device Start addr   : 0x%08X \r\n", rom_hdr_s.ulDrivglobStart);
-					fprintf(outfile,"      Device length       : 0x%08X \r\n", rom_hdr_s.ulDrivglobLen);
+					if(outfile) 
+					{
+						fprintf(outfile,"      RAM -- FSRAMPERCENT : 0x%08X \r\n", rom_hdr_s.ulFSRamPercent);
+						fprintf(outfile,"      Device Start addr   : 0x%08X \r\n", rom_hdr_s.ulDrivglobStart);
+						fprintf(outfile,"      Device length       : 0x%08X \r\n", rom_hdr_s.ulDrivglobLen);
 
-					fprintf(outfile,"      ROM Header ext.     : 0x%08X \r\n", rom_hdr_s.pExtensions);
-					fprintf(outfile,"      Tracking MEM start  : 0x%08X \r\n", rom_hdr_s.ulTrackingStart); /// Start Address
-					fprintf(outfile,"      Tracking MEM end    : 0x%08X \r\n",rom_hdr_s.ulTrackingLen);
-
-				
-					printf("      Extensions          : 0x%08X \n", rom_hdr_s.pExtensions );
-					fprintf(outfile,"      Extensions          : 0x%08X \r\n", rom_hdr_s.pExtensions );
-
+						fprintf(outfile,"      ROM Header ext.     : 0x%08X \r\n", rom_hdr_s.pExtensions);
+						fprintf(outfile,"      Tracking MEM start  : 0x%08X \r\n", rom_hdr_s.ulTrackingStart); /// Start Address
+						fprintf(outfile,"      Tracking MEM end    : 0x%08X \r\n",rom_hdr_s.ulTrackingLen);
+					
+						fprintf(outfile,"      Extensions          : 0x%08X \r\n", rom_hdr_s.pExtensions );
+					}
 			
 					if (rom_hdr_s.pExtensions) 
 					{
@@ -9774,7 +10135,7 @@ int main(int argc, char *argv[])
 
 
 					printf("     ----------------------------------- \r\n");
-					fprintf(outfile,"     ----------------------------------- \r\n");
+					if(outfile) fprintf(outfile,"     ----------------------------------- \r\n");
 
 				}
 
@@ -9786,12 +10147,12 @@ int main(int argc, char *argv[])
 					printf("    Record_%04d> ROM Header Indicator : %s \r\n", idx, rom_header_txt );
 					printf("    Record_%04d> ROM Header Address   : 0x%08X \r\n", idx, rom_header_addr);
 
-					fprintf(outfile,"    Record_%04d> ROM Header Indicator : %s \r\n", idx, rom_header_txt);
-					fprintf(outfile,"    Record_%04d> ROM Header Address   : 0x%08X \r\n", idx, rom_header_addr);
+					if(outfile) fprintf(outfile,"    Record_%04d> ROM Header Indicator : %s \r\n", idx, rom_header_txt);
+					if(outfile) fprintf(outfile,"    Record_%04d> ROM Header Address   : 0x%08X \r\n", idx, rom_header_addr);
 				}
 
 				printf(" \r\n");
-				fprintf(outfile," \r\n");
+				if(outfile) fprintf(outfile," \r\n");
 			#endif
 
 				prev_record_addr = record_addr;
@@ -9803,14 +10164,14 @@ int main(int argc, char *argv[])
 			memset(data_buf, 0x00, sizeof(data_buf));
 
 			printf("WinCE BIN (%s) payload size = %.3f MB (0x%X)\r\n", infile_name, (tot_record_size/1024.0)/1024.0,  tot_record_size);
-			fprintf(outfile,"WinCE BIN (%s) payload size = %.3f MB (0x%X) \r\n", infile_name, (tot_record_size/1024.0)/1024.0,  tot_record_size);
+			if(outfile) fprintf(outfile,"WinCE BIN (%s) payload size = %.3f MB (0x%X) \r\n", infile_name, (tot_record_size/1024.0)/1024.0,  tot_record_size);
 
 
 			if( 1==isCreateNB0 )
 			{
 				if(BIN_nb0) fclose(BIN_nb0);
 				printf("\nWinCE OS Kernel(NK.BIN) Information!!! Created CE_nk.nb0 - OK");
-				fprintf(outfile,"\r\nWinCE OS Kernel(NK.BIN) Information!!! Created CE_nk.nb0 - OK");
+				if(outfile) fprintf(outfile,"\r\nWinCE OS Kernel(NK.BIN) Information!!! Created CE_nk.nb0 - OK");
 			}
 			else
 			{
@@ -17738,7 +18099,7 @@ int main(int argc, char *argv[])
 			if( NULL == (inpfile = fopen( sefile_name, "rb")) ) 
 			{
 				beep(700,100);
-				printf("\n\n[++ERROR++] Can not open input file [%s]. \n",sefile_name);
+				printf("\n\n[++ERROR++] Can not open input file [%s]. Use --input option!!!\n", sefile_name);
 
 				AllFilesClosed();
 
