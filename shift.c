@@ -2403,7 +2403,7 @@ unsigned int SBtxtCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, 
 					if( iSBnewPoint[iReSB] && (iSBcount==iSBnewPoint[iReSB]) && (0==strcmp(sq2[0].sTimePos, TXT_SBTIME)) )
 					{
 						strcpy(sq2[0].sTimePos, TXT_SBTIME_SWING);
-						fprintf(stderr,"  SB swing point re-point rpm ratio (%.1f) %s -> %s ... %lu \n", fSBswingLvl, TXT_SBTIME, TXT_SBTIME_SWING, iSBnewPoint[iReSB] );
+						fprintf(stderr,"  SB re-point rpm ratio (%.1f) : %s -> %s ... %lu \n", fSBswingLvl, TXT_SBTIME, TXT_SBTIME_SWING, iSBnewPoint[iReSB] );
 
 						iReSB++;
 					}
