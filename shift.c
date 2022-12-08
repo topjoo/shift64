@@ -54,6 +54,7 @@
 #include <getopt.h> /* getopt_long() */
 #include <memory.h> 
 #include <stdarg.h>
+#include <direct.h> // mkdir, rename
 //#include <windows.h> /* 2022-11-22 */
 
 
@@ -550,17 +551,17 @@ void help(void)
 	#if SHIFT_QUALITY_DATA_SORTING /* 2022-11-13 */
            " \n"
            "--[ Shift Quality Data Sorting ]-------- -------------------------------------------------------------------------\n"
-           "  -U or --upshift [ModeID] [APS lvl] [APS tol(1\%)] \n" 
+           "  -U or --upshift [ModeID] [APS lvl] [APS tol(1\%)] [SB swing gear ratio]\n" 
            "\n"
-           " Ex) ah.exe --input 5ms_16select.tsv --output 5ms_eco.txt --upshift eco 3.5 1 \n"
-           "     ah.exe --input 5ms_16select.tsv --output 5ms_spt.txt --upshift spt 4 1.5  \n"
-           "     ah.exe --input 5ms_16select.tsv --output 5ms_nor.txt --upshift nor.used 4 1.5  \n"
+           " Ex) ah.exe --input 5ms_16select.tsv --output 5ms_eco.txt --upshift eco 3.5 1 1.5 \n"
+           "     ah.exe --input 5ms_16select.tsv --output 5ms_spt.txt --upshift spt 4 1.5 0.5 \n"
+           "     ah.exe --input 5ms_16select.tsv --output 5ms_nor.txt --upshift nor.used 4 1 2  \n"
            "        -> Sorted result output : 5ms_eco.txt \n"
            "        -> Generated temp files : 5ms_eco.ECO, 5ms_eco.cECO, 5ms_eco.zECO, ... \n"
            "\n" 
            "  -D or --downshift [ModeID] [APS lvl] [APS tol(1\%)] [VS start] [VS end] [VS step] \n" 
            "\n"
-           " Ex) ah.exe --input 5ms_16select.tsv --output 5ms_spt.txt --downshift SPT 5 1 160 60 -10 \n"
+           " Ex) ah.exe --input 5ms_16select.tsv --output 5ms_spt.txt --downshift SPT 5 1 1 160 60 -10 \n"
            "        -> Sorted result output : 5ms_spt.txt \n"
            "        -> Generated temp files : 5ms_spt.SPT, 5ms_spt.cSPT, 5ms_spt.zSPT, ... \n"
            "\n"
@@ -756,36 +757,53 @@ void AllFilesClosed(void)
 #define TYPE_MAXLAST_G 	(0x80 | TYPE_MAX_G)
 
 
-#define LEN_POS 		10
-#define TXT_SSTIME 		"(SS)"
-#define TXT_SBTIME 		"(SB)"
-#define TXT_SPTIME 		"(SP)"
-#define TXT_UNKNOWN 	"(***)"
-#define TXT_UPCASE 		"(*u*)"
-#define TXT_DNCASE 		"(*d*)"
-#define TXT_MaxNt 		"(MXNt)"
-#define TXT_MaxNe 		"(MXNe)"
-#define TXT_gMAX 		"(MXgX)"
-#define TXT_gmin 		"(migm)" // minumum g
+#define LEN_POS 		15
+#define TXT_SSTIME 			"(SS)"
+#define TXT_SBTIME 			"(SB)"
+#define TXT_SBTIME_SWING 	"(SB0)" /* SB re-point because of SB level swing */
+#define TXT_SBTIME_RE 		"(SB)2"
+#define TXT_SPTIME 			"(SP)"
+#define TXT_UNKNOWN 		"(***)"
+#define TXT_UPCASE 			"(*u*)"
+#define TXT_DNCASE 			"(*d*)"
+#define TXT_MaxNt 			"(MXNt)"
+#define TXT_MaxNe 			"(MXNe)"
+#define TXT_gMAX 			"(MXgX)"
+#define TXT_gmin 			"(migm)" // minumum g
 
-#define TXT_SBMXNt 		"(SB)MXNt"
-#define TXT_SBMXNe 		"(SB)MXNe"
-#define TXT_SBMXgX 		"(SB)gX"
-#define TXT_SBmigm 		"(SB)gm"
+#define TXT_SBMXNt 			"(SB)MXNt"
+#define TXT_SBMXNe 			"(SB)MXNe"
+#define TXT_SBMXgX 			"(SB)gX"
+#define TXT_SBmigm 			"(SB)gm"
 
-#define TXT_MXNtgX 		"(MXNtgX)"
-#define TXT_MXNtgm 		"(MXNtgm)"
-#define TXT_MXNtNe 		"(MXNtNe)"
-#define TXT_MXNegX 		"(MXNegX)"
-#define TXT_MXNegm 		"(MXNegm)"
+#define TXT_SB0_MaxNt 		"(SB0)MXNt" 
+#define TXT_SB0_MaxNe 		"(SB0)MXNe" 
+#define TXT_SB0_MaxgX 		"(SB0)MXgX" 
+#define TXT_SB0_Mingm 		"(SB0)migm" 
 
-#define TXT_NEW_MaxNt 	"(xNt)"
-#define TXT_NEW_MaxNe 	"(xNe)"
-#define TXT_NEW_gMAX 	"(gMax)"
-#define TXT_NEW_gmin 	"(gmin)"
+#define TXT_MXNtgX 			"(MXNtgX)"
+#define TXT_MXNtgm 			"(MXNtgm)"
+#define TXT_MXNtNe 			"(MXNtNe)"
+#define TXT_MXNegX 			"(MXNegX)"
+#define TXT_MXNegm 			"(MXNegm)"
+
+#define TXT_NEW_MaxNt 		"(xNt)"
+#define TXT_NEW_MaxNe 		"(xNe)"
+#define TXT_NEW_gMAX 		"(gMax)"
+#define TXT_NEW_gmin 		"(gmin)"
 
 
-float gearTable[11] = {
+
+#define SB_LEVEL_POINT		1.0f
+#define SB_PNT_RPM_UPS 		(-30.0f) /* unit: rpm */
+#define SP_PNT_RPM_UPS 		(30.0f) /* unit: rpm */
+
+
+
+unsigned int iSBnewPoint[500] = {0,};
+
+
+double gearTable[11] = {
 		0.000f,
 		4.717f, /* 1-DAN */
 		2.906f, /* 2-DAN */
@@ -951,9 +969,9 @@ static short  VSkphTblUP[VS_TABLE_NUM] = {
 
 
 
-static double fAPSpwrLvl = -1.0f;
-static double fAPStol    = APS_TOLENANCE;  /* APS tolerance */
-
+static double fAPSpwrLvl  = -1.0f;
+static double fAPStol     = APS_TOLENANCE;  /* APS tolerance */
+static double fSBswingLvl = SB_LEVEL_POINT;
 
 #define PWR_ON_UP_SHIFT_SSPOINT_START 		1
 
@@ -1132,8 +1150,8 @@ iShift, iShiType12, arrGear[iShiType12].sGear, TqFr, ShiftPh, sNe, sNt16, Long_A
 #define 	WR_Nt16 		" %8.2lf"
 #define 	WR_LAcc17 		" %7.4lf"
 #define 	WR_TimeDiff 	" %8.3lf"
-#define 	WR_TimePos 	 	" %-9s"
-#define 	WR_GearRatio  	" %4.2lf"
+#define 	WR_TimePos 	 	" %-12s"
+#define 	WR_GearRatio  	" %5.3lf"
 #define 	WR_GearSOne  	" %9.2lf"
 #define 	WR_GearSTwo  	" %9.2lf"
 #define 	WR_Jerk1  		" %8.2lf"
@@ -1558,7 +1576,7 @@ short vsKPHTableIndex(void)
 
 
 
-int ShiftQualData(short aiPATs05, int iPwrOnOff04, int shiDir03, unsigned int *SScnt, unsigned int *SBcnt, unsigned int *SPcnt)
+int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigned int *SScnt, unsigned int *SBcnt, unsigned int *SPcnt)
 {
 	FILE *shiFile=NULL;
 
@@ -1580,7 +1598,7 @@ int ShiftQualData(short aiPATs05, int iPwrOnOff04, int shiDir03, unsigned int *S
 	double g_SFtime = -1.0f;
 
 	double gearShift = -1.0f;
-	double gearShiftOne = -1.0f;
+	double gearShiftOne = -1.0f, pre_gearShiftOne = -1.0f;
 	double gearShiftTwo = -1.0f;
 
 	/* line inputted from file */
@@ -1608,11 +1626,14 @@ int ShiftQualData(short aiPATs05, int iPwrOnOff04, int shiDir03, unsigned int *S
 	unsigned int iSBcount = 0U;
 	unsigned int iSPcount = 0U;
 
-	short iOnce_SS = 1; /* */
+	unsigned int iSB_new_cnt = 0U;
+	short iOnce_SS = 0; /* */
 	short iOnce_SB = 1; /* Shift Begin */
 	short iOnce_SP = 1; /* Synchronizing Point */
 	short iOnce_SF = 0; /* Shift Finish */
 
+	short iSB_rePoint = 0;
+	
 	double MaxNe = 0.0f;
 	double MaxNt = 0.0f;
 	double MaxAcc = 0.0f;
@@ -1625,10 +1646,11 @@ int ShiftQualData(short aiPATs05, int iPwrOnOff04, int shiDir03, unsigned int *S
 	memset(sq, 0x00, sizeof(sq) );
 	memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
 
+	memset(iSBnewPoint, 0x00, sizeof(iSBnewPoint) );
 
 		
 
-	iOnce_SS	= TRUE;
+	iOnce_SS	= 0;
 	iOnce_SB	= TRUE;
 	iOnce_SP	= TRUE;
 
@@ -1676,7 +1698,7 @@ int ShiftQualData(short aiPATs05, int iPwrOnOff04, int shiDir03, unsigned int *S
 	/* get file  */
 	//fprintf(stderr,"\n");
 	//fprintf(stderr,">>ModeID %s Sorting... \n", arrPATs_ModeID[aiPATs05].ModeID );
-	fprintf(stderr,">>Shift Type      : %s \n", (iPwrOnOff04==SHI_PWR_ON?"PWR On":(iPwrOnOff04==SHI_PWR_OFF?"PWR Off":(iPwrOnOff04==SHI_STATIC?"Static":(iPwrOnOff04==SHI_N_STOP_DN?"Stop Dn":"Unknown")))) );
+	fprintf(stderr,">>Shift Type      : %s \n", (iShiftType==SHI_PWR_ON?"PWR On":(iShiftType==SHI_PWR_OFF?"PWR Off":(iShiftType==SHI_STATIC?"Static":(iShiftType==SHI_N_STOP_DN?"Stop Dn":"Unknown")))) );
 	fprintf(stderr,">>Shift Direction : Shift %s \n", (shiDir03==SHIFT_UP?"UP":(shiDir03==SHIFT_DN?"DOWN": \
 		(shiDir03==SHIFT_SKIP_DN?"SkipDown":(shiDir03==SHIFT_SKIP_UP?"SkipUp":"Unknown"))) ));			
 
@@ -1840,7 +1862,7 @@ int ShiftQualData(short aiPATs05, int iPwrOnOff04, int shiDir03, unsigned int *S
 			}
 			/* === 3 STEP : ModeID check ===================== */
 
-			if( iPwrOnOff04 == SHI_PWR_ON )
+			if( iShiftType == SHI_PWR_ON )
 			{
 				if( sq[0].APS09 < fAPSpwrLvl ) continue; /* APS power level check and ignored */
 			}
@@ -1879,10 +1901,10 @@ int ShiftQualData(short aiPATs05, int iPwrOnOff04, int shiDir03, unsigned int *S
 				gearShiftTwo = 0.0f;
 				if( (sq[0].No10>0.0 || sq[0].No10<0.0) )
 				{
-					gearRatio	  = (sq[0].Nt16/sq[0].No10);
-					gearShiftOne  = (sq[0].Nt16 - sq[0].No10 * gearTable[sq[0].curGear08]);
-					gearShiftTwo  = (sq[0].Nt16 - sq[0].No10 * gearTable[sq[0].tgtGear11]);
+					gearRatio	  = (sq[0].Nt16/sq[0].No10); // gearTable[sq[0].curGear08];
 				}
+				gearShiftOne  = (sq[0].Nt16 - sq[0].No10 * gearTable[sq[0].curGear08]);
+				gearShiftTwo  = (sq[0].Nt16 - sq[0].No10 * gearTable[sq[0].tgtGear11]);
 
 
 				/* ----------------------------------------------------- */
@@ -1921,7 +1943,7 @@ int ShiftQualData(short aiPATs05, int iPwrOnOff04, int shiDir03, unsigned int *S
 					isFindSS = 0;
 					strcpy(sTimePos, TXT_SSTIME);
 					iSScount ++;
-					
+					iOnce_SS = 1;
 
 					/* initialized */
 					iOnce_SB = 1;
@@ -1942,21 +1964,42 @@ int ShiftQualData(short aiPATs05, int iPwrOnOff04, int shiDir03, unsigned int *S
 								  Synch Point (SP) 점 판단식 : Nt - No x 2단 기어비 ≤ 30RPM 되는 싯점	 
 						---------------------------------------------------------------------------------- */
 
-						if( iOnce_SB && (gearShiftOne <= -30.0) ) /* Shift Begin (SB) -30 rpm under */
+						/* SB 튀는 시점 발생 -> */
+						if( (iOnce_SS) && (0==iOnce_SB) && (gearShiftOne > SB_PNT_RPM_UPS) && (pre_gearShiftOne < (gearShiftOne-fSBswingLvl /*SB_LEVEL_POINT*/)) )
+						{
+							iOnce_SB = 1; // re-SB point
+							iSB_rePoint = 1;
+							pre_gearShiftOne = gearShiftOne;
+
+							iSBnewPoint[iSB_new_cnt] = iSBcount;
+							iSB_new_cnt ++;
+							fprintf(stderr,"  SB re-point because of rpm ratio (%.1f) swing... SBcount:%3d -> %lu : *\n", fSBswingLvl, iSB_new_cnt, iSBcount );
+						}
+						
+
+						if( iOnce_SB && (gearShiftOne <= SB_PNT_RPM_UPS) ) /* Shift Begin (SB) -30 rpm under */
 						{
 							iOnce_SB = FALSE;
-							strcpy(sTimePos, TXT_SBTIME);
+
+							if( iSB_rePoint ) 
+								strcpy(sTimePos, TXT_SBTIME); // TXT_SBTIME_RE);
+							else
+								strcpy(sTimePos, TXT_SBTIME);
+
 							iSBcount ++;
 
 							g_SBtime = sq[0].Time01;
+							pre_gearShiftOne = gearShiftOne;
+							iSB_rePoint = 0;
 						}
-						else if( iOnce_SP && (gearShiftTwo <= 30.0) ) /* 30 rpm under */
+						else if( iOnce_SP && (gearShiftTwo <= SP_PNT_RPM_UPS) ) /* 30 rpm under */
 						{
 							iOnce_SP = FALSE;
 							strcpy(sTimePos, TXT_SPTIME);
 							iSPcount ++;
 
 							g_SPtime = sq[0].Time01;
+							iOnce_SS = 0;
 						}
 						else
 						{
@@ -2182,7 +2225,258 @@ int ShiftQualData(short aiPATs05, int iPwrOnOff04, int shiDir03, unsigned int *S
 
 
 
-int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsigned int SPcnt)
+
+
+unsigned int SBtxtCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsigned int SPcnt)
+{
+	FILE *fp2chk = NULL;
+	char chk_out[MAX_CHARS*LENGTH_OF_FILENAME+1];
+	char shi_inp[MAX_CHARS*LENGTH_OF_FILENAME+1];
+	char chk_tmp[MAX_CHARS*LENGTH_OF_FILENAME+1];
+
+	unsigned int ii, iReSB=0;
+	int isNaming=0;
+	sqd2nd_type sq2[2];  /* 0:SS, 1:SB, 2:MaxNt, 3:MaxNe, 4:g_Max, 5:g_min, 6:SP */
+	int  ierr = -1;
+
+	/* line inputted from file */
+	char QualData[QUAL_DATA_MAX_SIZE]; 
+	int result;
+	unsigned long long RecordCnt=0ULL;
+	short iItemCurOK = 0; /* 1: OK, 0: NG */
+	short iItemPreOK = 0;
+	short iSave = 0;
+
+	unsigned int iSScount = 0U;
+	unsigned int iSBcount = 0U;
+	unsigned int iSPcount = 0U;
+	
+	unsigned long long iNGcount = 0ULL;
+	unsigned long long iOKcount = 0ULL;
+	unsigned long long iSortCount = 0ULL;
+
+
+
+	if( SScnt==SBcnt && SBcnt==SPcnt && SScnt==SPcnt)
+	{
+		fprintf(stderr,">>SB swing poing checking %s ...... SS(%d) SB(%d) SP(%d) - Same OK!!! \n", arrPATs_ModeID[aiPATs05].ModeID, SScnt, SBcnt, SPcnt);
+	}
+	else
+	{
+		memset(shi_inp, 0x00, sizeof(shi_inp));  
+		memset(chk_out, 0x00, sizeof(chk_out));  
+		memset(chk_tmp, 0x00, sizeof(chk_tmp));  
+
+		strcpy(shi_inp, shift_file);
+		strcpy(chk_out, shift_file);
+		strcpy(chk_tmp, shift_file);
+
+		isNaming = 0;
+		for(ii=strlen(chk_out)-1; ii>0; ii--)
+		{
+			if( shi_inp[ii]=='.' ) 
+			{
+				shi_inp[ii+1] = '\0';
+				chk_out[ii+1] = '\0';
+				chk_tmp[ii+1] = '\0';
+
+				strcat(shi_inp, arrPATs_ModeID[aiPATs05].ModeNm);
+
+				strcat(chk_tmp, "a" );
+				strcat(chk_tmp, arrPATs_ModeID[aiPATs05].ModeNm);
+
+				strcat(chk_out, "b" );
+				strcat(chk_out, arrPATs_ModeID[aiPATs05].ModeNm);
+				isNaming = 1;
+				break;
+			}
+		}
+
+		if( 0==isNaming )
+		{
+			strcat(shi_inp, "."); 
+			strcat(shi_inp, arrPATs_ModeID[aiPATs05].ModeNm);
+
+			strcat(chk_tmp, ".a" );
+			strcat(chk_tmp, arrPATs_ModeID[aiPATs05].ModeNm);
+
+			strcat(chk_out, ".b"); 
+			strcat(chk_out, arrPATs_ModeID[aiPATs05].ModeNm);
+		}
+
+		// read file OK
+		if( NULL == (inpfile = fopen( shi_inp, "rb")) ) 
+		{
+			// FAIL
+			fprintf(stderr,"\r\n++ERROR++[%s]:Can not read file for SB point (%s) \n\n", __FUNCTION__, shi_inp );
+			AllFilesClosed();
+			exit(0);
+		}
+
+		// write file OK
+		if( NULL == (fp2chk = fopen( chk_out, "wb")) )	
+		{
+			// FAIL
+			fprintf(stderr,"\r\n++ERROR++[%s]:Can not create file for SB point (%s) \n\n", __FUNCTION__, chk_out );
+			AllFilesClosed();
+			exit(0);
+		}
+		////////////////////////////////////////
+
+
+		fprintf(stderr,">>SB swing poing checking %s ...... SS(%d) SB(%d) SP(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, SScnt, SBcnt, SPcnt);
+
+
+
+#if SAVEMODE
+		if(fp2chk)
+		fprintf(fp2chk,"	 time	iPAT  ModeID	 vsp	tqi    cg	Aps 	 No    tg ct iShi txt		 TqFr ShiPh Ne		 Nt    LAccel  TimPos  Ratio   ShiOne	ShiTwo	Jerk1 MaxNe   MaxNt  g_Max	g_min \n");
+#endif
+
+		{
+			iSScount = 0U;
+			iSBcount = 0U;
+			iSPcount = 0U;
+
+			iNGcount   = 0ULL;
+			iOKcount   = 0ULL;
+			iReSB = 0;
+
+			do
+			{
+				unsigned int i=0;
+
+				/* Read a line from input file. */
+				memset( QualData, 0x00, sizeof(QualData) );
+
+				if( NULL == fgets( QualData, QUAL_DATA_MAX_SIZE, inpfile ) )
+				{
+					ierr = ferror(inpfile);
+					fprintf(stderr,">>SB point swing level check completed %s -- [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp );			
+					fclose(inpfile);
+					break;
+				}
+
+				RecordCnt++;
+
+
+				/* Remove carriage return/line feed at the end of line. */
+				i = strlen(QualData);
+				
+				if(i >= QUAL_DATA_MAX_SIZE)
+				{
+					fprintf(stderr,"ERROR:%6d: Not enough Buffer length (%d) \r\n", RecordCnt, i );
+				}
+
+				if (--i > 0)
+				{
+					if (QualData[i] == '\n') QualData[i] = '\0';
+					if (QualData[i] == '\r') QualData[i] = '\0'; 
+
+					result = sscanf(QualData, RD_2ndFMT,
+							&sq2[0].Time01,  &sq2[0].iPATs05,	 &sq2[0].iPATs05S,	 &sq2[0].VSP03, 	&sq2[0].tqi07,	 &sq2[0].curGear08, 
+							&sq2[0].APS09,	 &sq2[0].No10,		 &sq2[0].tgtGear11,  &sq2[0].ShiNew12,	&sq2[0].ShiTy12, &sq2[0].arrGear, 
+							&sq2[0].TqFr13,  &sq2[0].ShiPh14,	 &sq2[0].Ne15,		 &sq2[0].Nt16,		&sq2[0].LAcc17,  &sq2[0].sTimePos, 
+							&sq2[0].gearRat, &sq2[0].gearShiOne, &sq2[0].gearShiTwo, &sq2[0].fJerk1,	&sq2[0].MaxNe,	 &sq2[0].MaxNt, 
+							&sq2[0].MaxAcc,  &sq2[0].minAcc );
+					
+
+					/* === 1 STEP : record (17 items check) =============== */
+					iSave = 0;
+					iItemCurOK = 0; /* NG - FAIL */
+					if(QUAL_2ND_DATA_ITEM_NUM==result)
+					{
+						iItemCurOK = 1; /* OK */
+						iOKcount ++;
+					}
+					else if( (QUAL_2ND_DATA_ITEM_NUM!=result) && (result!=-1 && i>0) ) 
+					{
+						iNGcount ++;
+						continue; // reading Next item because of FAIL item
+					}
+					/* === 1 STEP : record (17 items check) =============== */
+
+
+					if( 0==strcmp( sq2[0].sTimePos, TXT_SSTIME) ) { iSScount++; }
+					if( 0==strncmp( sq2[0].sTimePos, TXT_SBTIME, 4) ) { iSBcount++;  }
+					if( 0==strncmp( sq2[0].sTimePos, TXT_SPTIME, 4) ) { iSPcount++;  }
+
+					/* ignored	*/
+					if( iSBnewPoint[iReSB] && (iSBcount==iSBnewPoint[iReSB]) && (0==strcmp(sq2[0].sTimePos, TXT_SBTIME)) )
+					{
+						strcpy(sq2[0].sTimePos, TXT_SBTIME_SWING);
+						fprintf(stderr,"  SB swing point re-point rpm ratio (%.1f) %s -> %s ... %lu \n", fSBswingLvl, TXT_SBTIME, TXT_SBTIME_SWING, iSBnewPoint[iReSB] );
+
+						iReSB++;
+					}
+	
+			#if SAVEMODE
+					if(fp2chk) // && is2File)
+					{
+						fprintf(fp2chk, SAVE_ChkFMT,
+								sq2[0].Time01,	sq2[0].iPATs05,    sq2[0].iPATs05S,   sq2[0].VSP03, 	sq2[0].tqi07,	sq2[0].curGear08, 
+								sq2[0].APS09,	sq2[0].No10,	   sq2[0].tgtGear11,  sq2[0].ShiNew12,	sq2[0].ShiTy12, sq2[0].arrGear, 
+								sq2[0].TqFr13,	sq2[0].ShiPh14,    sq2[0].Ne15, 	  sq2[0].Nt16,		sq2[0].LAcc17,	sq2[0].sTimePos, 
+								sq2[0].gearRat, sq2[0].gearShiOne, sq2[0].gearShiTwo, sq2[0].fJerk1,	sq2[0].MaxNe,	sq2[0].MaxNt, 
+								sq2[0].MaxAcc,	sq2[0].minAcc );
+
+						fprintf(fp2chk, "\n");
+					}
+			#endif
+					
+				}
+
+			}
+			while (!feof (inpfile));
+
+		}
+
+	}
+	fprintf(stderr,"---------------------------------------------------------------\n" );
+
+	if(fp2chk) fclose(fp2chk);
+	if(inpfile) fclose(inpfile);
+
+
+
+	if( iReSB ) 
+	{
+		int irenOK = 0;
+
+
+		// ----------------------------------------------
+		irenOK = rename( shi_inp, chk_tmp );  /* rename:  **.ECO --> **.aECO */
+		if( 0!=irenOK )
+		{
+			fprintf(stderr, "  rename FAIL [%s] -> [%s] -- %d \n", shi_inp, chk_tmp, irenOK);
+		}
+
+
+		irenOK = rename( chk_out, shi_inp );  /* rename:  **.bECO --> **.ECO */
+		if( 0!=irenOK )
+		{
+			fprintf(stderr, "  rename FAIL [%s] -> [%s] -- %d \n", chk_out, shi_inp, irenOK);
+		}
+		// ----------------------------------------------
+
+		// ----------------------------------------------
+		irenOK = remove( chk_tmp );
+		if( 0 != irenOK )
+		{
+			fprintf(stderr,"  Deleted temp file [%s] -> Failed (%d) \n", chk_tmp, irenOK );
+		}
+		// ----------------------------------------------
+		
+		return iReSB;
+	}
+	else return 0;
+}
+
+
+
+
+
+int SSCounterCheck(short aiPATs05, unsigned int iSBchk, unsigned int SScnt, unsigned int SBcnt, unsigned int SPcnt)
 {
 	FILE *fp2chk = NULL;
 	char chk_out[MAX_CHARS*LENGTH_OF_FILENAME+1];
@@ -2231,10 +2525,8 @@ int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsig
 		{
 			if( shi_inp[ii]=='.' ) 
 			{
-				//chk_out[ii+1] = '\0';
 				shi_inp[ii+1] = '\0';
 
-				//strcat(chk_out, FILE_EXT_CHK );
 				strcat(shi_inp, arrPATs_ModeID[aiPATs05].ModeNm);
 				isNaming = 1;
 				break;
@@ -2243,22 +2535,10 @@ int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsig
 
 		if( 0==isNaming )
 		{
-			//strcat(chk_out, "."); 
-			//strcat(chk_out, FILE_EXT_CHK );
-
 			strcat(shi_inp, "."); 
 			strcat(shi_inp, arrPATs_ModeID[aiPATs05].ModeNm);
 		}
 
-		#if 0
-		// write file OK
-		if( NULL == (fp2chk = fopen( chk_out, "wb")) )	
-		{
-			// FAIL
-			fprintf(stderr,"\r\n++ERROR++[%s]:Can not create file (%s) \n\n", __FUNCTION__, chk_out );
-			exit(0);
-		}
-		#endif
 
 		// read file OK
 		if( NULL == (inpfile = fopen( shi_inp, "rb")) ) 
@@ -2355,12 +2635,13 @@ int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsig
 			while (!feof (inpfile));
 			//fprintf(stderr,"---------------------------------------------------------------\n" );
 
+			rewind(inpfile);
+
 		}
 
 		//fclose(fp2chk);
 		// ---------------------------------------------------------
 
-		rewind(inpfile);
 
 		// ---------------------------------------------------------
 		// --Duplicate Record ignred -------------------------------
@@ -2549,7 +2830,6 @@ int Find2nd_NtNeminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigne
 	unsigned long long iOKcount = 0ULL;
 	unsigned long long iSortCount = 0ULL;
 
-	double gearRatio = 0.0f;
 	int isNaming = 0;
 	short isFindSS = 1;
 	int curPreGear = -1, tgtPreGear = 1;
@@ -3017,7 +3297,6 @@ int Find2nd_gminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigned i
 	unsigned long long iOKcount = 0ULL;
 	unsigned long long iSortCount = 0ULL;
 
-	double gearRatio = 0.0f;
 	int isNaming = 0;
 	short isFindSS = 1;
 	int curPreGear = -1, tgtPreGear = 1;
@@ -3781,6 +4060,8 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 								strcpy( sq2[0].sTimePos, TXT_MXNtgX);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_gmin) )
 								strcpy( sq2[0].sTimePos, TXT_MXNtgm);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBTIME_SWING) )
+								strcpy( sq2[0].sTimePos, TXT_SB0_MaxNt);
 							else
 								strcpy( sq2[0].sTimePos, maxType);
 
@@ -3811,6 +4092,8 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 								strcpy( sq2[0].sTimePos, TXT_MXNegX);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_gmin) )
 								strcpy( sq2[0].sTimePos, TXT_MXNegm);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBTIME_SWING) )
+								strcpy( sq2[0].sTimePos, TXT_SB0_MaxNe);
 							else							
 								strcpy( sq2[0].sTimePos, maxType);
 
@@ -3842,6 +4125,8 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 								strcpy( sq2[0].sTimePos, TXT_MXNtgX);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_MaxNe) )
 								strcpy( sq2[0].sTimePos, TXT_MXNegX);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBTIME_SWING) )
+								strcpy( sq2[0].sTimePos, TXT_SB0_MaxgX);
 							else							
 								strcpy( sq2[0].sTimePos, maxType);
 
@@ -3891,6 +4176,8 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 								strcpy( sq2[0].sTimePos, TXT_MXNtgm);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_MaxNe) )
 								strcpy( sq2[0].sTimePos, TXT_MXNegm);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBTIME_SWING) )
+								strcpy( sq2[0].sTimePos, TXT_SB0_Mingm);
 							else							
 								strcpy( sq2[0].sTimePos, maxType);
 
@@ -4052,8 +4339,7 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
 
 #if SAVEMODE
 	if(outfile)
-	fprintf(outfile,"     time   iPAT  ModeID   cG tG   vsp    tqi      Aps      No    ct iShi txt        TqFr ShiPh Ne       Nt     LAccel DiffTime TimPos    Ratio Jerk1_%dms  Jerk2 (msec)\n", avgTime);
-//	fprintf(outfile,"     time   iPAT  ModeID   cG tG   vsp    tqi      Aps      No    ct iShi txt        TqFr ShiPh Ne       Nt     LAccel DiffTime TimPos    Ratio  Jerk1  MaxNe    MaxNt    g_Max   g_min  Jerk2\n");
+	fprintf(outfile,"     time   iPAT  ModeID   cG tG   vsp    tqi      Aps      No    ct iShi txt        TqFr ShiPh Ne       Nt     LAccel DiffTime TimPos       Ratio Jerk1_%dms   Jerk2 (msec)\n", avgTime);
 #endif
 
 
@@ -4238,7 +4524,15 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
 					gMaxTime = sq3[0].Time01;
 					gMaxVal  = sq3[0].LAcc17;
 					//fprintf(stderr, "==TXT_MXNegX +++++ %u %d \n", 1000*gMaxTime, ig_min);
+				}
+				else if( 0==strcmp( sq3[0].sTimePos, TXT_SB0_MaxgX) ) /* SB0 & gX */
+				{
+					ig_Max = 1;
+					gMaxTime = sq3[0].Time01;
+					gMaxVal  = sq3[0].LAcc17;
+					//fprintf(stderr, "==TXT_MXNegX +++++ %u %d \n", 1000*gMaxTime, ig_min);
 				}			
+
 				//else
 				//{
 				//	fprintf(stderr,"Jerk2 Calc Error>> g_Max time posistion error.  %s \n", sq3[0].sTimePos );
@@ -4270,6 +4564,13 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
 					//fprintf(stderr, "min TXT_MXNtgm ++++ %u %d \n", 1000*(gminTime-gMaxTime), ig_Max);
 				}
 				else if( 0==strcmp( sq3[0].sTimePos, TXT_MXNegm) ) /* MX Ne & g_min */
+				{
+					ig_min = 1;
+					gminTime = sq3[0].Time01;
+					gminVal  = sq3[0].LAcc17;
+					//fprintf(stderr, "min TXT_MXNegm ++++ %u %d \n", 1000*(gminTime-gMaxTime), ig_Max);
+				}
+				else if( 0==strcmp( sq3[0].sTimePos, TXT_SB0_Mingm) ) /* SB0 & g_min */
 				{
 					ig_min = 1;
 					gminTime = sq3[0].Time01;
@@ -4353,11 +4654,12 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
 
 int CheckLicense(void)
 {
-#define MAC_BUF_SIZ 		200
+#define MAC_BUF_SIZ 		300
 #define MAC_ADDR_NUM 		6
 #define MAC_ADDR_LINE_SIZ 	10
 #define HOSTPC_MAC_FILE 	"C:/Temp/ahLic.mac"
 #define HOSTPC_MAC_TEMP 	"C:/Temp/111.tmp"
+#define HOSTPC_LICENSE 		"./shift.lic"
 #define LICENSE_LEN 		128
 
 	char tmpData[MAC_BUF_SIZ];
@@ -4374,19 +4676,32 @@ int CheckLicense(void)
 
 
 	///////////////////////////////////////////////////////////
-	if( NULL == (fr = fopen( "./shift.lic", "rb")) ) 
+	memset( LicFile, 0x00, sizeof(LicFile) );	
+	if( NULL == (fr = fopen( HOSTPC_LICENSE, "rb")) ) 
 	{
-		fprintf(stderr,"\r\nCan not read License file (./shift.lic) \r\n");
+		fprintf(stderr,"\r\nCan not read License file (%s) \n\n", HOSTPC_LICENSE );
+		re = system("getmac > send2me.gil");
+		if( 0!=re )
+		{
+			fprintf(stderr,"\rLicense temp check needed.. (%d) \n\n", re);
+			exit(0);
+		}
+
 		//fclose(fr);
 		//exit(0);
 	}
 	else
 	{
+	
+		if( 0 != remove( "./send2me.gil" ) )
+		{
+			//fprintf(stderr,"  Deleted temp file -> Failed \n");
+		}
+	
 		ii=0;
 		memset( LicFile, 0x00, sizeof(LicFile) );	
 		do {
 			fscanf(fr, "%s", LicFile[ii] );
-			if( strlen(LicFile[ii] ) < 1 ) break;
 			//fprintf(stderr, "%d -> %s\n", ii, LicFile[ii]);
 			if(ii++ > MAC_ADDR_LINE_SIZ) break;
 		} while (!feof (fr));
@@ -4459,7 +4774,8 @@ int CheckLicense(void)
 				{
 					//fprintf(stderr, "%d [%02x-%02x-%02x-%02x-%02x-%02x] \n", lloop, macAdd[lloop][0], macAdd[lloop][1], macAdd[lloop][2], macAdd[lloop][3], macAdd[lloop][4], macAdd[lloop][5] );
 
-					if(fo) fprintf(fo, "%02x-%02x-%02x-%02x-%02x-%02x\n", 
+					// 3 uppercase + 3 lowercase
+					if(fo) fprintf(fo, "%02X-%02X-%02X-%02x-%02x-%02x\n", 
 								macAdd[lloop][0], macAdd[lloop][1], macAdd[lloop][2], macAdd[lloop][3], macAdd[lloop][4], macAdd[lloop][5] );
 					iOKc ++;
 					lloop ++;
@@ -4534,6 +4850,12 @@ int CheckLicense(void)
 
 				for(ii=0; ii<MAC_ADDR_LINE_SIZ; ii++)
 				{
+					if( LicFile[ii][0] == '\0' || LicFile[ii][0]=='\n' || LicFile[ii][0]=='\r' ) 
+					{
+						//fprintf(stderr,"NULL break.1.. %d \n", ii);
+						break;
+					}
+
 					if( 0==strncmp(sha3digestTxt, &LicFile[ii][4], LICENSE_LEN ) ) 
 					{
 						licOk ++;
@@ -4612,6 +4934,11 @@ int CheckLicense(void)
 
 			for(ii=0; ii<MAC_ADDR_LINE_SIZ; ii++)
 			{
+				if( LicFile[ii][0] == '\0' || LicFile[ii][0]=='\n' || LicFile[ii][0]=='\r' ) 
+				{
+					//fprintf(stderr,"NULL break.2..  %d \n", ii);
+					break;
+				}
 				if( 0==strncmp(sha3digestTxt, &LicFile[ii][4], LICENSE_LEN) ) 
 				{
 					licOk++;
@@ -5127,24 +5454,26 @@ int main(int argc, char *argv[])
 	help_brief();
 
 
-	// ========================================
+	#if 1 /* 2022012-07 */
+	// ================================================================
 	if( iret = CheckLicense() )
 	{
 		// License OK~~
 		//fprintf(stderr,"\n");		
-		fprintf(stderr," ------->> Licensed OK on the PC.. (%#x) \n", iret);
+		fprintf(stderr," ------->> Licensed OK on the PC... (%#x) \n", iret);
 		fprintf(stderr,"---------------------------------------------------------------\n" );
 	}
 	else
 	{
 		beep(700,100);
 		AllFilesClosed();
-		fprintf(stderr,"\r\n\n [LICENSED] License is required... \n\n");
+		fprintf(stderr,"\r\n [LICENSED] License is required... \n\n");
 		exit(0);
 		return 0;
 	}
-	// ========================================
-	
+	// ================================================================
+	#endif
+
 
 	/* ---------------------------------------------------------------------
 	A (MOTOROLA) : convert hex to Motorola bin
@@ -7330,7 +7659,7 @@ int main(int argc, char *argv[])
 					// ------------------------------------------------
 
 					itmpFileDeleted = 1;
-					if( strstr(str_ShiftOp[0], ".used") )
+					if( strstr(str_ShiftOp[0], ".used") || strstr(str_ShiftOp[0], "_used") )
 					{
 					int i, len;
 
@@ -7339,7 +7668,7 @@ int main(int argc, char *argv[])
 						len = strlen( str_ShiftOp[0] );
 						for(i=0; i<len; i++)
 						{
-							if( '.' == str_ShiftOp[0][i] ) str_ShiftOp[0][i]='\0';
+							if( '.' == str_ShiftOp[0][i] || '_' == str_ShiftOp[0][i] ) str_ShiftOp[0][i]='\0';
 						}
 					}
 
@@ -7385,7 +7714,156 @@ int main(int argc, char *argv[])
 							else iPwrOnOff = SHI_PWR_OFF;
 							fprintf(stderr,"\n");
 							fprintf(stderr,">>APS Percent lvl : <<%d>> %.2lf%% -- default(3\%~5\%) \n", kk, fAPSpwrLvl ); 
-							fprintf(stderr,">>POWER ON/OFF    :  %s", (iPwrOnOff==SHI_PWR_ON?"PWR On":(iPwrOnOff==SHI_PWR_OFF?"PWR Off":(iPwrOnOff==SHI_STATIC?"Static":(iPwrOnOff==SHI_N_STOP_DN?"Stop Dn":"Unknown")))) ); 
+							fprintf(stderr,">>POWER ON/OFF    :       %s", (iPwrOnOff==SHI_PWR_ON?"PWR On":(iPwrOnOff==SHI_PWR_OFF?"PWR Off":(iPwrOnOff==SHI_STATIC?"Static":(iPwrOnOff==SHI_N_STOP_DN?"Stop Dn":"Unknown")))) ); 
+							break;
+							
+						case 2:
+							// 2>> APS tolerance
+							fAPStol = atof( str_ShiftOp[kk] ); 
+							fprintf(stderr,"\n");
+							fprintf(stderr,">>APS Tolerance   : <<%d>> %.1lf -- default(-/+1.0)", kk, fAPStol ); 
+							break;
+
+						case 3:
+							// 3>> SB repoint : SB gear ratio swing level
+							fSBswingLvl = atof( str_ShiftOp[kk] ); 
+							fprintf(stderr,"\n");
+							fprintf(stderr,">>SB swing level  : <<%d>> %.1lf (rpm gear ratio)", kk, fSBswingLvl ); 
+							break;
+							
+						case 4:
+							aps1 = atof( str_ShiftOp[kk] ); 
+							fprintf(stderr,"\n");
+							fprintf(stderr,">>APS Table Init  : <<%d>> %.1lf ", kk, aps1 ); 
+							break;
+						case 5:
+							aps2 = atof( str_ShiftOp[kk] ); 
+							fprintf(stderr,"\n");
+							fprintf(stderr,">>APS Table Last  : <<%d>> %.1lf ", kk, aps2 ); 
+							break;
+						case 6:
+							apstep = atof( str_ShiftOp[kk] ); 
+							fprintf(stderr,"\n");
+							fprintf(stderr,">>APS Table Step  : <<%d>> %.1lf -- APS Table updated...", kk, apstep ); 
+
+							for(ll=0, aps=aps1; ((aps<=aps2) && (ll<APS_TABLE_NUM)); aps+=apstep, ll++)
+							{
+								ApsTble[ll] = aps;
+							}
+							break;
+
+						case 7:
+						case 8:
+
+
+						default:
+							fprintf(stderr,"\n");
+							fprintf(stderr,">>upshift options : <<%d>> (%s) ", kk, str_ShiftOp[kk] ); 
+							break;
+						}
+
+					}
+					
+
+				}
+				else
+				{
+					fprintf(stderr,"\n\n[++ERROR++] up shift option error. %s \r\n", optarg );
+
+					beep(700,100);
+					AllFilesClosed();
+
+					exit(0);
+					return 0;
+				}
+
+				break;
+
+			case 'D': /* DOWN - Shift Quality Data Sorting */
+				if(optarg) 
+				{
+				int kk=0;
+				int ll=0;
+				double aps, aps1, aps2, apstep;
+				
+					//printf("\n");
+					//printf("--1-- optind=%d, argv=%d\n", optind, argc);
+
+					isShift 	 = 1;
+					isUpShift	 = 0;
+					isDownShift  = 1;
+					iModeID      = -1;
+
+					memset(str_ShiftOp, 0x00, sizeof(str_ShiftOp) );
+
+					// ------------------------------------------------
+					// -- Option Saved --------------------------------
+					iTCnt = 0;
+					for(kk=optind-1; kk<argc; kk++, iTCnt++)
+					{
+						//memcpy(str_ShiftOp[0], optarg, MAX_CHARS);
+						memcpy(str_ShiftOp[iTCnt], argv[kk], MAX_CHARS);
+					}
+					// ------------------------------------------------
+					// ------------------------------------------------
+
+					itmpFileDeleted = 1;
+					if( strstr(str_ShiftOp[0], ".used") || strstr(str_ShiftOp[0], "_used") )
+					{
+					int i, len;
+
+						itmpFileDeleted = 0; /* temp file Live ~~~ */
+
+						len = strlen( str_ShiftOp[0] );
+						for(i=0; i<len; i++)
+						{
+							if( '.' == str_ShiftOp[0][i] || '_' == str_ShiftOp[0][i] ) str_ShiftOp[0][i]='\0';
+						}
+					}
+
+
+					iModeID = -1;
+					for(kk=0; kk<MODE_ID_NUMS-1; kk++)
+					{
+						if( 0==strcasecmp(str_ShiftOp[0], arrPATs_ModeID[kk].ModeNm) )
+						{
+							iModeID = kk;
+							fprintf(stderr,"\n");
+							fprintf(stderr,">>PATs-ModeID     : <<%d>> %d, %s", 0, kk, arrPATs_ModeID[kk].ModeID ); 
+							break;
+						}
+					}
+					if(iModeID == -1)
+					{
+						fprintf(stderr,"\n");
+						fprintf(stderr,">>PATs-ModeID	  : <<%d>> %d, Unknown ModeID +++", 0, iModeID ); 
+					}
+
+					if(itmpFileDeleted) 
+					{
+						//fprintf(stderr,"\n");
+						fprintf(stderr," -- temp files to be deleted..."); 
+					}
+					
+					for(kk=1; kk<iTCnt; kk++)
+					{
+						if( (0==strncmp(str_ShiftOp[kk], "--", 2)) || (0==strncmp(str_ShiftOp[kk], "-", 1)) ) 
+						{
+							iEidx = kk;
+							break;
+						}
+						
+						switch(kk)
+						{
+						case 1: /* Power On/Off  APS Level */
+							// 1>> APS POWER ON/OFF Level
+							olen = strlen(str_ShiftOp[kk]);
+							fAPSpwrLvl = atof( str_ShiftOp[kk] ); 
+							if(fAPSpwrLvl >= 3.0f) iPwrOnOff = SHI_PWR_ON;
+							else iPwrOnOff = SHI_PWR_OFF;
+							fprintf(stderr,"\n");
+							fprintf(stderr,">>APS Percent lvl : <<%d>> %.2lf%% -- default(3\%~5\%) \n", kk, fAPSpwrLvl ); 
+							fprintf(stderr,">>POWER ON/OFF    :      %s", (iPwrOnOff==SHI_PWR_ON?"PWR On":(iPwrOnOff==SHI_PWR_OFF?"PWR Off":(iPwrOnOff==SHI_STATIC?"Static":(iPwrOnOff==SHI_N_STOP_DN?"Stop Dn":"Unknown")))) ); 
 							break;
 							
 						case 2:
@@ -7442,17 +7920,6 @@ int main(int argc, char *argv[])
 				}
 
 				break;
-
-			case 'D': /* DOWN - Shift Quality Data Sorting */
-			
-				printf("\n");
-				//memcpy(str_ShiftOp, optarg, MAX_CHARS);
-				//olen = strlen(str_ShiftOp);
-				//printf("downshift: [%s] -> %d \n",str_ShiftOp,  olen);
-
-				isShift 	 = 1;
-				isUpShift	 = 0;
-				isDownShift  = 1;
 
 				break;
 
@@ -7645,7 +8112,7 @@ int main(int argc, char *argv[])
 					// FAIL
 					printf("\n\nCan not create folder & output file. [%s / %s] - (append mode) \n", szDir, outfile_name);
 					if( NULL == outfile_name || outfile_name[0] == 0x00 )
-						printf("Need an output file option (--output or --append) for saving output.\n" );
+						printf("Need an output file option (--output or --append).\n" );
 			
 					isIgnoreBothFile = 1; 
 					isIgnoreOuFile = 1; 
@@ -7656,7 +8123,7 @@ int main(int argc, char *argv[])
 			{
 				printf("\n\nCan not create output file. [%s] - (append mode) \n", outfile_name);
 				if( NULL == outfile_name || outfile_name[0] == 0x00 )
-					printf("Need an output file option (--output or --append) for saving output. \n" );
+					printf("Need an output file option (--output or --append) \n" );
 
 				isIgnoreBothFile = 1; 
 				isIgnoreOuFile = 1; 
@@ -7737,17 +8204,17 @@ int main(int argc, char *argv[])
 				if( NULL == (outfile = fopen( outfile_name, "wb"))  )	
 				{
 					// FAIL
-					printf("\n\n[++ERROR++]Can NOT create folder & output file. [%s / %s] - (write mode) \n", szDir, outfile_name);
+					printf("\n\n[++ERROR++]Can NOT write folder & output file. [%s/ %s] \n", szDir, outfile_name);
 					if( NULL == outfile_name || outfile_name[0] == 0x00 )
-						printf("Need an output file option (--output or --append) for saving output.\n" );
+						printf("Need an output file option (--output or --append)\n" );
 
 				}
 			}
 			else
 			{
-				printf("\n\n[++ERROR++]Can NOT create output file. [%s] - (write mode) \n", outfile_name);
+				printf("\n\n[++ERROR++]Can NOT write output file. [%s] \n", outfile_name);
 				if( NULL == outfile_name || outfile_name[0] == 0x00 )
-					printf("Need an output file option (--output or --append) for saving output.\n" );
+					printf("Need an output file option (--output or --append) \n" );
 			}
 			//isIgnoreBothFile = 1; 
 			//isIgnoreOuFile = 1; 
@@ -11539,7 +12006,7 @@ int main(int argc, char *argv[])
 	else if( (1==isUpShift) && (1==isShift) )
 	{
 		unsigned int SScnt=0, SBcnt=0, SPcnt=0;
-		int ii=0, ichk=0, iavgtm=0;
+		int ii=0, ichk=0, iavgtm=0, iSBchk=0;
 		short isNaming = 0;
 		char shi_ori[MAX_CHARS*LENGTH_OF_FILENAME+1];
 		char shi_inp[MAX_CHARS*LENGTH_OF_FILENAME+1];
@@ -11564,9 +12031,17 @@ int main(int argc, char *argv[])
 		iavgtm = ShiftQualData(iModeID, iPwrOnOff, SHIFT_UP, &SScnt, &SBcnt, &SPcnt);
 	    //rewind(inpfile);
 
+
+		
+		iSBchk = SBtxtCheck(iModeID, SScnt, SBcnt, SPcnt);
+
+		if(iSBchk)
+		{
+			SBcnt -= iSBchk;
+		}
 		// --------------------------------------------------------
 		// 2nd STEP -----------------------------------------------
-		ichk = SSCounterCheck(iModeID, SScnt, SBcnt, SPcnt);
+		ichk = SSCounterCheck(iModeID, iSBchk, SScnt, SBcnt, SPcnt);
 
 		// --------------------------------------------------------
 		// 3rd-1 STEP -----------------------------------------------
