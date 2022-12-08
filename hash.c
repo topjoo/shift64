@@ -4029,9 +4029,11 @@ void compression_hook_1(md6_word *C,
 			md6_word *B
 )
 { 
-	int i;
 	md6_word A[5000];
+#ifdef DEBUG_PRINT
+	int i;
 	time_t now;
+#endif
 
 	md6_pack(A,Q,K,ell,ii,r,L,z,p,keylen,d,B);
 
@@ -7359,7 +7361,7 @@ unsigned char checkCrc(unsigned char* pData, int Len)
 	unsigned int value =0;
 	int i, j, crc = 0xffff;
 	unsigned short crcCalc=0, crcOrg = 0;
-	unsigned char bCrcOk = 0; 
+	//unsigned char bCrcOk = 0; 
 	unsigned char* DataPtr = NULL;
 	
 	DataPtr = pData;

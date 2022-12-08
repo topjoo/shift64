@@ -1660,8 +1660,6 @@ int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigned int *SS
 	iSortCount  = 0;
 	iFirstItem  = 0;
 
-	RecordCnt   = 0ULL;
-
 	g_SBtime    = -1.0f;
 	g_SPtime    = -1.0f;
 	g_SFtime    = -1.0f;
@@ -1767,7 +1765,7 @@ int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigned int *SS
 		i = strlen(QualData);
 		if(i >= QUAL_DATA_MAX_SIZE)
 		{
-			fprintf(stderr,"ShiftLine%6d :ERROR: Not enough Buffer length(%d) \r\n", RecordCnt, i );
+			fprintf(stderr,"ShiftLine%6lld :ERROR: Not enough Buffer length(%d) \r\n", RecordCnt, i );
 		}
 
 		if (--i > 0)
@@ -2187,9 +2185,9 @@ int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigned int *SS
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 	fprintf(stderr,">>Quality Data Sorting Summary... \n" );
 	fprintf(stderr,"  Data Time period ------------: %9u msec\n", (unsigned int)(avgTime/avgCount) );
-	fprintf(stderr,"  Total Records ---------------: %9lu lines \n", RecordCnt );
-	fprintf(stderr,"  Error Records (ignored) -----: %9lu lines \n", iNGcount );
-	fprintf(stderr,"  Quality Records -------------: %9lu lines \n", iOKcount );
+	fprintf(stderr,"  Total Records ---------------: %9llu lines \n", RecordCnt );
+	fprintf(stderr,"  Error Records (ignored) -----: %9u lines \n", iNGcount );
+	fprintf(stderr,"  Quality Records -------------: %9u lines \n", iOKcount );
 
 
 	totChkModeID = 0;
@@ -2365,7 +2363,7 @@ unsigned int SBtxtCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, 
 				
 				if(i >= QUAL_DATA_MAX_SIZE)
 				{
-					fprintf(stderr,"ERROR:%6d: Not enough Buffer length (%d) \r\n", RecordCnt, i );
+					fprintf(stderr,"ERROR:%6lld: Not enough Buffer length (%d) \r\n", RecordCnt, i );
 				}
 
 				if (--i > 0)
@@ -2471,8 +2469,6 @@ unsigned int SBtxtCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, 
 	}
 	else return 0;
 }
-
-
 
 
 
@@ -2584,7 +2580,7 @@ int SSCounterCheck(short aiPATs05, unsigned int iSBchk, unsigned int SScnt, unsi
 				
 				if(i >= QUAL_DATA_MAX_SIZE)
 				{
-					fprintf(stderr,"ERROR:%6d: Not enough Buffer length (%d) \r\n", RecordCnt, i );
+					fprintf(stderr,"ERROR:%6lld: Not enough Buffer length (%d) \r\n", RecordCnt, i );
 				}
 
 				if (--i > 0)
@@ -2718,7 +2714,7 @@ int SSCounterCheck(short aiPATs05, unsigned int iSBchk, unsigned int SScnt, unsi
 				
 				if(i >= QUAL_DATA_MAX_SIZE)
 				{
-					fprintf(stderr,"ERROR:%6d: Not enough Buffer length (%d) \r\n", RecordCnt, i );
+					fprintf(stderr,"ERROR:%6lld: Not enough Buffer length (%d) \r\n", RecordCnt, i );
 				}
 
 				if (--i > 0)
@@ -3050,7 +3046,7 @@ int Find2nd_NtNeminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigne
 				
 				if(i >= QUAL_DATA_MAX_SIZE)
 				{
-					fprintf(stderr,"\n[%s]: ++ERROR++:%6d: Not enough Buffer length (%d) \r\n", __FUNCTION__, RecordCnt, i );
+					fprintf(stderr,"\n[%s]: ++ERROR++:%6lld: Not enough Buffer length (%d) \r\n", __FUNCTION__, RecordCnt, i );
 				}
 
 				if (--i > 0)
@@ -3177,7 +3173,7 @@ int Find2nd_NtNeminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigne
 				
 				if(i >= QUAL_DATA_MAX_SIZE)
 				{
-					fprintf(stderr,"ERROR:%6d: Not enough Buffer length Ne (%d) \r\n", RecordCnt, i );
+					fprintf(stderr,"ERROR:%6lld: Not enough Buffer length Ne (%d) \r\n", RecordCnt, i );
 				}
 
 				if (--i > 0)
@@ -3259,6 +3255,7 @@ int Find2nd_NtNeminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigne
 
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
+	return 1;
 }
 
 
@@ -3536,7 +3533,7 @@ int Find2nd_gminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigned i
 				
 				if(i >= QUAL_DATA_MAX_SIZE)
 				{
-					fprintf(stderr,"ERROR:%6d: Not enough Buffer length gMax (%d) \r\n", RecordCnt, i );
+					fprintf(stderr,"ERROR:%6lld: Not enough Buffer length gMax (%d) \r\n", RecordCnt, i );
 				}
 
 				if (--i > 0)
@@ -3687,7 +3684,7 @@ int Find2nd_gminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigned i
 				
 				if(i >= QUAL_DATA_MAX_SIZE)
 				{
-					fprintf(stderr,"ERROR:%6d: Not enough Buffer length gMax (%d) \r\n", RecordCnt, i );
+					fprintf(stderr,"ERROR:%6lld: Not enough Buffer length gMax (%d) \r\n", RecordCnt, i );
 				}
 
 				if (--i > 0)
@@ -3779,6 +3776,8 @@ int Find2nd_gminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigned i
 		fclose(fp2gmin);
 	}
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
+
+	return 1;
 }
 
 
@@ -3876,8 +3875,6 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 	//memset(gMaxSaveTime, 0x00, sizeof(gMaxSaveTime) );
 	//igMaxIdx = 0;
 
-	RecordCnt	= 0ULL;
-
 	RecordCnt  = 0ULL;
 	iNGcount   = 0ULL;
 	iOKcount   = 0ULL;
@@ -3957,7 +3954,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 		
 		if(i >= QUAL_DATA_MAX_SIZE)
 		{
-			fprintf(stderr,"ERROR:%6d: Not enough Buffer length (%d) \r\n", RecordCnt, i );
+			fprintf(stderr,"ERROR:%6lld: Not enough Buffer length (%d) \r\n", RecordCnt, i );
 		}
 
 		if (--i > 0)
@@ -4252,11 +4249,12 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 	}
 #endif
 
+	return 1;
 }
 
 
 
-int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
+int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime)
 {
 	FILE *fp2in = NULL;
 	FILE *fp2out = NULL;
@@ -4264,12 +4262,8 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
 	sqd3rd_type sq3[2];  /* 0:SS, 1:SB, 2:MaxNt, 3:MaxNe, 4:g_Max, 5:g_min, 6:SP */
 	char shi_out[MAX_CHARS*LENGTH_OF_FILENAME+1];
 	
-	unsigned int ii=0U, kk=0U;
 	int  ierr = -1;
 
-	double g_SBtime = -1.0f;
-	double g_SPtime = -1.0f;
-	double g_SFtime = -1.0f;
 	double fJerk2 = 0.0f;
 
 	/* line inputted from file */
@@ -4326,12 +4320,6 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
 	memset(QualData, 0x00, sizeof(QualData) );
 	memset(sq3, 0x00, sizeof(sq3) );
 
-	RecordCnt	= 0ULL;
-
-	g_SBtime	= -1.0f;
-	g_SPtime	= -1.0f;
-	g_SFtime	= -1.0f;
-
 	RecordCnt  = 0ULL;
 	iNGcount   = 0ULL;
 	iOKcount   = 0ULL;
@@ -4339,7 +4327,7 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
 
 #if SAVEMODE
 	if(outfile)
-	fprintf(outfile,"     time   iPAT  ModeID   cG tG   vsp    tqi      Aps      No    ct iShi txt        TqFr ShiPh Ne       Nt     LAccel DiffTime TimPos       Ratio Jerk1_%dms   Jerk2 (msec)\n", avgTime);
+	fprintf(outfile,"     time   iPAT  ModeID   cG tG   vsp    tqi      Aps      No    ct iShi txt        TqFr ShiPh Ne       Nt     LAccel DiffTime TimPos       Ratio Jerk_%dms    Jerk2 (msec)\n", avgTime);
 #endif
 
 
@@ -4367,7 +4355,7 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
 		
 		if(i >= QUAL_DATA_MAX_SIZE)
 		{
-			fprintf(stderr,"ERROR:%6d: Not enough Buffer length---(%d) \r\n", RecordCnt, i );
+			fprintf(stderr,"ERROR:%6llu: Not enough Buffer length---(%u) \r\n", RecordCnt, i );
 		}
 
 		if (--i > 0)
@@ -4538,7 +4526,6 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
 				//	fprintf(stderr,"Jerk2 Calc Error>> g_Max time posistion error.  %s \n", sq3[0].sTimePos );
 				//}
 
-
 				// ------------------------------------
 				// -- g min time
 				// ------------------------------------
@@ -4583,8 +4570,7 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
 				//}
 
 			}
-			
-			
+
 			/* ----------------------------------------------------- */
 			/* Calc Jerk											 */
 			/* ----------------------------------------------------- */
@@ -4607,8 +4593,6 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
 			/* ----------------------------------------------------- */
 			/* Calc Jerk											 */
 			/* ----------------------------------------------------- */
-		
-
 
 		#if SAVEMODE
 			if(outfile && is2File)
@@ -4624,9 +4608,7 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
 			}
 		#endif
 
-
 		}
-
 
 	}
 	while (!feof (fp2in));
@@ -4634,16 +4616,17 @@ int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime)
 	if(fp2in) fclose(fp2in);
 	if(fp2out) fclose(fp2out);
 
-
 	fprintf(stderr,">>Sorted result file: %s \n", shift_file );
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
-#if 0
-	fprintf(stderr,"---------------------------------------------------------------\n" );
-	fprintf(stderr,"  Result file: %s \n", shi_inp);
-	fprintf(stderr,"  ModeID file: %s \n", shift_file );
-	fprintf(stderr,"---------------------------------------------------------------\n" );
-#endif
+	return 1;
+}
+
+
+
+int ShiftData_LastSorting(char *shi_inp, short aiPATs05, int avgTime, unsigned int SScnt, unsigned int SBcnt, unsigned int SPcnt)
+{
+
 }
 #endif /* SHIFT_QUALITY_DATA_SORTING */
 
@@ -4993,9 +4976,8 @@ int main(int argc, char *argv[])
 	long	retFiles;
 	int 	multifileindex = 0, idx=0;
 	int 	olen=0;
-	//__int64 isize;
+
 	unsigned int titlen=0;
-	int 	isLength = 0;
 
 	// index file merged
 	int istartIdx=-1, iEndIdx=0, iTotcnt=0;
@@ -5014,7 +4996,7 @@ int main(int argc, char *argv[])
 		int  mergeIndex;
 		char mergeDate[MERGE_DATE_SIZ];
 		char mergeFileName[MERGE_FILENAME_LENGTH];
-		int  mergeSize;
+		unsigned int  mergeSize;
 		char mergeSHA256[MERGE_SHA256_SIZ];
 	} _mergeFiles ;
 
@@ -5060,7 +5042,7 @@ int main(int argc, char *argv[])
 			0x00
 		};
 
-	WORD    mot_style = 0x0;
+
 	int ret_scan = 0, ret_bdscan=0;
 	int opt;
 	unsigned char opt_ok = 0x0;
@@ -5121,7 +5103,6 @@ int main(int argc, char *argv[])
 	int isIDEA = 0;
 	int isMJD = 0; /// 2014.07.04
 	int isBMPreverse = 0;
-	unsigned int ibmpIndex = 0;
 	
 	unsigned int i_readCount = 0;
 	int len_board_name = 0;
@@ -5131,7 +5112,7 @@ int main(int argc, char *argv[])
 	int len_attach_hdr = 0; // 2020.07.07
 	int len_checksum = 0;
 	int iloop=0;
-	int temp_index = 0;
+
 #if MODIFIED_JULIAN_DATE 
 	double	MJDvalue;
 	__double_hex_union	cHex;
@@ -5175,7 +5156,6 @@ int main(int argc, char *argv[])
 	/* line inputted from file */
 	char 	Mot2bin_Line[MOT2BIN_MAX_LINE_SIZE];
 	unsigned char 	Mot2Bin_Data_Str[MOT2BIN_MAX_LINE_SIZE];
-	char    TmpHexBuf[10];
 #endif
 	char strZeroForced[MAX_CHARS+1];
 	char str_dummy[MAX_CHARS+1];
@@ -5195,11 +5175,8 @@ int main(int argc, char *argv[])
 	char strPadByte[MAX_CHARS+1];
 //	char strPadArea[MAX_CHARS+1];
 
-	int result;
 	unsigned int iFileLimit=0;
-	unsigned int i2ndFileSize=0;
 	unsigned int iHdr_len=0;
-	unsigned int iEachPacketSize=0; // Hexa decimal in Byte.
 	/* -------------------------------------------------------------------- */
 	/* -- getopt_long stores the option index here. -- */
 	int option_index = 0;	
@@ -5207,11 +5184,10 @@ int main(int argc, char *argv[])
 
 #if SHIFT_QUALITY_DATA_SORTING /* 2022-11-13 */
 	char str_ShiftOp[10][32+1]; 
-	int iSkipLn = 0;
 	int isShift = 0;
 	int isUpShift=0, isDownShift=0;	
 
-	int iEidx=0, iTCnt=0;
+	int iTCnt=0;
 	short iModeID = -1; /* 8:md_NOR */
 	short iPwrOnOff = -1; /* POWER ON, POWER OFF*/
 	short itmpFileDeleted = 1;
@@ -6480,7 +6456,7 @@ int main(int argc, char *argv[])
 						Max_Length_Setted = 1;
 						Max_Length = GetHex( strHex2BinLen );
 
-						isLength = 1;
+						//isLength = 1;
 						titlen = GetDec( strHex2BinLen ); // 2021.12.27
 					}
 
@@ -7500,7 +7476,7 @@ int main(int argc, char *argv[])
 						printf("\n>>Input file   : %s (%.3f kB)", infile_name, (iFiles.size/1024.0) );
 					else 
 				#endif
-						printf("\n>>Input file      : %s (%lu Bytes, %.2lfMB)", infile_name, iFiles.size, (iFiles.size/1024.0)/1024.0 );
+						printf("\n>>Input file      : %s (%llu Bytes, %.2lfMB)", infile_name, iFiles.size, (iFiles.size/1024.0)/1024.0 );
 
 
 				#if 1 // 2017.04.05, 2nd file information
@@ -7522,7 +7498,7 @@ int main(int argc, char *argv[])
 						
 						sefile_size = iFiles.size; /// file size
 
-						printf("\n>>2nd input file  : %s (%lu Bytes)", sefile_name, sefile_size );
+						printf("\n>>2nd input file  : %s (%llu Bytes)", sefile_name, sefile_size );
 
 					}
 				#endif
@@ -7531,7 +7507,7 @@ int main(int argc, char *argv[])
 
 					if( strlen(optarg) >= (MAX_CHARS*LENGTH_OF_FILENAME) )
 					{
-						printf("\n\n[++ERROR++] Input file name length is too long (%d Chars).. Max:%d Bytes\n\n", strlen(optarg), (MAX_CHARS*LENGTH_OF_FILENAME) );
+						printf("\n\n[++ERROR++] Input file name length is too long (%lld Chars).. Max:%d Bytes\n\n", strlen(optarg), (MAX_CHARS*LENGTH_OF_FILENAME) );
 
 						beep(700,100);
 						AllFilesClosed();
@@ -7564,7 +7540,7 @@ int main(int argc, char *argv[])
 
 					if( strlen(optarg) >= (MAX_CHARS*LENGTH_OF_FILENAME) )
 					{
-						printf("\n\n[++ERROR++] Output file name length is too long (%d Chars).. Max:%d Bytes \n\n", strlen(optarg), (MAX_CHARS*LENGTH_OF_FILENAME) );
+						printf("\n\n[++ERROR++] Output file name length is too long (%lld Chars).. Max:%d Bytes \n\n", strlen(optarg), (MAX_CHARS*LENGTH_OF_FILENAME) );
 
 						beep(700,100);
 						AllFilesClosed();
@@ -7700,7 +7676,6 @@ int main(int argc, char *argv[])
 					{
 						if( (0==strncmp(str_ShiftOp[kk], "--", 2)) || (0==strncmp(str_ShiftOp[kk], "-", 1)) ) 
 						{
-							iEidx = kk;
 							break;
 						}
 						
@@ -7849,7 +7824,6 @@ int main(int argc, char *argv[])
 					{
 						if( (0==strncmp(str_ShiftOp[kk], "--", 2)) || (0==strncmp(str_ShiftOp[kk], "-", 1)) ) 
 						{
-							iEidx = kk;
 							break;
 						}
 						
@@ -7937,13 +7911,6 @@ int main(int argc, char *argv[])
 				return 0;
 				break;
 		}
-
-
-		#if 0 //////////////////////
-		if( 'i' == opt )
-		for (temp_index = optind; temp_index < argc; temp_index++)
-			printf ("opt(%c;%d)argc(%d) => argv(%d)[%s] : %d, %c \n", opt,opt, argc, temp_index, argv[temp_index], optind, optopt);
-		#endif //////////////////////
 
 	}
 
@@ -9812,6 +9779,7 @@ int main(int argc, char *argv[])
 	
 		unsigned char read_buf[BMP_RESOL+800*480];
 		unsigned int idx=1;
+		unsigned int ibmpIndex = 0;
 
 		printf("ibmpIndex = %d \n", ibmpIndex);
 
@@ -10139,7 +10107,7 @@ int main(int argc, char *argv[])
 						if(data_buf){ free(data_buf); data_buf=NULL; }
 
 						/* file length checking */
-						if( iFiles.size != kll ) printf("CRC>> file length is wrong!! (%lld) (%ld)... \r\n", kll, iFiles.size );
+						if( iFiles.size != kll ) printf("CRC>> file length is wrong!! (%lld) (%lld)... \r\n", kll, iFiles.size );
 
 						iTotSize += kll;
 						multifileindex ++;
@@ -10480,41 +10448,41 @@ int main(int argc, char *argv[])
 					memcpy( (void*)&rom_hdr_s, data_buf, sizeof(ROMHDR) );
 
 					printf("     ------------ ROMHDR ---------------\n");
-					printf("      DLL First           : 0x%08X \n", rom_hdr_s.dllfirst);
-					printf("      DLL Last            : 0x%08X \n", rom_hdr_s.dlllast);
-					printf("      Physical First      : 0x%08X \n", rom_hdr_s.physfirst);
-					printf("      Physical Last       : 0x%08X \n", rom_hdr_s.physlast);
-					printf("      Num Modules         : %10d \n", rom_hdr_s.nummods);
-					printf("      RAM Start           : 0x%08X \n", rom_hdr_s.ulRamStart);
-					printf("      RAM Free            : 0x%08X \n", rom_hdr_s.ulRAMFree);
-					printf("      RAM End             : 0x%08X \n", rom_hdr_s.ulRAMEnd);
-					printf("      Num Copy Entries    : %10d \n", rom_hdr_s.ulCopyEntries);
-					printf("      Copy Entries Offset : 0x%08X \n", rom_hdr_s.ulCopyOffset);
-					printf("      Length of profile   : %10u \n", rom_hdr_s.ulProfileLen);
-					printf("      Prof Symbol Offset  : 0x%08X \n", rom_hdr_s.ulProfileOffset);
-					printf("      Num Files           : %10d \n", rom_hdr_s.numfiles);
-					printf("      Kernel flags        : 0x%08X \n", rom_hdr_s.ulKernelFlags);
-					printf("      MiscFlags           : 0x%08X \n", rom_hdr_s.usMiscFlags);
+					printf("      DLL First           : 0x%08lX \n", rom_hdr_s.dllfirst);
+					printf("      DLL Last            : 0x%08lX \n", rom_hdr_s.dlllast);
+					printf("      Physical First      : 0x%08lX \n", rom_hdr_s.physfirst);
+					printf("      Physical Last       : 0x%08lX \n", rom_hdr_s.physlast);
+					printf("      Num Modules         : %10ld \n", rom_hdr_s.nummods);
+					printf("      RAM Start           : 0x%08lX \n", rom_hdr_s.ulRamStart);
+					printf("      RAM Free            : 0x%08lX \n", rom_hdr_s.ulRAMFree);
+					printf("      RAM End             : 0x%08lX \n", rom_hdr_s.ulRAMEnd);
+					printf("      Num Copy Entries    : %10ld \n", rom_hdr_s.ulCopyEntries);
+					printf("      Copy Entries Offset : 0x%08lX \n", rom_hdr_s.ulCopyOffset);
+					printf("      Length of profile   : %10lu \n", rom_hdr_s.ulProfileLen);
+					printf("      Prof Symbol Offset  : 0x%08lX \n", rom_hdr_s.ulProfileOffset);
+					printf("      Num Files           : %10ld \n", rom_hdr_s.numfiles);
+					printf("      Kernel flags        : 0x%08lX \n", rom_hdr_s.ulKernelFlags);
+					printf("      MiscFlags           : 0x%08lX \n", rom_hdr_s.usMiscFlags);
 					printf("      CPU                 : 0x%04x ", rom_hdr_s.usCPUType);
 
 					if(outfile) 
 					{
 						fprintf(outfile,"     ------------ ROMHDR --------------- \r\n");
-						fprintf(outfile,"      DLL First           : 0x%08X \r\n", rom_hdr_s.dllfirst);
-						fprintf(outfile,"      DLL Last            : 0x%08X \r\n", rom_hdr_s.dlllast);
-						fprintf(outfile,"      Physical First      : 0x%08X \r\n", rom_hdr_s.physfirst);
-						fprintf(outfile,"      Physical Last       : 0x%08X \r\n", rom_hdr_s.physlast);
-						fprintf(outfile,"      Num Modules         : %10d \r\n", rom_hdr_s.nummods);
-						fprintf(outfile,"      RAM Start           : 0x%08X \r\n", rom_hdr_s.ulRamStart);
-						fprintf(outfile,"      RAM Free            : 0x%08X \r\n", rom_hdr_s.ulRAMFree);
-						fprintf(outfile,"      RAM End             : 0x%08X \r\n", rom_hdr_s.ulRAMEnd);
-						fprintf(outfile,"      Num Copy Entries    : %10d \r\n", rom_hdr_s.ulCopyEntries);
-						fprintf(outfile,"      Copy Entries Offset : 0x%08X \r\n", rom_hdr_s.ulCopyOffset);
-						fprintf(outfile,"      Length of profile   : %10u \r\n", rom_hdr_s.ulProfileLen);
-						fprintf(outfile,"      Prof Symbol Offset  : 0x%08X \r\n", rom_hdr_s.ulProfileOffset);
-						fprintf(outfile,"      Num Files           : %10d \r\n", rom_hdr_s.numfiles);
-						fprintf(outfile,"      Kernel flags        : 0x%08X \r\n", rom_hdr_s.ulKernelFlags);
-						fprintf(outfile,"      MiscFlags           : 0x%08X \r\n", rom_hdr_s.usMiscFlags);
+						fprintf(outfile,"      DLL First           : 0x%08lX \r\n", rom_hdr_s.dllfirst);
+						fprintf(outfile,"      DLL Last            : 0x%08lX \r\n", rom_hdr_s.dlllast);
+						fprintf(outfile,"      Physical First      : 0x%08lX \r\n", rom_hdr_s.physfirst);
+						fprintf(outfile,"      Physical Last       : 0x%08lX \r\n", rom_hdr_s.physlast);
+						fprintf(outfile,"      Num Modules         : %10ld \r\n", rom_hdr_s.nummods);
+						fprintf(outfile,"      RAM Start           : 0x%08lX \r\n", rom_hdr_s.ulRamStart);
+						fprintf(outfile,"      RAM Free            : 0x%08lX \r\n", rom_hdr_s.ulRAMFree);
+						fprintf(outfile,"      RAM End             : 0x%08lX \r\n", rom_hdr_s.ulRAMEnd);
+						fprintf(outfile,"      Num Copy Entries    : %10ld \r\n", rom_hdr_s.ulCopyEntries);
+						fprintf(outfile,"      Copy Entries Offset : 0x%08lX \r\n", rom_hdr_s.ulCopyOffset);
+						fprintf(outfile,"      Length of profile   : %10lu \r\n", rom_hdr_s.ulProfileLen);
+						fprintf(outfile,"      Prof Symbol Offset  : 0x%08lX \r\n", rom_hdr_s.ulProfileOffset);
+						fprintf(outfile,"      Num Files           : %10ld \r\n", rom_hdr_s.numfiles);
+						fprintf(outfile,"      Kernel flags        : 0x%08lX \r\n", rom_hdr_s.ulKernelFlags);
+						fprintf(outfile,"      MiscFlags           : 0x%08lX \r\n", rom_hdr_s.usMiscFlags);
 						fprintf(outfile,"      CPU                 : 0x%04x ", rom_hdr_s.usCPUType);
 					}
 					switch(rom_hdr_s.usCPUType) 
@@ -10574,25 +10542,25 @@ int main(int argc, char *argv[])
 					}
 
 
-					printf("      RAM -- FSRAMPERCENT : 0x%08X \n", rom_hdr_s.ulFSRamPercent);
-					printf("      Device Start addr   : 0x%08X \n", rom_hdr_s.ulDrivglobStart);
-					printf("      Device length       : 0x%08X \n", rom_hdr_s.ulDrivglobLen);
-					printf("      ROM Header ext.     : 0x%08X \n", rom_hdr_s.pExtensions);
-					printf("      Tracking MEM start  : 0x%08X \n", rom_hdr_s.ulTrackingStart); /// Start Address
-					printf("      Tracking MEM end    : 0x%08X \n",rom_hdr_s.ulTrackingLen);
-					printf("	  Extensions		  : 0x%08X \n", rom_hdr_s.pExtensions );
+					printf("      RAM -- FSRAMPERCENT : 0x%08lX \n", rom_hdr_s.ulFSRamPercent);
+					printf("      Device Start addr   : 0x%08lX \n", rom_hdr_s.ulDrivglobStart);
+					printf("      Device length       : 0x%08lX \n", rom_hdr_s.ulDrivglobLen);
+					printf("      ROM Header ext.     : 0x%08lX \n", rom_hdr_s.pExtensions);
+					printf("      Tracking MEM start  : 0x%08lX \n", rom_hdr_s.ulTrackingStart); /// Start Address
+					printf("      Tracking MEM end    : 0x%08lX \n",rom_hdr_s.ulTrackingLen);
+					printf("	  Extensions		  : 0x%08lX \n", rom_hdr_s.pExtensions );
 
 					if(outfile) 
 					{
-						fprintf(outfile,"      RAM -- FSRAMPERCENT : 0x%08X \r\n", rom_hdr_s.ulFSRamPercent);
-						fprintf(outfile,"      Device Start addr   : 0x%08X \r\n", rom_hdr_s.ulDrivglobStart);
-						fprintf(outfile,"      Device length       : 0x%08X \r\n", rom_hdr_s.ulDrivglobLen);
+						fprintf(outfile,"      RAM -- FSRAMPERCENT : 0x%08lX \r\n", rom_hdr_s.ulFSRamPercent);
+						fprintf(outfile,"      Device Start addr   : 0x%08lX \r\n", rom_hdr_s.ulDrivglobStart);
+						fprintf(outfile,"      Device length       : 0x%08lX \r\n", rom_hdr_s.ulDrivglobLen);
 
-						fprintf(outfile,"      ROM Header ext.     : 0x%08X \r\n", rom_hdr_s.pExtensions);
-						fprintf(outfile,"      Tracking MEM start  : 0x%08X \r\n", rom_hdr_s.ulTrackingStart); /// Start Address
-						fprintf(outfile,"      Tracking MEM end    : 0x%08X \r\n",rom_hdr_s.ulTrackingLen);
+						fprintf(outfile,"      ROM Header ext.     : 0x%08lX \r\n", rom_hdr_s.pExtensions);
+						fprintf(outfile,"      Tracking MEM start  : 0x%08lX \r\n", rom_hdr_s.ulTrackingStart); /// Start Address
+						fprintf(outfile,"      Tracking MEM end    : 0x%08lX \r\n",rom_hdr_s.ulTrackingLen);
 					
-						fprintf(outfile,"      Extensions          : 0x%08X \r\n", rom_hdr_s.pExtensions );
+						fprintf(outfile,"      Extensions          : 0x%08lX \r\n", rom_hdr_s.pExtensions );
 					}
 			
 					if (rom_hdr_s.pExtensions) 
@@ -12164,7 +12132,12 @@ int main(int argc, char *argv[])
 
 		// --------------------------------------------------------
 		// 5th STEP -----------------------------------------------
-		ShiftData_LastSorting(shi_out, iModeID, iavgtm);
+		ShiftData_Filtering(shi_out, iModeID, iavgtm);
+
+		// --------------------------------------------------------
+		// 6th STEP -----------------------------------------------
+		ShiftData_LastSorting(shi_out, iModeID, iavgtm, SScnt, SBcnt, SPcnt);
+
 
 		#if 1
 		if(itmpFileDeleted)
@@ -12243,7 +12216,7 @@ int main(int argc, char *argv[])
 			fprintf(outfile,"-------float_number-----------LSB_format---------MSB_format----- \r\n");
 
 			i_readCount = 0;
-			while( EOF != (c=fscanf(inpfile,"%s", &str_float)) )
+			while( EOF != (c=fscanf(inpfile,"%s", str_float)) )
 			{
 				i_readCount ++;
 
@@ -16441,7 +16414,9 @@ int main(int argc, char *argv[])
 
 
 			printf("RipeMD160>> RipeMD160 hashing for input files* \n");
-			for(ii=0; ii<RMD160_LENGTH*2; ii++) printf("-");  printf(" %d --\r\n", RMD160_LENGTH*2 );
+			for(ii=0; ii<RMD160_LENGTH*2; ii++) 
+				printf("-");  
+			printf(" %d --\r\n", RMD160_LENGTH*2 );
 
 			if(inpfile) { fclose(inpfile); inpfile=NULL; }
 			if(data_buf){ free(data_buf); data_buf=NULL; }
@@ -16977,7 +16952,7 @@ int main(int argc, char *argv[])
 		unsigned __int64  kll;
 		size_t		ll;
 
-		int iLenSub=0;
+		unsigned int iLenSub=0;
 		struct	tm *pTime = NULL;
 	
 		pTime = current_time();
@@ -16994,7 +16969,7 @@ int main(int argc, char *argv[])
 
 		if( ASTERISK_FOUND == isAsteMode )	/* For ah.exe --input *.* */
 		{
-			unsigned __int64 	kll = 0UL;
+			//unsigned __int64 	kll = 0UL;
 
 			printf("BLAKE256>> BLAKE256 hashing for input files* (%d) \n", argc );
 
@@ -17215,7 +17190,7 @@ int main(int argc, char *argv[])
 			if( (2==iVerbosType || 3==iVerbosType) && (TRUE == verbose) )
 			{
 				printf("%s  *%s*%s__(%llu) \r\n", outTxt, str_hash, infile_name, infile_size );
-				if(outfile) fprintf(outfile, "%s  *BLAKE256*%s__(%llu) \r\n", outTxt, str_hash, infile_name, infile_size );
+				if(outfile) fprintf(outfile, "%s  *%s*%s__(%llu) \r\n", outTxt, str_hash, infile_name, infile_size );
 			}
 			else
 			{
@@ -17236,10 +17211,10 @@ int main(int argc, char *argv[])
 		state384 blakeS; 		
 		unsigned __int64  kll;
 		size_t		ll;
-
-		int iLenSub=0;
 		struct	tm *pTime = NULL;
-	
+		unsigned int iLenSub = 0;
+
+
 		pTime = current_time();
 	
 		if( (1==iVerbosType || 3==iVerbosType) && (TRUE == verbose) && outfile) /// 2014.08.01
@@ -17254,7 +17229,7 @@ int main(int argc, char *argv[])
 	
 		if( ASTERISK_FOUND == isAsteMode )	/* For ah.exe --input *.* */
 		{
-			unsigned __int64	kll = 0UL;
+			//unsigned __int64	kll = 0UL;
 	
 			printf("BLAKE384>> BLAKE384 hashing for input files* (%d) \n", argc );
 
@@ -17498,10 +17473,9 @@ int main(int argc, char *argv[])
 		state512 blakeS; 
 		unsigned __int64 kll;
 		size_t		ll;
-
-		int iLenSub=0;
 		struct	tm *pTime = NULL;
-	
+		unsigned int iLenSub = 0;
+
 		pTime = current_time();
 	
 		if( (1==iVerbosType || 3==iVerbosType) && (TRUE == verbose) && outfile) /// 2014.08.01
@@ -17516,7 +17490,7 @@ int main(int argc, char *argv[])
 	
 		if( ASTERISK_FOUND == isAsteMode )	/* For ah.exe --input *.* */
 		{
-			unsigned __int64	kll = 0UL;
+			//unsigned __int64	kll = 0UL;
 	
 			printf("BLAKE512>> BLAKE512 hashing for input files* (%d) \n", argc );
 
@@ -17893,11 +17867,9 @@ int main(int argc, char *argv[])
 		int  ii=0, iiTot=0, hashOK=0;
 		unsigned __int64	fSize=0UL, fUsize=0UL, fRead=0UL;
 
-		
 		SHA256_CTX		ctx256;
 		unsigned char	sha256_buf[SHA2_BUFLEN];
-		int iLenSub=0;
-		
+	
 
 		if( NULL != (inpfile = fopen( extractFile, "rb")) ) 
 		{
@@ -17924,12 +17896,12 @@ int main(int argc, char *argv[])
 			{
 				ll = fread((char *)&exFileInfo[ii], 1, sizeof(exFileInfo[0]), inpfile);
 				kll += ll;
-				printf("Index ---------: [%s] len:%d \n", exFileInfo[ii].mergeTxtIndex, strlen(exFileInfo[ii].mergeTxtIndex) );
-				printf("  Date --------: [%s] len:%d \n", exFileInfo[ii].mergeDate, strlen(exFileInfo[ii].mergeDate) );
-				printf("  FileName ----: [%s] len:%d \n", exFileInfo[ii].mergeFileName, strlen(exFileInfo[ii].mergeFileName) );
-				printf("  FileSize ----: [%s] len:%d \n", exFileInfo[ii].mergeTxtSize, strlen(exFileInfo[ii].mergeTxtSize)  );
+				printf("Index ---------: [%s] len:%lld \n", exFileInfo[ii].mergeTxtIndex, strlen(exFileInfo[ii].mergeTxtIndex) );
+				printf("  Date --------: [%s] len:%lld \n", exFileInfo[ii].mergeDate, strlen(exFileInfo[ii].mergeDate) );
+				printf("  FileName ----: [%s] len:%lld \n", exFileInfo[ii].mergeFileName, strlen(exFileInfo[ii].mergeFileName) );
+				printf("  FileSize ----: [%s] len:%lld \n", exFileInfo[ii].mergeTxtSize, strlen(exFileInfo[ii].mergeTxtSize)  );
 				exFileInfo[ii].mergeSHA256[MERGE_SHA256_SIZ] = 0x00; 
-				printf("  File SHA256 -: [%s] len:%d \n", exFileInfo[ii].mergeSHA256, strlen(exFileInfo[ii].mergeSHA256)  );
+				printf("  File SHA256 -: [%s] len:%lld \n", exFileInfo[ii].mergeSHA256, strlen(exFileInfo[ii].mergeSHA256)  );
 
 				if(inpfile) fseek(inpfile, -1, SEEK_CUR);  /* because of SHA256 - 64bytes, SEEK_CUR, SEEK_END */
 
@@ -17952,7 +17924,7 @@ int main(int argc, char *argv[])
 					fUsize = 0UL;
 					memset(strExtract, 0x00, sizeof(strExtract) );
 
-					printf(">>%2d -> Extracting --: %s / %d \n", ii+1, exFileInfo[ii].mergeFileName, fSize );
+					printf(">>%2d -> Extracting --: %s / %lld \n", ii+1, exFileInfo[ii].mergeFileName, fSize );
 					while((ll = fread(strExtract, 1, fRead, inpfile)) > 0) 
 					{
 						kll += ll;
@@ -18030,8 +18002,6 @@ int main(int argc, char *argv[])
 	unsigned __int64	kll=0UL, ll=0UL;
 	SHA256_CTX		ctx256;
 	unsigned char	sha256_buf[SHA2_BUFLEN];
-	int iLenSub=0;
-
 
 		//==1== Total Counter
 		printf("\n>>Total merged file count : %d \n",  fileNum-1) ;
@@ -18221,7 +18191,7 @@ int main(int argc, char *argv[])
 			strcpy(mFile[ii].mergeSHA256, sha256_buf );
 
 			printf("\r");
-			printf("%2d -> %s  *SHA256*%s [%s] / %ld Bytes \n", ii, mFile[ii].mergeSHA256, mFile[ii].mergeFileName, mFile[ii].mergeDate, mFile[ii].mergeSize );
+			printf("%2d -> %s  *SHA256*%s [%s] / %u Bytes \n", ii, mFile[ii].mergeSHA256, mFile[ii].mergeFileName, mFile[ii].mergeDate, mFile[ii].mergeSize );
 
 
 			if(outfile) 
@@ -18308,7 +18278,7 @@ int main(int argc, char *argv[])
 			for(ii=1; ii<fileNum; ii++)
 			{
 			
-				printf("%2d -> [%s / %ld Bytes] to output [%s / ", ii, mFile[ii].mergeFileName, mFile[ii].mergeSize, outfile_name );
+				printf("%2d -> [%s / %u Bytes] to output [%s / ", ii, mFile[ii].mergeFileName, mFile[ii].mergeSize, outfile_name );
 				if( NULL == (inpfile = fopen( mFile[ii].mergeFileName, "rb")) ) 
 				{
 					printf("--merge option error2, files not found!! [%s] \n", mFile[ii].mergeFileName );
@@ -18326,7 +18296,7 @@ int main(int argc, char *argv[])
 					tot_size += fr_size;
 				}
 
-				printf("%ld Bytes] ... \n", tot_size );
+				printf("%lld Bytes] ... \n", tot_size );
 
 				if(inpfile) { fclose(inpfile); inpfile=NULL; }
 
@@ -18468,7 +18438,7 @@ int main(int argc, char *argv[])
 					else if( ipad_byte_cnt>>10 )
 						printf("\n>>Fill Pad byte   : (0x%02X) Size: %.3f kB (%#x)", Pad_Byte, (ipad_byte_cnt/1024.0), ipad_byte_cnt );
 					else 
-						printf("\n>>Fill Pad byte   : (0x%02X) Size: %lu Byte (%#x)", Pad_Byte, ipad_byte_cnt, ipad_byte_cnt );
+						printf("\n>>Fill Pad byte   : (0x%02X) Size: %u Byte (%#x)", Pad_Byte, ipad_byte_cnt, ipad_byte_cnt );
 				}
 				
 
@@ -18479,7 +18449,7 @@ int main(int argc, char *argv[])
 				//itoa(sec_file_tot_size, Siz2ndBuf, 16);
 				//fprintf(outfile,"%s",Siz2ndBuf );
 				
-				sprintf(Siz2ndBuf,"%08x",sec_file_tot_size );
+				sprintf( (char *)Siz2ndBuf,"%08x",sec_file_tot_size );
 				printf("\n>>2nd file size   : %#04x (%d Byte)", sec_file_tot_size, sec_file_tot_size); // , Siz2ndBuf );
 
 		#if 1
@@ -18516,7 +18486,7 @@ int main(int argc, char *argv[])
 						if( ENDIAN_BIG == is2ndEndian ) // Big Endian
 							fprintf(outfile,"%c",isum );
 						else if( ENDIAN_LITTLE == is2ndEndian ) // Little Endian
-							sprintf(&Siz2ndTmp[iidx],"%c",isum );
+							sprintf( (char *)&Siz2ndTmp[iidx],"%c",isum );
 
 
 						totsum += isum;
@@ -18572,7 +18542,7 @@ int main(int argc, char *argv[])
 					else if( ipad_byte_cnt>>10 )
 						printf("\n>>Fill Pad byte   : (0x%02X) size: %.3f kB (%#x)", Pad_Byte, (ipad_byte_cnt/1024.0), ipad_byte_cnt );
 					else 
-						printf("\n>>Fill Pad byte   : (0x%02X) size: %lu Byte (%#x)", Pad_Byte, ipad_byte_cnt, ipad_byte_cnt );
+						printf("\n>>Fill Pad byte   : (0x%02X) size: %u Byte (%#x)", Pad_Byte, ipad_byte_cnt, ipad_byte_cnt );
 				
 				}
 			}
@@ -18615,7 +18585,7 @@ int main(int argc, char *argv[])
 				first_file_tot_size += fr_size;
 			}
 
-			printf("\n>>Merged Total file size : %lld (0x%x) Bytes", first_file_tot_size, first_file_tot_size );
+			printf("\n>>Merged Total file size : %lld (0x%llx) Bytes", first_file_tot_size, first_file_tot_size );
 
 
 		}
@@ -18637,8 +18607,8 @@ int main(int argc, char *argv[])
 
 		srand( (unsigned int)time(NULL)+(unsigned int)getpid() );
 
-		fprintf(stderr,"\n\n== Random Generator == (0x00~0xff: Count:%d) SEED:%d %d\n", iRanMaxi, time(NULL), getpid());
-		if(outfile) fprintf(outfile,"\n\n== Random Generator == (0x00~0xff: Count:%d) SEED:%d %d\n", iRanMaxi, time(NULL), getpid());
+		fprintf(stderr,"\n\n== Random Generator == (0x00~0xff: Count:%d) SEED:%lld %d\n", iRanMaxi, time(NULL), getpid());
+		if(outfile) fprintf(outfile,"\n\n== Random Generator == (0x00~0xff: Count:%d) SEED:%lld %d\n", iRanMaxi, time(NULL), getpid());
 
 		for ( idx = 1; idx <= iRanMaxi; idx++ )
 		{

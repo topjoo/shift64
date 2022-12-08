@@ -337,20 +337,20 @@ typedef struct {
 	unsigned char   amon;	
 } _month_table_ ;
 
-_month_table_ month_table[MONTH_LEN] =
+_month_table_ month_table[MONTH_LEN] = 
 {
-	"Jan", 'A',
-	"Feb", 'B',
-	"Mar", 'C',
-	"Apr", 'D',
-	"May", 'E',
-	"Jun", 'F',
-	"Jul", 'G',
-	"Aug", 'H',
-	"Sep", 'I',
-	"Oct", 'J',
-	"Nov", 'K',
-	"Dec", 'L',
+	{ "Jan", 'A' },
+	{ "Feb", 'B' },
+	{ "Mar", 'C' },
+	{ "Apr", 'D' },
+	{ "May", 'E' },
+	{ "Jun", 'F' },
+	{ "Jul", 'G' },
+	{ "Aug", 'H' },
+	{ "Sep", 'I' },
+	{ "Oct", 'J' },
+	{ "Nov", 'K' },
+	{ "Dec", 'L' },
 };
 
 
