@@ -794,7 +794,7 @@ void AllFilesClosed(void)
 
 
 
-#define SB_LEVEL_POINT		1.0f
+#define SB_SWING_LEVEL 		0.5f /* SB level point swing : when 0.5 gear ratio */
 #define SB_PNT_RPM_UPS 		(-30.0f) /* unit: rpm */
 #define SP_PNT_RPM_UPS 		(30.0f) /* unit: rpm */
 
@@ -971,7 +971,7 @@ static short  VSkphTblUP[VS_TABLE_NUM] = {
 
 static double fAPSpwrLvl  = -1.0f;
 static double fAPStol     = APS_TOLENANCE;  /* APS tolerance */
-static double fSBswingLvl = SB_LEVEL_POINT;
+static double fSBswingLvl = SB_SWING_LEVEL;
 
 #define PWR_ON_UP_SHIFT_SSPOINT_START 		1
 
@@ -2012,7 +2012,7 @@ int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigned int *SS
 						---------------------------------------------------------------------------------- */
 
 						/* SB 튀는 시점 발생 -> */
-						if( (iOnce_SS) && (0==iOnce_SB) && (gearShiftOne > SB_PNT_RPM_UPS) && (pre_gearShiftOne < (gearShiftOne-fSBswingLvl /*SB_LEVEL_POINT*/)) )
+						if( (iOnce_SS) && (0==iOnce_SB) && (gearShiftOne > SB_PNT_RPM_UPS) && (pre_gearShiftOne < (gearShiftOne-fSBswingLvl /*SB_SWING_LEVEL*/)) )
 						{
 							iOnce_SB = 1; // re-SB point
 							iSB_rePoint = 1;
