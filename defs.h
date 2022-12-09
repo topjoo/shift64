@@ -62,6 +62,7 @@
 #define QUAL_2ND_DATA_ITEM_NUM 		26
 #define QUAL_3RD_DATA_ITEM_NUM 		25
 
+#define QUAL_FLT_DATA_ITEM_NUM 		23
 
 #endif /* __DEFS_H__ */
 
