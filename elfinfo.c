@@ -572,7 +572,7 @@ int elf_dumpimage(char *image, int imagelen)
     Elf32_Shdr *scnhdr; 
     Elf32_Phdr *proghdr, *p; 
     Elf32_Sym *syms; 
-    int i, l; 
+    int i;
     unsigned long last = 0; 
     Elf32_Ehdr ehdr; 
     Elf32_Shdr shdr; 
@@ -690,7 +690,7 @@ int elf_dumpimage(char *image, int imagelen)
     ehdr.e_shstrndx = 3; 
 
 	if(verbose)
-		printf("ELF2BIN>> dump syms at file offset %#x...\n", ftell(outfile)); 
+		printf("ELF2BIN>> dump syms at file offset %#lx...\n", ftell(outfile)); 
 	
     elf_swap_ehdr(&ehdr); 
     elf_dump_bin((char *)&ehdr, sizeof ehdr); 

@@ -545,7 +545,7 @@ void *NoFailMalloc (size_t size)
 
     if ((result = malloc (size)) == NULL)
     {
-        fprintf (stderr,"Can't allocate memory. size(%d) \n", size);
+        fprintf (stderr,"Can't allocate memory. size(%lld) \n", size);
         exit(1);
     }
     return (result);

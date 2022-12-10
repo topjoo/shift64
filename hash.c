@@ -7510,7 +7510,7 @@ unsigned __int64 RunCRC16(char *infile_name, char *outfile_name, __int64 Fsize, 
 	}
 	else
 	{
-		printf("CRC16>> Can not create CRC16 for file [%s] or wrong length(%u) \r\n", infile_name, TotDLen );
+		printf("CRC16>> Can not create CRC16 for file [%s] or wrong length(%llu) \r\n", infile_name, TotDLen );
 	}
 	
 	if(data_buf) { free(data_buf); data_buf=NULL; }
@@ -7606,7 +7606,7 @@ unsigned __int64 RunKSC_CRC16(char *infile_name, char *outfile_name, __int64 Fsi
 	}
 	else
 	{
-		printf("KSC-CRC16>> Can not create KSC-CRC16 for file [%s] or wrong length(%u) \r\n", infile_name, TotDLen );
+		printf("KSC-CRC16>> Can not create KSC-CRC16 for file [%s] or wrong length(%llu) \r\n", infile_name, TotDLen );
 	}
 	
 	if(data_buf) { free(data_buf); data_buf=NULL; }
@@ -7693,7 +7693,7 @@ unsigned __int64 RunCRC16CCITT(char *infile_name, char *outfile_name, __int64 Fs
 	}
 	else
 	{
-		printf("CRC16CCITT> Can not create CRC16CCITT for file [%s] or wrong length(%u) \r\n", infile_name, TotDLen );
+		printf("CRC16CCITT> Can not create CRC16CCITT for file [%s] or wrong length(%llu) \r\n", infile_name, TotDLen );
 	}
 
 	//*Fsize = TotDLen; /* 인자로 값을 넘길경우,  맨마지막에 하라~~ else fclosed !!! */

@@ -108,11 +108,11 @@ int istextfile(char *txtstr)
 void 	FileCounter(char *txt)
 {
 	struct 	_finddata_t 	root_files;
-	struct 	_finddata_t 	subd_files;
-	long 	roothFile, subdhFile;
+	//struct 	_finddata_t 	subd_files;
+	long 	roothFile; //, subdhFile;
 	unsigned int LineCounter = 0, AccLineCounter = 0 ;
 	int 	c, subdlen, itmp;
-	unsigned char sub_txt[255];
+	//unsigned char sub_txt[255];
 	char strtmp[255];
 	
 	/* Find first .c file in current directory */
@@ -195,7 +195,7 @@ void 	FileCounter(char *txt)
 					
 					AccLineCounter += LineCounter;
 
-					printf( "   %10ld\n", LineCounter );
+					printf( "   %10u\n", LineCounter );
 				}
 				else
 				{
@@ -262,7 +262,7 @@ void 	FileCounter(char *txt)
 		_findclose( roothFile );
 
 		printf( "-------------------------------------------------------  ------\n" );
-		printf( " Total Line Counter ===>                             %10ld\n", AccLineCounter );
+		printf( " Total Line Counter ===>                             %10u\n", AccLineCounter );
 
 
 	}
@@ -551,7 +551,11 @@ void help(void)
 	#if SHIFT_QUALITY_DATA_SORTING /* 2022-11-13 */
            " \n"
            "--[ Shift Quality Data Sorting ]-------- -------------------------------------------------------------------------\n"
-           "  -U or --upshift [ModeID] [APS lvl] [APS tol(1\%)] [SB swing gear ratio]\n" 
+           "  -U or --upshift [ModeID] [APS#1] [APS#2] [SB#1] [Jerk#1]\n" 
+           "               APS#1  : APS level as 3, or 4.5. -> Power On/Off decision \n"
+           "               APS#2  : APS tolerance as 1%%, or 2%% \n"
+           "               SB#1   : SB point decision continuous count. default value (3 times) \n"
+           "               Jerk#1 : Unit: msec, Reverse time length at SB point for Jerk1 calcution. (default 300msec) \n"
            "\n"
            " Ex) ah.exe --input 5ms_16select.tsv --output 5ms_eco.txt --upshift eco 3.5 1 1.5 \n"
            "     ah.exe --input 5ms_16select.tsv --output 5ms_spt.txt --upshift spt 4 1.5 0.5 \n"
@@ -724,7 +728,9 @@ void AllFilesClosed(void)
  --------------------------------------------------------- */
 
 #define MAX_TABLE_SIZ 		1000 //2000
-
+#define SB_DECISION_NUM 	100 /* SB decision times */
+#define SB_DECISION_TIMES 	3
+#define JERK_TIME_mSec 		300
 
 
 #define MODE_NOR 		8  /* 8: (md_NOR) */
@@ -760,7 +766,16 @@ void AllFilesClosed(void)
 #define LEN_POS 		15
 #define TXT_SSTIME 			"(SS)"
 #define TXT_SBTIME 			"(SB)"
-#define TXT_SBTIME_SWING 	"(SB0)" /* SB re-point because of SB level swing */
+#define TXT_SBSWING0 		"(SB0)" /* SB re-point because of SB level swing */
+#define TXT_SBSWING1 		"(SB1)" /* SB re-point because of SB level swing */
+#define TXT_SBSWING2 		"(SB2)" /* SB re-point because of SB level swing */
+#define TXT_SBSWING3 		"(SB3)" /* SB re-point because of SB level swing */
+#define TXT_SBSWING4 		"(SB4)" /* SB re-point because of SB level swing */
+#define TXT_SBSWING5 		"(SB5)" /* SB re-point because of SB level swing */
+#define TXT_SBSWING6 		"(SB6)" /* SB re-point because of SB level swing */
+#define TXT_SBSWING7 		"(SB7)" /* SB re-point because of SB level swing */
+#define TXT_SBSWING8 		"(SB8)" /* SB re-point because of SB level swing */
+#define TXT_SBSWING9 		"(SB9)" /* SB re-point because of SB level swing */
 #define TXT_SBTIME_RE 		"(SB)2"
 #define TXT_SPTIME 			"(SP)"
 #define TXT_UNKNOWN 		"(***)"
@@ -792,6 +807,51 @@ void AllFilesClosed(void)
 #define TXT_NEW_gMAX 		"(gMax)"
 #define TXT_NEW_gmin 		"(gmin)"
 
+
+#define TXT_SB1_MaxNt 		"(SB1)MXNt" 
+#define TXT_SB1_MaxNe 		"(SB1)MXNe" 
+#define TXT_SB1_MaxgX 		"(SB1)MXgX" 
+#define TXT_SB1_Mingm 		"(SB1)migm" 
+
+#define TXT_SB2_MaxNt 		"(SB2)MXNt" 
+#define TXT_SB2_MaxNe 		"(SB2)MXNe" 
+#define TXT_SB2_MaxgX 		"(SB2)MXgX" 
+#define TXT_SB2_Mingm 		"(SB2)migm" 
+
+#define TXT_SB3_MaxNt 		"(SB3)MXNt" 
+#define TXT_SB3_MaxNe 		"(SB3)MXNe" 
+#define TXT_SB3_MaxgX 		"(SB3)MXgX" 
+#define TXT_SB3_Mingm 		"(SB3)migm" 
+
+#define TXT_SB4_MaxNt 		"(SB4)MXNt" 
+#define TXT_SB4_MaxNe 		"(SB4)MXNe" 
+#define TXT_SB4_MaxgX 		"(SB4)MXgX" 
+#define TXT_SB4_Mingm 		"(SB4)migm" 
+
+#define TXT_SB5_MaxNt 		"(SB5)MXNt" 
+#define TXT_SB5_MaxNe 		"(SB5)MXNe" 
+#define TXT_SB5_MaxgX 		"(SB5)MXgX" 
+#define TXT_SB5_Mingm 		"(SB5)migm" 
+
+#define TXT_SB6_MaxNt 		"(SB6)MXNt" 
+#define TXT_SB6_MaxNe 		"(SB6)MXNe" 
+#define TXT_SB6_MaxgX 		"(SB6)MXgX" 
+#define TXT_SB6_Mingm 		"(SB6)migm" 
+
+#define TXT_SB7_MaxNt 		"(SB7)MXNt" 
+#define TXT_SB7_MaxNe 		"(SB7)MXNe" 
+#define TXT_SB7_MaxgX 		"(SB7)MXgX" 
+#define TXT_SB7_Mingm 		"(SB7)migm" 
+
+#define TXT_SB8_MaxNt 		"(SB8)MXNt" 
+#define TXT_SB8_MaxNe 		"(SB8)MXNe" 
+#define TXT_SB8_MaxgX 		"(SB8)MXgX" 
+#define TXT_SB8_Mingm 		"(SB8)migm" 
+
+#define TXT_SB9_MaxNt 		"(SB9)MXNt" 
+#define TXT_SB9_MaxNe 		"(SB9)MXNe" 
+#define TXT_SB9_MaxgX 		"(SB9)MXgX" 
+#define TXT_SB9_Mingm 		"(SB9)migm" 
 
 
 #define SB_SWING_LEVEL 		0.5f /* SB level point swing : when 0.5 gear ratio */
@@ -969,9 +1029,10 @@ static short  VSkphTblUP[VS_TABLE_NUM] = {
 
 
 
-static double fAPSpwrLvl  = -1.0f;
-static double fAPStol     = APS_TOLENANCE;  /* APS tolerance */
-static double fSBswingLvl = SB_SWING_LEVEL;
+static double fAPSpwrLvl   = -1.0f;
+static double fAPStol      = APS_TOLENANCE;  /* APS tolerance */
+static short  iSBdecision  = SB_DECISION_TIMES;
+static int    iJerkTimeLen = JERK_TIME_mSec;
 
 #define PWR_ON_UP_SHIFT_SSPOINT_START 		1
 
@@ -1588,7 +1649,7 @@ short apsTableIndex(void)
 		}
 	}
 
-	fprintf(stderr,">>APS Table Nums  : %2d (", aps_index );
+	fprintf(stderr,">>APS Table Nums   : %2d (", aps_index );
 	for(kk=0; kk<aps_index-1; kk++)
 	{
 		fprintf(stderr,"%.1lf ", ApsTble[kk] );
@@ -1613,7 +1674,7 @@ short vsKPHTableIndex(void)
 		}
 	}
 
-	fprintf(stderr,">>VS Table Nums   : %2d (", vs_index );
+	fprintf(stderr,">>VS Table Nums    : %2d (", vs_index );
 	for(kk=0; kk<vs_index-1; kk++)
 	{
 		fprintf(stderr,"%d ", VSkphTblDN[kk] );
@@ -1625,7 +1686,7 @@ short vsKPHTableIndex(void)
 
 
 
-int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigned int *SScnt, unsigned int *SBcnt, unsigned int *SPcnt)
+unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigned int *SScnt, unsigned int *SBcnt, unsigned int *SPcnt, unsigned int *SBswingcnt)
 {
 	FILE *shiFile=NULL;
 
@@ -1633,7 +1694,7 @@ int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigned int *SS
 	unsigned int iTimeShift = 0;
 	double avgTime = 0.0f;
 	unsigned long long avgCount = 0ULL;
-	int iavgTime = 0;
+	unsigned int iavgTime = 0;
 	char shift_out[MAX_CHARS*LENGTH_OF_FILENAME+1];
 	unsigned int ii=0;
 	short iItemCurOK = 0; /* 1: OK, 0: NG */
@@ -1646,7 +1707,6 @@ int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigned int *SS
 	double g_SPtime = -1.0f;
 	double g_SFtime = -1.0f;
 
-	double gearShift = -1.0f;
 	double gearShiftOne = -1.0f, pre_gearShiftOne = -1.0f;
 	double gearShiftTwo = -1.0f;
 
@@ -1675,13 +1735,13 @@ int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigned int *SS
 	unsigned int iSBcount = 0U;
 	unsigned int iSPcount = 0U;
 
-	unsigned int iSB_new_cnt = 0U;
+	unsigned int iSBswingCnt = 0U;
 	short iOnce_SS = 0; /* */
 	short iOnce_SB = 1; /* Shift Begin */
 	short iOnce_SP = 1; /* Synchronizing Point */
 	short iOnce_SF = 0; /* Shift Finish */
 
-	short iSB_rePoint = 0;
+	short iSBpntFix = 0;
 	
 	double MaxNe = 0.0f;
 	double MaxNt = 0.0f;
@@ -1689,15 +1749,23 @@ int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigned int *SS
 	double minAcc = GMAX_RVALUE;
 	short iAPSNum = APS_TABLE_NUM;
 	short ivsKPHNum = VS_TABLE_NUM;
+	short SBdecision[SB_DECISION_NUM];
+	unsigned short iSBdecCnt = 0;
+	short iSBstart = 0;
+	short iSBTimeSum = 0;
+	short ide=0;
 	
-
-	memset(QualData, 0x00, sizeof(QualData) );
+	memset(QualData, 0x00, QUAL_DATA_MAX_SIZE*sizeof(char) );
 	memset(sq, 0x00, sizeof(sq) );
 	memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
-
 	memset(iSBnewPoint, 0x00, sizeof(iSBnewPoint) );
 
-		
+	memset(SBdecision, 0x00, SB_DECISION_NUM*sizeof(short) );
+
+	iSBdecCnt  = 0;
+	iSBstart   = 0;
+	iSBTimeSum = 0;
+	iSBpntFix  = 0;
 
 	iOnce_SS	= 0;
 	iOnce_SB	= TRUE;
@@ -1745,10 +1813,11 @@ int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigned int *SS
 	/* get file  */
 	//fprintf(stderr,"\n");
 	//fprintf(stderr,">>ModeID %s Sorting... \n", arrPATs_ModeID[aiPATs05].ModeID );
-	fprintf(stderr,">>Shift Type      : %s \n", (iShiftType==SHI_PWR_ON?"PWR On":(iShiftType==SHI_PWR_OFF?"PWR Off":(iShiftType==SHI_STATIC?"Static":(iShiftType==SHI_N_STOP_DN?"Stop Dn":"Unknown")))) );
-	fprintf(stderr,">>Shift Direction : Shift %s \n", (shiDir03==SHIFT_UP?"UP":(shiDir03==SHIFT_DN?"DOWN": \
+	fprintf(stderr,">>Shift Type       : %s \n", (iShiftType==SHI_PWR_ON?"PWR On":(iShiftType==SHI_PWR_OFF?"PWR Off":(iShiftType==SHI_STATIC?"Static":(iShiftType==SHI_N_STOP_DN?"Stop Dn":"Unknown")))) );
+	fprintf(stderr,">>Shift Direction  : Shift %s \n", (shiDir03==SHIFT_UP?"UP":(shiDir03==SHIFT_DN?"DOWN": \
 		(shiDir03==SHIFT_SKIP_DN?"SkipDown":(shiDir03==SHIFT_SKIP_UP?"SkipUp":"Unknown"))) ));			
-
+	fprintf(stderr,">>SB decision Num  : %d times \n", iSBdecision );
+	fprintf(stderr,">>Jerk Time length : %d msec (Time position before SB point) \n", iJerkTimeLen );
 	/* ===================================================================================== */
 
 	memset(shift_out, 0x00, sizeof(shift_out)); // 2022.11.22
@@ -1843,7 +1912,7 @@ int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigned int *SS
 			else
 			{
 				iNGcount ++;
-				fprintf(stderr,"\n[%s]: ++ERROR++ result = %d, NGcount = %lu\n",__FUNCTION__, result, iNGcount );
+				fprintf(stderr,"\n[%s]: ++ERROR++ result = %d, NGcount = %u\n",__FUNCTION__, result, iNGcount );
 				continue; /* reading Next item because of FAIL item */
 			}
 			/* === 1 STEP : record (17 items check) =============== */
@@ -1948,14 +2017,14 @@ int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigned int *SS
 				gearShiftTwo = 0.0f;
 				if( (sq[0].No10>0.0 || sq[0].No10<0.0) )
 				{
-					gearRatio	  = (sq[0].Nt16/sq[0].No10); // gearTable[sq[0].curGear08];
+					gearRatio = (sq[0].Nt16/sq[0].No10); // gearTable[sq[0].curGear08];
 				}
 				gearShiftOne  = (sq[0].Nt16 - sq[0].No10 * gearTable[sq[0].curGear08]);
 				gearShiftTwo  = (sq[0].Nt16 - sq[0].No10 * gearTable[sq[0].tgtGear11]);
 
 
 				/* ----------------------------------------------------- */
-				/* Calc Jerk 											 */
+				/* Calc Jerk0 (per 5msec) 								 */
 				/* ----------------------------------------------------- */
 				fJerk1 = 0.0f;
 				if(preTime)
@@ -1969,7 +2038,7 @@ int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigned int *SS
 				preTime = (unsigned int)(sq[0].Time01 * 1000 * 10);
 				preLAcc = (sq[0].LAcc17 * 1000);
 				/* ----------------------------------------------------- */
-				/* Calc Jerk 											 */
+				/* Calc Jerk0 (per 5msec) 								 */
 				/* ----------------------------------------------------- */
 
 
@@ -2000,6 +2069,15 @@ int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigned int *SS
 					MaxNt = 0.0f;
 					MaxAcc = 0.0f;
 					minAcc = GMAX_RVALUE;
+
+					/* SB decision initialized */
+					memset(SBdecision, 0x00, SB_DECISION_NUM*sizeof(short) );					
+					iSBdecCnt  = 0;
+					iSBstart   = 0;
+					iSBTimeSum = 0;
+					iSBpntFix  = 0;
+					iSBswingCnt = 0;
+
 				}
 				else
 				{
@@ -2011,33 +2089,75 @@ int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigned int *SS
 								  Synch Point (SP) 점 판단식 : Nt - No x 2단 기어비 ≤ 30RPM 되는 싯점	 
 						---------------------------------------------------------------------------------- */
 
+					#if 0 // SB_POINT_SWING1
 						/* SB 튀는 시점 발생 -> */
 						if( (iOnce_SS) && (0==iOnce_SB) && (gearShiftOne > SB_PNT_RPM_UPS) && (pre_gearShiftOne < (gearShiftOne-fSBswingLvl /*SB_SWING_LEVEL*/)) )
 						{
 							iOnce_SB = 1; // re-SB point
-							iSB_rePoint = 1;
+							iSBpntFix = 1;
 							pre_gearShiftOne = gearShiftOne;
 
-							iSBnewPoint[iSB_new_cnt] = iSBcount;
-							iSB_new_cnt ++;
-							fprintf(stderr,"  SB re-point because of rpm ratio (%.1f) swing... SBcount:%3d -> %lu : *\n", fSBswingLvl, iSB_new_cnt, iSBcount );
+							iSBnewPoint[iSBswingCnt] = iSBcount;
+							iSBswingCnt ++;
+							fprintf(stderr,"  SB re-point because of rpm ratio (%.1f) swing... SBcount:%3u -> %u : *\n", fSBswingLvl, iSBswingCnt, iSBcount );
+						}
+					#endif
+
+						if( 0==iSBpntFix && (gearShiftOne <= SB_PNT_RPM_UPS) ) /* Shift Begin (SB) -30 rpm under */
+						{	
+							if(iSBdecCnt < SB_DECISION_NUM)
+							{
+								SBdecision[iSBdecCnt] = 1; // 1 times
+								iSBstart = 1;
+								iOnce_SB = 1; // re-enterance
+								//fprintf(stderr,"  SB decision SBdecision: %d:(%d) \n", iSBdecCnt, SBdecision[iSBdecCnt] );
+							}
+							else
+								fprintf(stderr, "  SB decision point too many points... \n");
+						}
+						else
+						{
+							iSBdecCnt  = 0;
+							iSBstart   = 0;
+							iSBTimeSum = 0;
+						}
+
+						
+						if(iSBstart)
+							iSBdecCnt ++;
+
+						iSBTimeSum = 0; /* clear before summation */
+						for(ide=0; ide<iSBdecCnt; ide++)
+							iSBTimeSum += SBdecision[ide];
+
+						if( iSBTimeSum >= iSBdecision /* SB_DECISION_TIMES */) 
+						{
+							iSBpntFix=1;
+							//fprintf(stderr,"  SB decision ---- OK (%d) \n", iSBTimeSum );
 						}
 						
-
 						if( iOnce_SB && (gearShiftOne <= SB_PNT_RPM_UPS) ) /* Shift Begin (SB) -30 rpm under */
 						{
 							iOnce_SB = FALSE;
 
-							if( iSB_rePoint ) 
+							if( iSBpntFix ) 
+							{
 								strcpy(sTimePos, TXT_SBTIME); // TXT_SBTIME_RE);
+								iSBcount ++;
+							}
 							else
-								strcpy(sTimePos, TXT_SBTIME);
-
-							iSBcount ++;
+							{
+								//sprintf(sTimePos,"(SB%d)",iSBdecCnt-1);
+								strcpy(sTimePos, TXT_SBSWING0);
+								iSBswingCnt++;
+							}
+							//iSBcount ++;
 
 							g_SBtime = sq[0].Time01;
+						#if 0 // SB_POINT_SWING1	
 							pre_gearShiftOne = gearShiftOne;
-							iSB_rePoint = 0;
+							iSBpntFix = 0;
+						#endif
 						}
 						else if( iOnce_SP && (gearShiftTwo <= SP_PNT_RPM_UPS) ) /* 30 rpm under */
 						{
@@ -2244,22 +2364,23 @@ int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigned int *SS
 	{
 		if( chkPATs_ModeID[ii] > 0UL )
 		{
-			fprintf(stderr,"    %3d:%-22s : %9lu lines %s \n", ii, arrPATs_ModeID[ii].ModeID, chkPATs_ModeID[ii], (aiPATs05==ii?"* Used":" ") );
+			fprintf(stderr,"    %3u:%-22s : %9lu lines %s \n", ii, arrPATs_ModeID[ii].ModeID, chkPATs_ModeID[ii], (aiPATs05==ii?"* Used":" ") );
 			totChkModeID += chkPATs_ModeID[ii];
 		}
 	}
-	fprintf(stderr,"  Quality Sum Records ---------: %9lu lines \n", totChkModeID );
-	fprintf(stderr,"  Shift Sorted Rec %-11s : %9lu/ %lu lines \n", arrPATs_ModeID[aiPATs05].ModeID, iSortCount, chkPATs_ModeID[aiPATs05] );
-	fprintf(stderr,"     SS Point Counts--%-8s : %9lu lines \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), iSScount );
-	fprintf(stderr,"     SB Point Counts--%-8s : %9lu lines \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), iSBcount );
-	fprintf(stderr,"     SP Point Counts--%-8s : %9lu lines \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), iSPcount );
+	fprintf(stderr,"  Quality Sum Records ---------: %9u lines \n", totChkModeID );
+	fprintf(stderr,"  Shift Sorted Rec %-11s : %9u/ %lu lines \n", arrPATs_ModeID[aiPATs05].ModeID, iSortCount, chkPATs_ModeID[aiPATs05] );
+	fprintf(stderr,"     SS Point Counts--%-8s : %9u lines \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), iSScount );
+	fprintf(stderr,"     SB Point Counts--%-8s : %9u lines \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), iSBcount );
+	fprintf(stderr,"     SP Point Counts--%-8s : %9u lines \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), iSPcount );
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
 	*SScnt = iSScount;
 	*SBcnt = iSBcount;
 	*SPcnt = iSPcount;
+	*SBswingcnt = iSBswingCnt;
 
-	iavgTime = (int)(avgTime/avgCount);
+	iavgTime = (unsigned int)(avgTime/avgCount);
 
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 	fprintf(stderr,">>ModeID %s files are saved as below! \n", arrPATs_ModeID[aiPATs05].ModeID);
@@ -2273,7 +2394,7 @@ int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigned int *SS
 
 
 
-
+#if 0 // SB_POINT_SWING1
 unsigned int SBtxtCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsigned int SPcnt)
 {
 	FILE *fp2chk = NULL;
@@ -2291,7 +2412,6 @@ unsigned int SBtxtCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, 
 	int result;
 	unsigned long long RecordCnt=0ULL;
 	short iItemCurOK = 0; /* 1: OK, 0: NG */
-	short iItemPreOK = 0;
 	short iSave = 0;
 
 	unsigned int iSScount = 0U;
@@ -2300,8 +2420,6 @@ unsigned int SBtxtCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, 
 	
 	unsigned long long iNGcount = 0ULL;
 	unsigned long long iOKcount = 0ULL;
-	unsigned long long iSortCount = 0ULL;
-
 
 
 	if( SScnt==SBcnt && SBcnt==SPcnt && SScnt==SPcnt)
@@ -2451,8 +2569,8 @@ unsigned int SBtxtCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, 
 					/* ignored	*/
 					if( iSBnewPoint[iReSB] && (iSBcount==iSBnewPoint[iReSB]) && (0==strcmp(sq2[0].sTimePos, TXT_SBTIME)) )
 					{
-						strcpy(sq2[0].sTimePos, TXT_SBTIME_SWING);
-						fprintf(stderr,"  SB re-point rpm ratio (%.1f) : %s -> %s ... %lu \n", fSBswingLvl, TXT_SBTIME, TXT_SBTIME_SWING, iSBnewPoint[iReSB] );
+						strcpy(sq2[0].sTimePos, TXT_SBSWING0);
+						fprintf(stderr,"  SB re-point rpm ratio (%.1f) : %s -> %s ... %u \n", fSBswingLvl, TXT_SBTIME, TXT_SBSWING0, iSBnewPoint[iReSB] );
 
 						iReSB++;
 					}
@@ -2518,7 +2636,7 @@ unsigned int SBtxtCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, 
 	}
 	else return 0;
 }
-
+#endif
 
 
 int SSCounterCheck(short aiPATs05, unsigned int iSBchk, unsigned int SScnt, unsigned int SBcnt, unsigned int SPcnt)
@@ -2539,7 +2657,6 @@ int SSCounterCheck(short aiPATs05, unsigned int iSBchk, unsigned int SScnt, unsi
 	int result;
 	unsigned long long RecordCnt=0ULL;
 	short iItemCurOK = 0; /* 1: OK, 0: NG */
-	short iItemPreOK = 0;
 	short iSave = 0;
 
 	unsigned int iSScount = 0U;
@@ -2548,8 +2665,6 @@ int SSCounterCheck(short aiPATs05, unsigned int iSBchk, unsigned int SScnt, unsi
 	
 	unsigned long long iNGcount = 0ULL;
 	unsigned long long iOKcount = 0ULL;
-	unsigned long long iSortCount = 0ULL;
-
 
 
 	if( SScnt==SBcnt && SBcnt==SPcnt && SScnt==SPcnt)
@@ -2850,21 +2965,16 @@ int Find2nd_NtNeminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigne
 	#define RCSZ 		2
 	sqd2nd_type sq2[RCSZ];  /* 0:SS, 1:SB, 2:MaxNt, 3:MaxNe, 4:g_Max, 5:g_min, 6:SP */
 	
-	unsigned int rc =0;
 	char shi_inp[MAX_CHARS*LENGTH_OF_FILENAME+1];
 	char shiNtMax[MAX_CHARS*LENGTH_OF_FILENAME+1];
 	char shiNeMax[MAX_CHARS*LENGTH_OF_FILENAME+1];
 	char shiNtmin[MAX_CHARS*LENGTH_OF_FILENAME+1];
 	char shiNemin[MAX_CHARS*LENGTH_OF_FILENAME+1];
 
-	unsigned int ii=0U, kk=0U;
+	unsigned int ii=0U;
 	int  ierr = -1;
 	short iItemCurOK = 0; /* 1: OK, 0: NG */
-	short iItemPreOK = 0;
 	short iSave = 0;
-
-	double gMaxSaveTime[MAX_TABLE_SIZ];
-	int igMaxIdx = 0;
 
 	/* line inputted from file */
 	char QualData[QUAL_DATA_MAX_SIZE]; 
@@ -2873,15 +2983,8 @@ int Find2nd_NtNeminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigne
 
 	unsigned long long iNGcount = 0ULL;
 	unsigned long long iOKcount = 0ULL;
-	unsigned long long iSortCount = 0ULL;
 
 	int isNaming = 0;
-	short isFindSS = 1;
-	int curPreGear = -1, tgtPreGear = 1;
-	double fJerk1 = 0.0f;
-	double preLAcc = 0.0f;
-	unsigned int DiffTime = 0;
-	unsigned int preTime = 0;
 
 	double MaxNe = 0.0f;
 	double MaxNt = 0.0f;
@@ -2889,18 +2992,11 @@ int Find2nd_NtNeminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigne
 	unsigned int NeCnt = 0;
 	unsigned int NtCnt = 0;
 	unsigned int irollback = 0U;
-	
-	short isAbnorOp = 0; // ABNORMAL opeation
-	short isMaxNtOnce = 1;
-	short isMaxNeOnce = 1;
 
 	unsigned int iSScount = 0U;
 	unsigned int iSBcount = 0U;
 	unsigned int iSPcount = 0U;
 	
-	short isSSOnce = 0;
-	short isSBOnce = 0;
-	short isSPOnce = 0;
 	
 	/* ===================================================================================== */
 	/* ===================================================================================== */
@@ -2914,9 +3010,6 @@ int Find2nd_NtNeminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigne
 	memset(shiNeMax, 0x00, sizeof(shiNeMax)); // 2022.11.27
 	memset(shiNtmin, 0x00, sizeof(shiNtmin));  
 	memset(shiNemin, 0x00, sizeof(shiNemin));  
-
-	memset(gMaxSaveTime, 0x00, sizeof(gMaxSaveTime));  
-
 
 	strcpy(shi_inp, shift_file);
 	strcpy(shiNtMax, shi_inp);
@@ -3028,7 +3121,7 @@ int Find2nd_NtNeminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigne
 	/* ===================================================================================== */
 	/* ===================================================================================== */
 
-	memset(QualData, 0x00, sizeof(QualData) );
+	memset(QualData, 0x00, QUAL_DATA_MAX_SIZE*sizeof(char) );
 	memset(sq2, 0x00, sizeof(sq2) );
 
 
@@ -3320,19 +3413,16 @@ int Find2nd_gminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigned i
 	#define RCSZ 		2
 	sqd2nd_type sq2[RCSZ];  /* 0:SS, 1:SB, 2:MaxNt, 3:MaxNe, 4:g_Max, 5:g_min, 6:SP */
 	
-	unsigned int rc =0;
 	char shi_inp[MAX_CHARS*LENGTH_OF_FILENAME+1];
 	char shigMax[MAX_CHARS*LENGTH_OF_FILENAME+1];
 	char shigmin[MAX_CHARS*LENGTH_OF_FILENAME+1];
 
-	unsigned int ii=0U, kk=0U;
+	unsigned int ii=0U;
 	int  ierr = -1;
 	short iItemCurOK = 0; /* 1: OK, 0: NG */
-	short iItemPreOK = 0;
 	short iSave = 0;
 
 	double gMaxSaveTime[MAX_TABLE_SIZ];
-	int igMaxIdx = 0;
 
 	/* line inputted from file */
 	char QualData[QUAL_DATA_MAX_SIZE]; 
@@ -3341,15 +3431,8 @@ int Find2nd_gminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigned i
 
 	unsigned long long iNGcount = 0ULL;
 	unsigned long long iOKcount = 0ULL;
-	unsigned long long iSortCount = 0ULL;
 
 	int isNaming = 0;
-	short isFindSS = 1;
-	int curPreGear = -1, tgtPreGear = 1;
-	double fJerk1 = 0.0f;
-	double preLAcc = 0.0f;
-	unsigned int DiffTime = 0;
-	unsigned int preTime = 0;
 
 	double g_Max = 0.0f;
 	double g_min = GMAX_RVALUE;
@@ -3516,7 +3599,7 @@ int Find2nd_gminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigned i
 	/* ===================================================================================== */
 	/* ===================================================================================== */
 
-	memset(QualData, 0x00, sizeof(QualData) );
+	memset(QualData, 0x00, QUAL_DATA_MAX_SIZE*sizeof(char) );
 	memset(sq2, 0x00, sizeof(sq2) );
 
 
@@ -3838,12 +3921,9 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 	
 	sqd2nd_type sq2[2];  /* 0:SS, 1:SB, 2:MaxNt, 3:MaxNe, 4:g_Max, 5:g_min, 6:SP */
 	
-	unsigned int ii=0U, kk=0U;
 	int  ierr = -1;
 	short iItemCurOK = 0; /* 1: OK, 0: NG */
-	short iItemPreOK = 0;
 	short iSave = 0;
-	short iFirstSS = 1;
 	char TmpStr[20];
 
 	/* line inputted from file */
@@ -3854,21 +3934,16 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 	unsigned long long iNGcount = 0ULL;
 	unsigned long long iOKcount = 0ULL;
 
-	int isNaming = 0;
-
 	unsigned int iSScount = 0;
 	unsigned int iSBcount = 0;
 	unsigned int iSPcount = 0;
 
 	double gTimeDiff = 0.0f;
 	double gSStime = 0.0f;
-	double gSBtime = 0.0f;
-	double gSPtime = 0.0f;
 	
 	short is2File = 0;
 	short isSSpoint = 0;
 	short isSBpoint = 0;
-	short isSPpoint = 0;
 
 	short isgMaxPoint = 0;
 	short isgMax = 0;
@@ -3903,7 +3978,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 	if( NULL == (fp2out = fopen( shi_out, "wb")) )	
 	{
 		// FAIL
-		fprintf(stderr,"\r\n++ERROR++[%s]:Can not create file (%s) \n\n", shi_out );
+		fprintf(stderr,"\r\n++ERROR++[%s]:Can not create file (%s) \n\n", __FUNCTION__, shi_out );
 		AllFilesClosed();
 		if(fpinput) { fclose(fpinput); fpinput=NULL; }
 		if(fp2out) { fclose(fp2out); fp2out=NULL; }
@@ -3918,7 +3993,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 	/* ===================================================================================== */
 	/* ===================================================================================== */
 
-	memset(QualData, 0x00, sizeof(QualData) );
+	memset(QualData, 0x00, QUAL_DATA_MAX_SIZE*sizeof(char) );
 	memset(sq2, 0x00, sizeof(sq2) );
 
 	//memset(gMaxSaveTime, 0x00, sizeof(gMaxSaveTime) );
@@ -4106,8 +4181,26 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 								strcpy( sq2[0].sTimePos, TXT_MXNtgX);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_gmin) )
 								strcpy( sq2[0].sTimePos, TXT_MXNtgm);
-							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBTIME_SWING) )
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING0) )
 								strcpy( sq2[0].sTimePos, TXT_SB0_MaxNt);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING1) )
+								strcpy( sq2[0].sTimePos, TXT_SB1_MaxNt);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING2) )
+								strcpy( sq2[0].sTimePos, TXT_SB2_MaxNt);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING3) )
+								strcpy( sq2[0].sTimePos, TXT_SB3_MaxNt);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING4) )
+								strcpy( sq2[0].sTimePos, TXT_SB4_MaxNt);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING5) )
+								strcpy( sq2[0].sTimePos, TXT_SB5_MaxNt);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING6) )
+								strcpy( sq2[0].sTimePos, TXT_SB6_MaxNt);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING7) )
+								strcpy( sq2[0].sTimePos, TXT_SB7_MaxNt);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING8) )
+								strcpy( sq2[0].sTimePos, TXT_SB8_MaxNt);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING9) )
+								strcpy( sq2[0].sTimePos, TXT_SB9_MaxNt);
 							else
 								strcpy( sq2[0].sTimePos, maxType);
 
@@ -4138,8 +4231,26 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 								strcpy( sq2[0].sTimePos, TXT_MXNegX);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_gmin) )
 								strcpy( sq2[0].sTimePos, TXT_MXNegm);
-							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBTIME_SWING) )
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING0) )
 								strcpy( sq2[0].sTimePos, TXT_SB0_MaxNe);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING1) )
+								strcpy( sq2[0].sTimePos, TXT_SB1_MaxNe);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING2) )
+								strcpy( sq2[0].sTimePos, TXT_SB2_MaxNe);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING3) )
+								strcpy( sq2[0].sTimePos, TXT_SB3_MaxNe);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING4) )
+								strcpy( sq2[0].sTimePos, TXT_SB4_MaxNe);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING5) )
+								strcpy( sq2[0].sTimePos, TXT_SB5_MaxNe);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING6) )
+								strcpy( sq2[0].sTimePos, TXT_SB6_MaxNe);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING7) )
+								strcpy( sq2[0].sTimePos, TXT_SB7_MaxNe);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING8) )
+								strcpy( sq2[0].sTimePos, TXT_SB8_MaxNe);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING9) )
+								strcpy( sq2[0].sTimePos, TXT_SB9_MaxNe);
 							else							
 								strcpy( sq2[0].sTimePos, maxType);
 
@@ -4171,8 +4282,26 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 								strcpy( sq2[0].sTimePos, TXT_MXNtgX);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_MaxNe) )
 								strcpy( sq2[0].sTimePos, TXT_MXNegX);
-							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBTIME_SWING) )
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING0) )
 								strcpy( sq2[0].sTimePos, TXT_SB0_MaxgX);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING1) )
+								strcpy( sq2[0].sTimePos, TXT_SB1_MaxgX);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING2) )
+								strcpy( sq2[0].sTimePos, TXT_SB2_MaxgX);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING3) )
+								strcpy( sq2[0].sTimePos, TXT_SB3_MaxgX);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING4) )
+								strcpy( sq2[0].sTimePos, TXT_SB4_MaxgX);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING5) )
+								strcpy( sq2[0].sTimePos, TXT_SB5_MaxgX);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING6) )
+								strcpy( sq2[0].sTimePos, TXT_SB6_MaxgX);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING7) )
+								strcpy( sq2[0].sTimePos, TXT_SB7_MaxgX);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING8) )
+								strcpy( sq2[0].sTimePos, TXT_SB8_MaxgX);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING9) )
+								strcpy( sq2[0].sTimePos, TXT_SB9_MaxgX);
 							else							
 								strcpy( sq2[0].sTimePos, maxType);
 
@@ -4222,8 +4351,26 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 								strcpy( sq2[0].sTimePos, TXT_MXNtgm);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_MaxNe) )
 								strcpy( sq2[0].sTimePos, TXT_MXNegm);
-							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBTIME_SWING) )
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING0) )
 								strcpy( sq2[0].sTimePos, TXT_SB0_Mingm);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING1) )
+								strcpy( sq2[0].sTimePos, TXT_SB1_Mingm);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING2) )
+								strcpy( sq2[0].sTimePos, TXT_SB2_Mingm);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING3) )
+								strcpy( sq2[0].sTimePos, TXT_SB3_Mingm);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING4) )
+								strcpy( sq2[0].sTimePos, TXT_SB4_Mingm);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING5) )
+								strcpy( sq2[0].sTimePos, TXT_SB5_Mingm);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING6) )
+								strcpy( sq2[0].sTimePos, TXT_SB6_Mingm);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING7) )
+								strcpy( sq2[0].sTimePos, TXT_SB7_Mingm);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING8) )
+								strcpy( sq2[0].sTimePos, TXT_SB8_Mingm);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING9) )
+								strcpy( sq2[0].sTimePos, TXT_SB9_Mingm);
 							else							
 								strcpy( sq2[0].sTimePos, maxType);
 
@@ -4309,8 +4456,6 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime)
 	FILE *fp2out = NULL;
 
 	sqd3rd_type sq3[2];  /* 0:SS, 1:SB, 2:MaxNt, 3:MaxNe, 4:g_Max, 5:g_min, 6:SP */
-	char shi_out[MAX_CHARS*LENGTH_OF_FILENAME+1];
-	
 	int  ierr = -1;
 
 	double fJerk2 = 0.0f;
@@ -4322,9 +4467,6 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime)
 
 	unsigned long long iNGcount = 0ULL;
 	unsigned long long iOKcount = 0ULL;
-
-	int isNaming = 0;
-	unsigned int DiffTime = 0;
 
 	double gTimeDiff = 0.0f;
 	double gSStime = 0.0f;
@@ -4366,7 +4508,7 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime)
 	/* ===================================================================================== */
 	/* ===================================================================================== */
 
-	memset(QualData, 0x00, sizeof(QualData) );
+	memset(QualData, 0x00, QUAL_DATA_MAX_SIZE*sizeof(char) );
 	memset(sq3, 0x00, sizeof(sq3) );
 
 	RecordCnt  = 0ULL;
@@ -4679,7 +4821,6 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime)
 int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTime, unsigned int SScnt, unsigned int SBcnt, unsigned int SPcnt)
 {
 	sqdflt_type sq4[2];  /* 0:SS, 1:SB, 2:MaxNt, 3:MaxNe, 4:g_Max, 5:g_min, 6:SP */
-	char shi_out[MAX_CHARS*LENGTH_OF_FILENAME+1];
 	
 	int  ierr = -1;
 
@@ -4734,7 +4875,7 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 	/* ===================================================================================== */
 	/* ===================================================================================== */
 
-	memset(QualData, 0x00, sizeof(QualData) );
+	memset(QualData, 0x00, QUAL_DATA_MAX_SIZE*sizeof(char) );
 	memset(sq4, 0x00, sizeof(sq4) );
 
 	RecordCnt  = 0ULL;
@@ -5135,7 +5276,7 @@ int CheckLicense(void)
 			
 			if(i >= MAC_BUF_SIZ)
 			{
-				fprintf(stderr,"ERROR:%6d: Not enough Buffer length---(%d) \r\n", i );
+				fprintf(stderr,"ERROR:Not enough Buffer length---(%u) \r\n", i );
 			}
 
 			if (--i > 0)
@@ -5427,7 +5568,7 @@ int main(int argc, char *argv[])
 	
 	unsigned int crc32_ctab[CRC32_TAB_SIZE] = {0,};
 
-	const char WeekTXT[][3+1] = {
+	const char WeekTXT[9][3+1] = {
 			"Sun", // wDayOfWeek 0
 			"Mon", // wDayOfWeek 1
 			"Tue", // wDayOfWeek 2
@@ -5440,7 +5581,7 @@ int main(int argc, char *argv[])
 		};
 
 
-	int ret_scan = 0, ret_bdscan=0;
+	int ret_scan = 0;
 	int opt;
 	unsigned char opt_ok = 0x0;
 	int ii;
@@ -5472,7 +5613,6 @@ int main(int argc, char *argv[])
 	int isElf2Bin = 0;
 	int isRandomNum = 0;
 	int iRanMaxi=0;
-	int isTitle = 0;
 	unsigned int total_bin_size = 0;
 	int c;
 	int count=0;
@@ -8097,23 +8237,30 @@ int main(int argc, char *argv[])
 							break;
 
 						case 3:
-							// 3>> SB repoint : SB gear ratio swing level
-							fSBswingLvl = atof( str_ShiftOp[kk] ); 
+							// 3>> SB repoint : SB decision times
+							iSBdecision = atoi( str_ShiftOp[kk] ); 
 							fprintf(stderr,"\n");
-							fprintf(stderr,">>SB swing level  : <<%d>> %.1lf (rpm gear ratio)", kk, fSBswingLvl ); 
+							fprintf(stderr,">>SB decision Num : <<%d>> %d (SB decision times, default:3 times)", kk, iSBdecision ); 
 							break;
 							
 						case 4:
-							aps1 = atof( str_ShiftOp[kk] ); 
+							// 4>> Jerk#1
+							iJerkTimeLen = atoi( str_ShiftOp[kk] ); 
+							fprintf(stderr,"\n");
+							fprintf(stderr,">>Jerk Time Length: <<%d>> %d msec (unit: msec)", kk, iJerkTimeLen ); 
+							break;
+							
+						case 5:							
+							aps1 = atoi( str_ShiftOp[kk] ); 
 							fprintf(stderr,"\n");
 							fprintf(stderr,">>APS Table Init  : <<%d>> %.1lf ", kk, aps1 ); 
 							break;
-						case 5:
+						case 6:
 							aps2 = atof( str_ShiftOp[kk] ); 
 							fprintf(stderr,"\n");
 							fprintf(stderr,">>APS Table Last  : <<%d>> %.1lf ", kk, aps2 ); 
 							break;
-						case 6:
+						case 7:
 							apstep = atof( str_ShiftOp[kk] ); 
 							fprintf(stderr,"\n");
 							fprintf(stderr,">>APS Table Step  : <<%d>> %.1lf -- APS Table updated...", kk, apstep ); 
@@ -8124,7 +8271,6 @@ int main(int argc, char *argv[])
 							}
 							break;
 
-						case 7:
 						case 8:
 
 
@@ -9076,12 +9222,7 @@ int main(int argc, char *argv[])
 				size_t nBytes;
 				sha1_context ctx;
 				unsigned char sha1_buf[SHA_READ_BUFSIZ]; /// NERVER modified!!!!
-				unsigned __int64 	kll=0UL, ll=0UL;
-				//unsigned char *sha1_buf;
-
-				//printf("SHA1>> SHA1 hashing... \n");
-
-				//sha1_buf = (unsigned char*)malloc( SHA_READ_BUFSIZ*sizeof(unsigned char) );
+				unsigned __int64 	kll=0UL; //, ll=0UL;
 
 				memset( &ctx, 0x00, sizeof(sha1_context) );
 				memset( sha1_buf, 0x00, SHA_READ_BUFSIZ );
@@ -9568,8 +9709,8 @@ int main(int argc, char *argv[])
 
 				unsigned long long nBytes = 0UL, kll = 0UL;
 				unsigned char md6_data[MD_HASH_BUFSIZ];
-				double elapsed_time = end_time - start_time;
-				unsigned long long elapsed_ticks = end_ticks - start_ticks;
+				//double elapsed_time = end_time - start_time;
+				//unsigned long long elapsed_ticks = end_ticks - start_ticks;
 
 
 				/* -------------------------------------------------- */
@@ -10213,8 +10354,6 @@ int main(int argc, char *argv[])
 	/* 3. CRC 생성하기 */
 	else if( 1 == isCRC )
 	{
-		unsigned int index = 0;
-		unsigned int iloop = 0;
 		int iLenSub=0;
 		char cdate[30];
 		time_t	sys_t;
@@ -10356,7 +10495,6 @@ int main(int argc, char *argv[])
 
 		if( ASTERISK_FOUND == isAsteMode ) /* For ah.exe --input *.* */
 		{
-			int iIdx=0, iCount=0;
 			unsigned __int64 	kll = 0UL;
 			unsigned __int64 	totSize = 0UL;
 
@@ -10701,7 +10839,7 @@ int main(int argc, char *argv[])
 
 		data_buf = (unsigned char*)malloc( MAX_BUF_SIZ*sizeof(unsigned char) );
 
-		memset(data_buf, 0x00, sizeof(data_buf));
+		memset(data_buf, 0x00, MAX_BUF_SIZ*sizeof(unsigned char));
 		fr_size = fread(data_buf, sizeof(unsigned char), NK_BIN_ID, inpfile );
 		if( (0==strncmp(data_buf, (char*)"B000FF", NK_BIN_ID-1)) && (0x0A==data_buf[NK_BIN_ID-1]) )
 		{
@@ -10736,7 +10874,7 @@ int main(int argc, char *argv[])
 		{
 
 			/* ------ Load Address to SDRAM ---------------- */
-			memset(data_buf, 0x00, sizeof(data_buf));
+			memset(data_buf, 0x00, MAX_BUF_SIZ*sizeof(unsigned char));
 			fr_size = fread(data_buf, sizeof(unsigned char), NK_BIN_LAUNCH_ADDR, inpfile );
 			load_addr = data_buf[3]<<24 | data_buf[2]<<16 | data_buf[1]<<8 | data_buf[0];
 			printf("%s Inform> Load Address (RAM start address) : 0x%X \r\n", infile_name, load_addr);
@@ -10747,7 +10885,7 @@ int main(int argc, char *argv[])
 
 
 			/* ------ bin image Size ---------------- */
-			memset(data_buf, 0x00, sizeof(data_buf));
+			memset(data_buf, 0x00, MAX_BUF_SIZ*sizeof(unsigned char));
 			fr_size = fread(data_buf, sizeof(unsigned char), NK_BIN_IMAGE_SIZE, inpfile );
 			image_size = data_buf[3]<<24 | data_buf[2]<<16 | data_buf[1]<<8 | data_buf[0];
 			printf("%s Inform> BIN Image size                   : 0x%08X (%.3fKB) \r\n", infile_name, image_size, (image_size/1024.0));
@@ -10762,7 +10900,7 @@ int main(int argc, char *argv[])
 			for(idx=1; is_BIN_OK ; idx++)
 			{
 				/* ------ Record 1 ~ N ---------------- */
-				memset(data_buf, 0x00, sizeof(data_buf));
+				memset(data_buf, 0x00, MAX_BUF_SIZ*sizeof(unsigned char));
 				fr_size = fread(data_buf, sizeof(unsigned char), 
 								(NK_BIN_RECORD_ADDR+NK_BIN_RECORD_SIZE+NK_BIN_RECORD_CRC), 
 								inpfile );
@@ -10809,7 +10947,7 @@ int main(int argc, char *argv[])
 
 
 				/* --------- payload -------- */
-				memset(data_buf, 0x00, sizeof(data_buf));
+				memset(data_buf, 0x00, MAX_BUF_SIZ*sizeof(unsigned char));
 				fr_size = fread(data_buf, sizeof(unsigned char), record_size, inpfile ); /* size 만큰 payload reading.. */
 				/* --------- payload -------- */
 				if( fr_size <= 0) break;
@@ -10859,7 +10997,7 @@ int main(int argc, char *argv[])
 					printf("      Prof Symbol Offset  : 0x%08lX \n", rom_hdr_s.ulProfileOffset);
 					printf("      Num Files           : %10ld \n", rom_hdr_s.numfiles);
 					printf("      Kernel flags        : 0x%08lX \n", rom_hdr_s.ulKernelFlags);
-					printf("      MiscFlags           : 0x%08lX \n", rom_hdr_s.usMiscFlags);
+					printf("      MiscFlags           : 0x%08X \n", rom_hdr_s.usMiscFlags);
 					printf("      CPU                 : 0x%04x ", rom_hdr_s.usCPUType);
 
 					if(outfile) 
@@ -10879,7 +11017,7 @@ int main(int argc, char *argv[])
 						fprintf(outfile,"      Prof Symbol Offset  : 0x%08lX \r\n", rom_hdr_s.ulProfileOffset);
 						fprintf(outfile,"      Num Files           : %10ld \r\n", rom_hdr_s.numfiles);
 						fprintf(outfile,"      Kernel flags        : 0x%08lX \r\n", rom_hdr_s.ulKernelFlags);
-						fprintf(outfile,"      MiscFlags           : 0x%08lX \r\n", rom_hdr_s.usMiscFlags);
+						fprintf(outfile,"      MiscFlags           : 0x%08X \r\n", rom_hdr_s.usMiscFlags);
 						fprintf(outfile,"      CPU                 : 0x%04x ", rom_hdr_s.usCPUType);
 					}
 					switch(rom_hdr_s.usCPUType) 
@@ -10942,7 +11080,7 @@ int main(int argc, char *argv[])
 					printf("      RAM -- FSRAMPERCENT : 0x%08lX \n", rom_hdr_s.ulFSRamPercent);
 					printf("      Device Start addr   : 0x%08lX \n", rom_hdr_s.ulDrivglobStart);
 					printf("      Device length       : 0x%08lX \n", rom_hdr_s.ulDrivglobLen);
-					printf("      ROM Header ext.     : 0x%08lX \n", rom_hdr_s.pExtensions);
+					printf("      ROM Header ext.     : 0x%08X \n", rom_hdr_s.pExtensions);
 					printf("      Tracking MEM start  : 0x%08lX \n", rom_hdr_s.ulTrackingStart); /// Start Address
 					printf("      Tracking MEM end    : 0x%08lX \n",rom_hdr_s.ulTrackingLen);
 					printf("	  Extensions		  : 0x%08lX \n", rom_hdr_s.pExtensions );
@@ -11002,7 +11140,7 @@ int main(int argc, char *argv[])
 				
 			}
 
-			memset(data_buf, 0x00, sizeof(data_buf));
+			memset(data_buf, 0x00, MAX_BUF_SIZ*sizeof(unsigned char));
 
 			printf("WinCE BIN (%s) payload size = %.3f MB (0x%X)\r\n", infile_name, (tot_record_size/1024.0)/1024.0,  tot_record_size);
 			if(outfile) fprintf(outfile,"WinCE BIN (%s) payload size = %.3f MB (0x%X) \r\n", infile_name, (tot_record_size/1024.0)/1024.0,  tot_record_size);
@@ -11049,7 +11187,7 @@ int main(int argc, char *argv[])
 		printf("ELF2BIN>> ELF size      : %u Bytes\n", elf_size ); 
 
 		data_buf = (unsigned char*)malloc( elf_size );
-		memset( data_buf, 0x00, elf_size );
+		memset( data_buf, 0x00, elf_size * sizeof(unsigned char) );
 		
 		if( NULL==data_buf ) 
 		{ 
@@ -11100,8 +11238,8 @@ int main(int argc, char *argv[])
 		iErrCount = 0; // clear
 		checksum_err_cnt = 0;	// 2022.08.03
 
-		memset( HexaLine, 0x00, sizeof(HexaLine) );
-		memset( Data_Str, 0x00, sizeof(Data_Str) );
+		memset( HexaLine, 0x00, HEX_MAX_LINE_SIZE*sizeof(char) );
+		memset( Data_Str, 0x00, HEX_MAX_LINE_SIZE*sizeof(unsigned char) );
 
 
 		Fileread = 1;
@@ -11132,7 +11270,7 @@ int main(int argc, char *argv[])
 			unsigned int i;
 	
 			/* Read a line from input file. */
-			memset( HexaLine, 0x00, sizeof(HexaLine) );
+			memset( HexaLine, 0x00, HEX_MAX_LINE_SIZE*sizeof(char) );
 	
 			if( NULL == fgets( HexaLine, HEX_MAX_LINE_SIZE, inpfile ) )
 			{
@@ -12370,8 +12508,8 @@ int main(int argc, char *argv[])
 #if SHIFT_QUALITY_DATA_SORTING /* 2022-11-13 */
 	else if( (1==isUpShift) && (1==isShift) )
 	{
-		unsigned int SScnt=0, SBcnt=0, SPcnt=0;
-		int ii=0, ichk=0, iavgtm=0, iSBchk=0;
+		unsigned int SScnt=0, SBcnt=0, SPcnt=0, iSBchk=0;
+		int ii=0, ichk=0, iavgtm=0;
 		short isNaming = 0;
 		char shi_ori[MAX_CHARS*LENGTH_OF_FILENAME+1];
 		char shi_inp[MAX_CHARS*LENGTH_OF_FILENAME+1];
@@ -12394,15 +12532,13 @@ int main(int argc, char *argv[])
 
 		// --------------------------------------------------------
 		// 1st STEP -----------------------------------------------
-		iavgtm = ShiftQualData(iModeID, iPwrOnOff, SHIFT_UP, &SScnt, &SBcnt, &SPcnt);
+		iavgtm = ShiftQualData(iModeID, iPwrOnOff, SHIFT_UP, &SScnt, &SBcnt, &SPcnt, &iSBchk);
 	    //rewind(inpfile);
 
+		#if 0
 		iSBchk = SBtxtCheck(iModeID, SScnt, SBcnt, SPcnt);
-
-		if(iSBchk)
-		{
-			SBcnt -= iSBchk;
-		}
+		if(iSBchk) { SBcnt -= iSBchk; }
+		#endif
 		// --------------------------------------------------------
 		// 2nd STEP -----------------------------------------------
 		ichk = SSCounterCheck(iModeID, iSBchk, SScnt, SBcnt, SPcnt);
@@ -12890,7 +13026,6 @@ int main(int argc, char *argv[])
 	#if MD5_MULTI_INPUT_FILES
 		if( ASTERISK_FOUND == isAsteMode ) /* For ah.exe --input *.* */
 		{
-			int iIdx=0, iCount=0;
 			unsigned __int64 	kll = 0UL;
 
 
@@ -12960,7 +13095,6 @@ int main(int argc, char *argv[])
 			int iLenFile = 0;
 			int iLenSub=0;
 			iLenFile = strlen(infile_name);
-			int iIdx=0, iCount=0;
 			unsigned __int64 	kll = 0UL;
 
 
@@ -13190,7 +13324,6 @@ int main(int argc, char *argv[])
 
 		if( ASTERISK_FOUND == isAsteMode ) /* For ah.exe --input *.* */
 		{
-			int iIdx=0, iCount=0;
 			unsigned __int64 	kll = 0UL;
 
 
@@ -13256,7 +13389,6 @@ int main(int argc, char *argv[])
 			int iLenFile = 0;
 			int iLenSub=0;
 			iLenFile = strlen(infile_name);
-			int iIdx=0, iCount=0;
 			unsigned __int64 	kll = 0UL;
 
 
@@ -13425,7 +13557,6 @@ int main(int argc, char *argv[])
 		LOG_V("\n");
 		if( ASTERISK_FOUND == isAsteMode ) /* For ah.exe --input *.* */
 		{
-			int iIdx=0, iCount=0;
 			unsigned __int64 	kll = 0UL;
 
 			printf("MD2>> MD2 hashing for input files* \n");
@@ -13653,7 +13784,6 @@ int main(int argc, char *argv[])
 	#if SHA1_MULTI_INPUT_FILES
 		if( ASTERISK_FOUND == isAsteMode ) /* For ah.exe --input *.* */
 		{
-			int iIdx=0, iCount=0;
 			unsigned __int64 	kll = 0UL;
 
 
@@ -13899,7 +14029,6 @@ int main(int argc, char *argv[])
 	#if SHA2_MULTI_INPUT_FILES
 		if( ASTERISK_FOUND == isAsteMode )  /* For ah.exe --input *.* */
 		{
-			int iIdx=0, iCount=0;
 			unsigned __int64 	kll = 0UL;
 
 			printf("SHA2>> SHA256 hashing for input files* \n");
@@ -14124,7 +14253,6 @@ int main(int argc, char *argv[])
 	#if SHA2_MULTI_INPUT_FILES
 		if( ASTERISK_FOUND == isAsteMode ) /* For ah.exe --input *.* */
 		{
-			int iIdx=0, iCount=0;
 			unsigned __int64 	kll = 0UL;
 
 
@@ -14349,7 +14477,6 @@ int main(int argc, char *argv[])
 	#if SHA2_MULTI_INPUT_FILES
 		if( ASTERISK_FOUND == isAsteMode )  /* For ah.exe --input *.* */
 		{
-			int iIdx=0, iCount=0;
 			unsigned __int64 	kll = 0UL;
 
 
@@ -14572,7 +14699,6 @@ int main(int argc, char *argv[])
 	#if SHA2_MULTI_INPUT_FILES
 		if( ASTERISK_FOUND == isAsteMode )  /* For ah.exe --input *.* */
 		{
-			int iIdx=0, iCount=0;
 			unsigned __int64 	kll = 0UL;
 
 
@@ -14778,8 +14904,8 @@ int main(int argc, char *argv[])
 	{
 		unsigned long long nBytes = 0UL, kll = 0UL;
 		unsigned char md6_data[1024*10]; // MD_HASH_BUFSIZ
-		double elapsed_time = end_time - start_time;
-		unsigned long long elapsed_ticks = end_ticks - start_ticks;
+		//double elapsed_time = end_time - start_time;
+		//unsigned long long elapsed_ticks = end_ticks - start_ticks;
 		int iLenSub=0;
 		struct	tm *pTime;
 
@@ -14807,7 +14933,6 @@ int main(int argc, char *argv[])
 
 		if( ASTERISK_FOUND == isAsteMode ) /* For ah.exe --input *.* */
 		{
-			int iIdx=0, iCount=0;
 			unsigned __int64 	kll = 0UL;
 
 			printf("MD6>> MD6 hashing for input files* \n");
@@ -16503,7 +16628,6 @@ int main(int argc, char *argv[])
 
 		if( ASTERISK_FOUND == isAsteMode )  /* For ah.exe --input *.* */
 		{
-			int iIdx=0;
 			unsigned __int64 	kll = 0UL;
 
 
@@ -16810,7 +16934,6 @@ int main(int argc, char *argv[])
 
 		if( ASTERISK_FOUND == isAsteMode )  /* For ah.exe --input *.* */
 		{
-			int iIdx=0;
 			unsigned __int64 	kll = 0UL;
 
 
@@ -17106,7 +17229,7 @@ int main(int argc, char *argv[])
 
 		if( ASTERISK_FOUND == isAsteMode )	/* For ah.exe --input *.* */
 		{
-			unsigned __int64 	kll = 0UL;
+			//unsigned __int64 	kll = 0UL;
 
 			printf("BLAKE224>> BLAKE224 hashing for input files* (%d) \n", argc );
 
@@ -18588,7 +18711,7 @@ int main(int argc, char *argv[])
 			}
 			SHA256_End(&ctx256, sha256_buf);
 
-			memset(mFile[ii].mergeSHA256, 0x00, sizeof(mFile[ii].mergeSHA256) );
+			memset(mFile[ii].mergeSHA256, 0x00, MERGE_SHA256_SIZ*sizeof(char) );
 			strcpy(mFile[ii].mergeSHA256, sha256_buf );
 
 			printf("\r");
@@ -18600,7 +18723,7 @@ int main(int argc, char *argv[])
 
 				// --------------------------------------------------------
 				// sub store-1: Index Number
-				memset(mergeTxtIndex, 0x00, sizeof(mergeTxtIndex) );
+				memset(mergeTxtIndex, 0x00, MERGE_INDEX_SIZ*sizeof(char) );
 				sprintf(mergeTxtIndex,"%d",ii );
 				fprintf(outfile,"%s", mergeTxtIndex);
 				
