@@ -85,7 +85,7 @@ void beep (int frequency, int duration)
 #if 0
 #define ESC 	27
 
-	printf("%c[10;%d]%c[11;%d]\a", ESC, frequency, ESC, duration);
+	fprintf(stderr,"%c[10;%d]%c[11;%d]\a", ESC, frequency, ESC, duration);
 #endif
 }
 
@@ -551,11 +551,11 @@ void help(void)
 	#if SHIFT_QUALITY_DATA_SORTING /* 2022-11-13 */
            " \n"
            "--[ Shift Quality Data Sorting ]-------- -------------------------------------------------------------------------\n"
-           "  -U or --upshift [ModeID] [APS#1] [APS#2] [SB#1] [Jerk#1]\n" 
+           "  -U or --upshift [ModeID] [SB#1] [Jerk#1] [APS#1] [APS#2] \n" 
+           "               SB#1   : SB point decision continuous count. (default 3 times) \n"
+           "               Jerk#1 : Unit: msec, Reverse time length at SB point for Jerk1 calcution. (default 300msec) \n"
            "               APS#1  : APS level as 3, or 4.5. -> Power On/Off decision \n"
            "               APS#2  : APS tolerance as 1%%, or 2%% \n"
-           "               SB#1   : SB point decision continuous count. default value (3 times) \n"
-           "               Jerk#1 : Unit: msec, Reverse time length at SB point for Jerk1 calcution. (default 300msec) \n"
            "\n"
            " Ex) ah.exe --input 5ms_16select.tsv --output 5ms_eco.txt --upshift eco 3.5 1 1.5 \n"
            "     ah.exe --input 5ms_16select.tsv --output 5ms_spt.txt --upshift spt 4 1.5 0.5 \n"
@@ -1031,7 +1031,7 @@ static short  VSkphTblUP[VS_TABLE_NUM] = {
 
 
 
-static double fAPSpwrLvl   = -1.0f;
+static double fAPSpwrLvl   = APS_PWR_ON_VAL;
 static double fAPStol      = APS_TOLENANCE;  /* APS tolerance */
 static short  iSBdecision  = SB_DECISION_TIMES;
 static int    iJerkTimeLen = JERK_TIME_mSec;
@@ -1630,9 +1630,9 @@ const tPATs_ModeType arrPATs_ModeID[MODE_ID_NUMS] = {
 	}; 
 
 
-#define TITLE_SHI1	"    time   iPAT  ModeID     vsp    tqi    cg   Aps      No    tg ct iShi txt        TqFr ShiPh Ne       Nt    LAccel  TimPos  Ratio   ShiOne   ShiTwo  Jerk0 MaxNe   MaxNt  g_Max  g_min "
+#define TITLE_SHI1	"    time   iPAT  ModeID     vsp    tqi    cg   Aps      No    tg ct iShi txt        TqFr ShiPh Ne       Nt    LAccel  TimPos  Ratio   ShiOne   ShiTwo  Jerk0 MaxNe   MaxNt  g_Max  g_min"
 
-#define TITLE_TXT   "     time   iPAT  ModeID   cG tG   vsp    tqi      Aps      No    ct iShi txt        TqFr ShiPh Ne       Nt     LAccel DiffTime TimPos       Ratio Jerk_%dms    Jerk2 (msec)"
+#define TITLE_TXT   "    time   iPAT  ModeID    cG tG   vsp    tqi      Aps      No    ct iShi txt        TqFr ShiPh Ne       Nt     LAccel DiffTime TimPos       Ratio Jerk_%dms    Jerk1 (msec)"
 
 #endif /* SHIFT_QUALITY_DATA_SORTING */
 
@@ -1677,7 +1677,7 @@ short apsTableIndex(void)
 
 short vsKPHTableIndex(void)
 {
-	short vs_index = 0;
+	short vs_index = VS_TABLE_NUM;
 	short kk = 0;
 
 	for(kk=0; kk<VS_TABLE_NUM; kk++)
@@ -1820,7 +1820,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 
 	if( fAPSpwrLvl < 0.0f ) 
 	{
-		fAPSpwrLvl = 3.0f; /* default value setting */
+		fAPSpwrLvl = APS_PWR_ON_VAL; /* default value setting */
 		fprintf(stderr,">>APS default lvl : %.2lf%% -- default(3\%~5\%) \n", fAPSpwrLvl );
 	}
 
@@ -1835,7 +1835,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 	fprintf(stderr,">>Shift Direction  : Shift %s \n", (shiDir03==SHIFT_UP?"UP":(shiDir03==SHIFT_DN?"DOWN": \
 		(shiDir03==SHIFT_SKIP_DN?"SkipDown":(shiDir03==SHIFT_SKIP_UP?"SkipUp":"Unknown"))) ));			
 	fprintf(stderr,">>SB decision Num  : %d times \n", iSBdecision );
-	fprintf(stderr,">>Jerk Time length : %d msec (Time position before SB point + SB point~100msec) \n", iJerkTimeLen );
+	fprintf(stderr,">>Jerk Time length : %d msec ~ (SB point) ~ %d msec \n", iJerkTimeLen, 5*SB_POINT_COUNT_NUM );
 	/* ===================================================================================== */
 
 	memset(shift_out, 0x00, sizeof(shift_out)); // 2022.11.22
@@ -2410,8 +2410,8 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 	iavgTime = (unsigned int)(avgTime/avgCount);
 
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
-	fprintf(stderr,">>ModeID %s files are saved as below! \n", arrPATs_ModeID[aiPATs05].ModeID);
-	fprintf(stderr,"  Sorted file: %s \n", shift_out);
+	fprintf(stderr,">>ModeID %s files are saved. \n", arrPATs_ModeID[aiPATs05].ModeID);
+	fprintf(stderr,"  1st step sorted file: %s  \n", shift_out );
 	//fprintf(stderr,"  ModeID file: %s \n", shift_file );
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
@@ -2946,7 +2946,7 @@ int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsig
 		}
 
 	}
-	//fprintf(stderr,"----------------------------------------------------------------------------------\n" );
+	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
 	if(fp2chk) fclose(fp2chk);
 	if(inpfile) fclose(inpfile);
@@ -4240,8 +4240,8 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 	else if(TYPE_MAX_NE==mType) strcpy(TmpStr, "Ne Max");
 	else if(TYPE_Min_NT==mType) strcpy(TmpStr, "Nt min");
 	else if(TYPE_Min_NE==mType) strcpy(TmpStr, "Ne min");
-	else if(TYPE_MAX_G==mType)  strcpy(TmpStr, "g Max");
-	else if(TYPE_Min_G==mType)  strcpy(TmpStr, "g min");
+	else if(TYPE_MAX_G==mType)  strcpy(TmpStr, "g_Max");
+	else if(TYPE_Min_G==mType)  strcpy(TmpStr, "g_min");
 	else strcpy(TmpStr, "**Unknown**");
 
 
@@ -4799,7 +4799,7 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime)
 			is2File = 0;
 			if( 0==strcmp( sq3[0].sTimePos, TXT_UNKNOWN) ||
 				0==strcmp( sq3[0].sTimePos, TXT_UPCASE) ||
-				0==strcmp( sq3[0].sTimePos, TXT_SBSWING0) ||
+				/* 0==strcmp( sq3[0].sTimePos, TXT_SBSWING0) || */
 				0==strcmp( sq3[0].sTimePos, TXT_DNCASE) ) 
 			{
 				continue;
@@ -5200,13 +5200,13 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 
 
 	if( icurGear+1 == itgtGear )
-		fprintf(stderr, "  UP shift Start ... curGear(%d), tgtGear(%d) \n", icurGear, itgtGear );
+		fprintf(stderr, "  %s UP shift Start ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, icurGear, itgtGear );
 	else if( icurGear == itgtGear+1 )
-		fprintf(stderr, "  DOWN shift Start ... curGear(%d), tgtGear(%d) \n", icurGear, itgtGear );
+		fprintf(stderr, "  %s DOWN shift Start ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, icurGear, itgtGear );
 	else if( icurGear > itgtGear+1 )
-		fprintf(stderr, "  SKIPDOWN shift Start ... curGear(%d), tgtGear(%d) \n", icurGear, itgtGear );
+		fprintf(stderr, "  %s SKIPDOWN shift Start ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, icurGear, itgtGear );
 	else
-		fprintf(stderr, "  STATIC shift Start ... curGear(%d), tgtGear(%d) \n", icurGear, itgtGear );
+		fprintf(stderr, "  %s STATIC shift Start ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, icurGear, itgtGear );
 		
 
 	// ==================================================
@@ -5372,13 +5372,13 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 
 
 	if( icurGear+1 == itgtGear )
-		fprintf(stderr, "  UP shift Ended ... curGear(%d), tgtGear(%d) \n", iBigcurGear, iBigtgtGear );
+		fprintf(stderr, "  %s UP shift Ended ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, iBigcurGear, iBigtgtGear );
 	else if( icurGear == itgtGear+1 )
-		fprintf(stderr, "  DOWN shift Ended ... curGear(%d), tgtGear(%d) \n", iBigcurGear, iBigtgtGear );
+		fprintf(stderr, "  %s DOWN shift Ended ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, iBigcurGear, iBigtgtGear );
 	else if( icurGear > itgtGear+1 )
-		fprintf(stderr, "  SKIPDOWN shift Ended ... curGear(%d), tgtGear(%d) \n", iBigcurGear, iBigtgtGear );
+		fprintf(stderr, "  %s SKIPDOWN shift Ended ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, iBigcurGear, iBigtgtGear );
 	else
-		fprintf(stderr, "  STATIC shift Ended ... curGear(%d), tgtGear(%d) \n", iBigcurGear, iBigtgtGear );
+		fprintf(stderr, "  %s STATIC shift Ended ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, iBigcurGear, iBigtgtGear );
 
 
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
@@ -6033,7 +6033,6 @@ int main(int argc, char *argv[])
 #endif //SHIFT_QUALITY_DATA_SORTING /* 2022-11-13 */
 
 
-	//static char strOpt[] = "gALz:h:b:m:v:i:o:a:cd:F:I:N:S:k:f:B:M:J:l:e";
 	static char strOpt[] = "g:ALz:h:b:m:v:i:o:a:c:d:F:I:N:S:f:B:M:J:l:ej:nE:P:kZR:y:x:p:D:N:"; // 2022.11.13
 
 	static struct option long_options[] =
@@ -6876,7 +6875,7 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
-					myerror("\n\n WARNING:wrong option --float [float number]. \r\n");
+					myerror("\r\n WARNING:wrong option --float [float number]. \n\n");
 
 					beep(700,100);
 					AllFilesClosed();
@@ -7031,13 +7030,13 @@ int main(int argc, char *argv[])
 				break;
 
 		    case 'A': /* convert mot2bin -> Motorola FORMAT family --- */
-				printf("\n");
-				printf(">>Hex family type : MOTOROLA family");
+				fprintf(stderr,"\n");
+				fprintf(stderr,">>Hex family type : MOTOROLA family");
 
 				if( 1==isIntel2bin ) // error
 				{
-					printf("\n");
-					printf("[++ERROR Motorola++] Choice one --motorola or --intel option \n");
+					fprintf(stderr,"\n");
+					fprintf(stderr,"[++ERROR Motorola++] Choice one --motorola or --intel option \n");
 
 					beep(700,100);
 					AllFilesClosed(); // 2020.07.10
@@ -7052,13 +7051,13 @@ int main(int argc, char *argv[])
 				break;
 				
 		    case 'L': /* convert intel2bin -> Intel FORMAT family --- */
-				printf("\n");
-				printf(">>Hex family type : Intel family");
+				fprintf(stderr,"\n");
+				fprintf(stderr,">>Hex family type : Intel family");
 
 				if( 1==isMot2bin ) // Error
 				{
-					printf("\n");
-					printf("[++ERROR Intel++] Choice one --intel or --motorola option \n");
+					fprintf(stderr,"\n");
+					fprintf(stderr,"[++ERROR Intel++] Choice one --intel or --motorola option \n");
 				
 					beep(700,100);
 					AllFilesClosed(); // 2020.07.10
@@ -7074,8 +7073,8 @@ int main(int argc, char *argv[])
 		    case 'n': /* --alignword : Address Alignment Word -> Intel family only --- */
 				if( 1==isMot2bin ) 
 				{
-					printf("\n");
-					printf("[++ERROR ALIGNWORD++] Need option --intel option only \n");
+					fprintf(stderr,"\n");
+					fprintf(stderr,"[++ERROR ALIGNWORD++] Need option --intel option only \n");
 				
 					beep(700,100);
 					AllFilesClosed(); // 2020.07.10
@@ -7087,14 +7086,14 @@ int main(int argc, char *argv[])
 
 				if( 1==isIntel2bin )
 				{
-					printf(">>Addr Alignment  : Enable address alignment word in Intel family");
+					fprintf(stderr,">>Addr Alignment   : Enable address alignment word in Intel family");
 					Address_Alignment_Word = 1; // true;
 				}
 				break;
 				
 			case 'P': // --padbyte
 
-				printf("\n");
+				fprintf(stderr,"\n");
 				if( (isMot2bin!=1) && (isIntel2bin!=1) && (1!=isFileMerge) && (1!=isFillSize) )
 				{
 					myerror("[++ERROR PADBYTE++] Need option --intel or --motorola or --fillsize [size] \n");
@@ -7116,7 +7115,7 @@ int main(int argc, char *argv[])
 					isPadByte = 1;
 					Pad_Byte = GetHex( strPadByte );
 
-					printf(">>Padding Byte    : 0x%x (default:ff) ", Pad_Byte);
+					fprintf(stderr,">>Padding Byte     : 0x%x (default:ff) ", Pad_Byte);
 				}
 				else
 				{
@@ -7133,8 +7132,8 @@ int main(int argc, char *argv[])
 
 				if( (isMot2bin!=1) && (isIntel2bin!=1) && (isFileMerge!=1) )
 				{
-					printf("\n");
-					printf("[++ERROR Endian++] Need option --intel or --motorola or --join \n");
+					fprintf(stderr,"\n");
+					fprintf(stderr,"[++ERROR Endian++] Need option --intel or --motorola or --join \n");
 					beep(700,100);
 					AllFilesClosed(); // 2020.07.10
 					exit(0); /// 2017.11.21
@@ -7153,18 +7152,18 @@ int main(int argc, char *argv[])
 					memset(str_SecFileSiz, 0x00, sizeof(str_SecFileSiz) );
 					memcpy(str_SecFileSiz, optarg, MAX_CHARS);
 
-					printf("\n");
+					fprintf(stderr,"\n");
 					if( 0==strcasecmp( str_SecFileSiz, "little" ) ) 
 					{
 						if(isFileMerge)
 						{
 							is2ndFileSize = 1;
 							is2ndEndian = ENDIAN_LITTLE; // little
-							printf(">>Endian          : Little endian");
+							fprintf(stderr,">>Endian           : Little endian");
 						}
 						else // For INTEL Hex2bin or MOTOROLA hex2bni
 						{
-							printf(">>Endian for CRC  : little endian");
+							fprintf(stderr,">>Endian for CRC   : little endian");
 							Endian = 0; // little
 						}
 					}
@@ -7174,18 +7173,18 @@ int main(int argc, char *argv[])
 						{
 							is2ndFileSize = 1;
 							is2ndEndian = ENDIAN_BIG; // big
-							printf(">>Endian          : BIG endian");
+							fprintf(stderr,">>Endian           : BIG endian");
 						}
 						else // For INTEL Hex2bin or MOTOROLA hex2bni
 						{
-							printf(">>Endian for CRC  : Big endian");
+							fprintf(stderr,">>Endian for CRC   : Big endian");
 							Endian = 1; // big
 						}
 
 					}
 					else
 					{
-						printf("[++ERROR Endian++] Need option --intel or --motorola or --join \n");
+						fprintf(stderr,"[++ERROR Endian++] Need option --intel or --motorola or --join \n");
 					
 						beep(700,100);
 						AllFilesClosed(); // 2020.07.10
@@ -7197,7 +7196,7 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
-					printf("\n\n WARNING:wrong option --endian [little|big]. check option\r\n");
+					fprintf(stderr,"\n\n WARNING:wrong option --endian [little|big]. check option\r\n");
 			
 					beep(700,100);
 					AllFilesClosed(); // 2020.07.10
@@ -7209,10 +7208,10 @@ int main(int argc, char *argv[])
 
 		    case 'k':  /* --allpadarea : fill Padbye in all empty area */
 
-				printf("\n");
+				fprintf(stderr,"\n");
 				if( (isMot2bin!=1) && (isIntel2bin!=1) )
 				{
-					printf("\n[++ERROR PADAREA++] Need option --intel or --motorola \n");
+					fprintf(stderr,"\n[++ERROR PADAREA++] Need option --intel or --motorola \n");
 
 					beep(700,100);
 					AllFilesClosed(); // 2020.07.10
@@ -7222,18 +7221,18 @@ int main(int argc, char *argv[])
 					break;
 				}
 
-				printf(">>Fill Pad Byte   : Pad byte(0x%X) in empty ALL area of binary \n", Pad_Byte);
+				fprintf(stderr,">>Fill Pad Byte    : Pad byte(0x%X) in empty ALL area of binary \n", Pad_Byte);
 
 				isPadByteAllArea = 1;  // The specified char (Pad_Byte) is filled in all area.
 				break;
 
 			case 'Z': // --zeroforced
 
-				printf("\n");
+				fprintf(stderr,"\n");
 				if( (isMot2bin!=1) && (isIntel2bin!=1) )
 				{
-					printf("\n");
-					printf("[++ERROR ZERO_FORCED++] Need option --intel or --motorola \n");
+					fprintf(stderr,"\n");
+					fprintf(stderr,"[++ERROR ZERO_FORCED++] Need option --intel or --motorola \n");
 
 					beep(700,100);
 					AllFilesClosed(); // 2020.07.10
@@ -7244,27 +7243,11 @@ int main(int argc, char *argv[])
 				}
 
 				Enable_HexaAddr_Zero_Forced = HEX2BIN_ZERO_FORCED;
-				printf(">>Address Forced  : Using ZERO addressing forced. \n");
+				fprintf(stderr,">>Address Forced   : Using ZERO addressing forced. \n");
 
 				break;
 
 		    case 'l': /* Hex2bin Max size - length */
-
-			#if 0 // 2021.12.27
-				if( (isMot2bin!=1) && (isIntel2bin!=1) )
-				{
-					printf("\n");
-					printf("\n[++ERROR++] Need option --intel or --motorola \n");
-
-					beep(700,100);
-					AllFilesClosed(); // 2020.07.10
-					exit(0); /// 2017.11.21
-
-					return 0;
-					break;
-				}
-			#endif
-
 			
 				if(optarg) 
 				{
@@ -7311,7 +7294,7 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
-					printf("\n WARNING:wrong --length [hexa value] in converting --intel or --motorola. check option [%s] \n", strHex2BinLen);
+					fprintf(stderr,"\n WARNING:wrong --length [hexa value] in converting --intel or --motorola. check option [%s] \n", strHex2BinLen);
 
 					beep(700,100);
 					AllFilesClosed(); // 2020.07.10
@@ -7349,7 +7332,7 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
-					printf("\n\n WARNING:wrong option --nk [nb0 | none]. check option\r\n");
+					fprintf(stderr,"\n\n WARNING:wrong option --nk [nb0 | none]. check option\r\n");
 
 					beep(700,100);
 					AllFilesClosed(); // 2020.07.10
@@ -7379,7 +7362,7 @@ int main(int argc, char *argv[])
 					memcpy(str_fillSiz, optarg, MAX_CHARS);
 					olen = strlen(str_fillSiz);
 
-			        printf("\n>>Total file size : %s ", str_fillSiz );
+			        fprintf(stderr,"\n>>Total file size  : %s ", str_fillSiz );
 				
 					if( 0 == strcasecmp( &str_fillSiz[olen-2], "kB" ) )
 					{
@@ -7388,7 +7371,7 @@ int main(int argc, char *argv[])
 						str_fillSiz[olen-0] = 0x00;
 						total_bin_size = str2int(str_fillSiz);
 						total_bin_size *= 1024; // Because of KBytes
-						printf(" (%#x) ", total_bin_size );
+						fprintf(stderr," (%#x) ", total_bin_size );
 					}
 					else if( 0 == strcasecmp( &str_fillSiz[olen-2], "MB" ) )
 					{
@@ -7397,18 +7380,18 @@ int main(int argc, char *argv[])
 						str_fillSiz[olen-0] = 0x00;
 						total_bin_size = str2int(str_fillSiz);
 						total_bin_size *= (1024*1024); // Because of MBytes
-						printf(" (%#x) ", total_bin_size );
+						fprintf(stderr," (%#x) ", total_bin_size );
 					}
 					else
 					{
 						total_bin_size = GetHex( str_fillSiz );
-						printf(" (0x%x) %dBytes ", total_bin_size, total_bin_size );
+						fprintf(stderr," (0x%x) %dBytes ", total_bin_size, total_bin_size );
 					}
 
 				}
 				else
 				{
-					printf("\n\n WARNING:wrong option --fillsize [value]. check option\r\n");
+					fprintf(stderr,"\r\n WARNING:wrong option --fillsize [value]. check option \n\n");
 
 					beep(700,100);
 					AllFilesClosed(); // 2020.07.10
@@ -7436,7 +7419,7 @@ int main(int argc, char *argv[])
 
 					if( istartIdx == -1 ) 
 					{
-						printf(">> check please --merge option!!\n" );
+						fprintf(stderr,">> check please --merge option!!\n" );
 						break;
 					}
 
@@ -7454,12 +7437,12 @@ int main(int argc, char *argv[])
 					memset( mFile, 0x00, sizeof(mFile) );
 					//memset(mergefile, 0x00, sizeof(mergefile) );
 
-					printf("\n>>Merging input file lists: \n");
+					fprintf(stderr,"\n>>Merging input file lists : \n");
 					for(reidx=1, ii=istartIdx+1; ii<iEndIdx; ii++, reidx++)
 					{
 						memset( mFile[reidx].mergeFileName, 0x00, sizeof(mFile[reidx].mergeFileName) );
 						strcpy( mFile[reidx].mergeFileName, argv[ii] );
-						printf("%2d -> filename: [%s] \n", reidx, mFile[reidx].mergeFileName );
+						fprintf(stderr,"%2d -> filename: [%s] \n", reidx, mFile[reidx].mergeFileName );
 					}
 
 					ismultiFilesMerge = 1;
@@ -7478,11 +7461,11 @@ int main(int argc, char *argv[])
 						memcpy(extractFile, optarg, MAX_FILENAME_LEN);
 						olen = strlen(extractFile);
 	
-						printf("\n>>Merged filename : %s ", extractFile );
+						fprintf(stderr,"\n>>Merged filename  : %s ", extractFile );
 
 						if( NULL == (inpfile = fopen( extractFile, "rb")) ) 
 						{
-							printf("\n--extract option error, files not found!! [%s] \n", extractFile );
+							fprintf(stderr,"\n--extract option error, files not found!! [%s] \n", extractFile );
 							AllFilesClosed();
 							exit(0); /// help();
 							return 0;
@@ -7530,7 +7513,7 @@ int main(int argc, char *argv[])
 						iFileLimit = str2int(str_FileMax);
 						iFileLimit *= 1024; // Because of KBytes
 
-						printf("\n>>2nd file pos    : %#x (%skB)", iFileLimit, str_FileMax );
+						fprintf(stderr,"\n>>2nd file pos     : %#x (%skB)", iFileLimit, str_FileMax );
 					}
 					else if( strcasecmp( &str_FileMax[olen-2], "MB" ) == 0 )
 					{
@@ -7540,12 +7523,12 @@ int main(int argc, char *argv[])
 						iFileLimit = str2int(str_FileMax);
 						iFileLimit *= (1024*1024); // Because of MBytes
 
-						printf("\n>>2nd file pos    : %#x (%sMB)", iFileLimit, str_FileMax );
+						fprintf(stderr,"\n>>2nd file pos     : %#x (%sMB)", iFileLimit, str_FileMax );
 					}
 					else
 					{
 						iFileLimit = GetHex( str_FileMax );
-						printf("\n>>2nd file pos    : %#x (%u Bytes)", iFileLimit, iFileLimit );
+						fprintf(stderr,"\n>>2nd file pos     : %#x (%u Bytes)", iFileLimit, iFileLimit );
 					}
 
 					//printf("\n>>2nd file pos    : %#x (%u)", iFileLimit, iFileLimit );
@@ -7554,7 +7537,7 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
-					printf("\n\n WARNING:wrong option --join [in hexa]. check option\r\n");
+					fprintf(stderr,"\r\n WARNING:wrong option --join [in hexa]. check option\n\n");
 
 					beep(700,100);
 					AllFilesClosed(); // 2020.07.10
@@ -7606,7 +7589,7 @@ int main(int argc, char *argv[])
 				    memcpy(str_DelHdr, optarg, MAX_CHARS);
 					olen = strlen(str_DelHdr);
 
-			    	printf("\n>>Delete HDR size : ");
+			    	fprintf(stderr,"\n>>Delete HDR size  : ");
 
 					if( 0 == strcasecmp( &str_DelHdr[olen-2], "kB" ) )
 					{
@@ -7615,7 +7598,7 @@ int main(int argc, char *argv[])
 						str_DelHdr[olen-0] = 0x00;
 
 						iHdr_len = str2int(str_DelHdr);
-						printf(" (%dkB) 0x%x \n", iHdr_len, iHdr_len );
+						fprintf(stderr," (%dkB) 0x%x \n", iHdr_len, iHdr_len );
 					
 						iHdr_len *= 1024; // Because of KBytes
 					}
@@ -7625,14 +7608,14 @@ int main(int argc, char *argv[])
 						str_DelHdr[olen-1] = 0x00;
 						str_DelHdr[olen-0] = 0x00;
 						iHdr_len = str2int(str_DelHdr);
-						printf(" (%dMB) 0x%x \n", iHdr_len, iHdr_len );
+						fprintf(stderr," (%dMB) 0x%x \n", iHdr_len, iHdr_len );
 					
 						iHdr_len *= (1024*1024); // Because of MBytes
 					}
 					else if( 0 == strcasecmp( str_DelHdr, "default" ) )
 					{
 						iHdr_len=16*4; // default size
-						printf("default (%dBytes) \n", iHdr_len );
+						fprintf(stderr,"default (%dBytes) \n", iHdr_len );
 					}
 					else
 					{
@@ -7640,16 +7623,16 @@ int main(int argc, char *argv[])
 						if( iHdr_len == 0 ) 
 						{
 							iHdr_len=16*4; // default size
-							printf("default (%dBytes) 0x%x \n", iHdr_len, iHdr_len );
+							fprintf(stderr,"default (%dBytes) 0x%x \n", iHdr_len, iHdr_len );
 						}
 						else
-							printf(" (%dBytes) 0x%x \n", iHdr_len, iHdr_len );
+							fprintf(stderr," (%dBytes) 0x%x \n", iHdr_len, iHdr_len );
 					}
 
 				}
 				else
 				{
-					printf("\n\n WARNING:wrong option --detach [decimal value]. check option\r\n");
+					fprintf(stderr,"\n\n WARNING:wrong option --detach [decimal value]. check option\r\n");
 
 					beep(700,100);
 					AllFilesClosed(); // 2020.07.10
@@ -7671,16 +7654,16 @@ int main(int argc, char *argv[])
 			        memcpy(str_boardName, optarg, MAX_CHARS);
 					olen = strlen(str_boardName);
 
-			        printf("\n>>Board Name      : %s", str_boardName);
+			        fprintf(stderr,"\n>>Board Name       : %s", str_boardName);
 
 					if( olen > MAX_CHARS )
 					{
-						printf("\n\n[++ERROR++] Board Name length is too long.. Max:%d Bytes\n\n", MAX_CHARS );
+						fprintf(stderr,"\r\n[++ERROR++] Board Name length is too long.. Max:%d Bytes\n\n", MAX_CHARS );
 					}
 				}
 				else
 				{
-					printf("\n\n WARNING:wrong option --board [string]. check option\r\n");
+					fprintf(stderr,"\r\n WARNING:wrong option --board [string]. check option\n\n");
 
 					beep(700,100);
 					AllFilesClosed(); // 2020.07.10
@@ -7701,25 +7684,25 @@ int main(int argc, char *argv[])
 
 					if(titlen)
 					{
-						printf("\n\n[length] %d  \r\n", titlen );
+						fprintf(stderr,"\n\n[length] %d  \r\n", titlen );
 					}
 					else
 					{
 				        memcpy(str_moduleName, optarg, MAX_CHARS);
 						olen = strlen(str_moduleName);
 
-				        printf("\n>>Model Name      : %s", str_moduleName);
+				        fprintf(stderr,"\n>>Model Name       : %s", str_moduleName);
 
 						if( olen > MAX_CHARS )
 						{
-							printf("\n\n[++ERROR++] Module Name length is too long.. Max:%d Bytes\n\n", MAX_CHARS );
+							fprintf(stderr,"\n\n[++ERROR++] Module Name length is too long.. Max:%d Bytes\n\n", MAX_CHARS );
 						}
 					}
 
 				}
 				else
 				{
-					printf("\n\n WARNING:wrong option --model [string]. check option\r\n");
+					fprintf(stderr,"\n\n WARNING:wrong option --model [string]. check option\r\n");
 
 					beep(700,100);
 					AllFilesClosed(); // 2020.07.10
@@ -7747,7 +7730,7 @@ int main(int argc, char *argv[])
 					iUpper    = 0;
 					olen = strlen(str_crcAdd);
 
-					printf("\n>>Security cinfo  : %s", str_crcAdd);
+					fprintf(stderr,"\n>>Security cinfo   : %s", str_crcAdd);
 
 					strcpy(str_hash, str_crcAdd);
 
@@ -7799,10 +7782,10 @@ int main(int argc, char *argv[])
 						memcpy(&str_abuild_date[14], &str_buildDate[17], 2);
 
 						#ifdef DEBUG
-						printf("\nABuild Date>>%s<<", str_abuild_date);
+						fprintf(stderr,"\nABuild Date>>%s<<", str_abuild_date);
 						#endif
 
-						printf("\n>>Make curr today : %s", str_buildDate);
+						fprintf(stderr,"\n>>Make curr today  : %s", str_buildDate);
 				        break;
 						
 				    }   
@@ -7813,7 +7796,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_CRC16;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]); // 2017.04.27
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}
 					else if( 0==strcasecmp(str_crcAdd, "crc16ksc") )
 					{
@@ -7822,7 +7805,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_KSC_CRC16;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]); // 2017.04.27
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}
 					else if( 0==strcasecmp(str_crcAdd, "crc16c") )
 					{
@@ -7831,7 +7814,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_CRC16CCITT;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]); // 2017.04.27
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}
 					else if( 0==strcasecmp(str_crcAdd, "crc32") )
 					{
@@ -7840,7 +7823,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_CRC32;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]); // 2017.04.27
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}
 					else if( 0==strcasecmp(str_crcAdd, "crc64") )
 					{
@@ -7849,7 +7832,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_CRC64;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]); // 2017.04.27
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}
 					else if( 0==strcasecmp(str_crcAdd, "crc64isc") )
 					{
@@ -7858,7 +7841,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_CRC64_ISC;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]); // 2017.04.27
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}
 					else if( 0==strcasecmp(str_crcAdd, "adler32") ) 
 					{
@@ -7867,7 +7850,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_ADLER32;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]); // 2017.04.27
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}	
 					else if( 0==strcasecmp(str_crcAdd, "joaat") ) 
 					{
@@ -7876,7 +7859,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_JOAAT;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]);
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}
 					else if( 0==strcasecmp(str_crcAdd, "sha1") )	// SHA1
 					{
@@ -7885,7 +7868,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_SHA1;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]);  
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}	
 					else if( 0==strcasecmp(str_crcAdd, "sha224") )	// SHA2-224
 					{
@@ -7894,7 +7877,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_SHA224;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]); // 2017.11.21
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}	
 					else if( 0==strcasecmp(str_crcAdd, "sha256") )  // SHA2-256
 					{
@@ -7903,7 +7886,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_SHA256;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]); // 2017.11.21
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}	
 					else if( 0==strcasecmp(str_crcAdd, "sha384") ) // SHA2-384
 					{
@@ -7912,7 +7895,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_SHA384;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]); // 2017.11.21
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}	
 					else if( 0==strcasecmp(str_crcAdd, "sha512") ) // SHA2-512
 					{
@@ -7921,7 +7904,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_SHA512;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]); // 2017.11.21
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}	
 					else if( 0==strcasecmp(str_crcAdd, "sha3-224") ) 
 					{
@@ -7930,7 +7913,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_SHA3_224;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]);
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}	
 					else if( 0==strcasecmp(str_crcAdd, "sha3-256") ) 
 					{
@@ -7939,7 +7922,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_SHA3_256;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]);
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}	
 					else if( 0==strcasecmp(str_crcAdd, "sha3-384") ) 
 					{
@@ -7948,7 +7931,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_SHA3_384;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]);
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}	
 					else if( 0==strcasecmp(str_crcAdd, "sha3-512") ) 
 					{
@@ -7957,7 +7940,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_SHA3_512;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]);
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}	
 					else if( 0==strcasecmp(str_crcAdd, "shake128") ) 
 					{
@@ -7966,7 +7949,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_SHAKE128;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]);
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}	
 					else if( 0==strcasecmp(str_crcAdd, "shake256") ) 
 					{
@@ -7975,7 +7958,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_SHAKE256;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]);
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}	
 					else if( 0==strcasecmp(str_crcAdd, "md5") ) // MD5
 					{
@@ -7984,7 +7967,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_MD5;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]); // 2017.11.21
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}	
 					else if( 0==strcasecmp(str_crcAdd, "md6") ) // MD6
 					{
@@ -7993,7 +7976,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_MD6;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]); // 2017.11.21
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}	
 					else if( 0==strcasecmp(str_crcAdd, "md2") ) // MD2
 					{
@@ -8002,7 +7985,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_MD2; // 2020.07.15
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]); // 2017.11.21
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}	
 					else if( 0==strcasecmp(str_crcAdd, "md4") ) // MD4
 					{
@@ -8011,7 +7994,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_MD4; // 2020.07.15
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]); // 2017.11.21
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}	
 				#if BLAKE_224_256_384_512_HASH
 					else if( 0==strcasecmp(str_crcAdd, "blake224") ) 
@@ -8021,7 +8004,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_BLAKE224;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]);
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}	
 					else if( 0==strcasecmp(str_crcAdd, "blake256") ) 
 					{
@@ -8030,7 +8013,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_BLAKE256;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]);
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}	
 					else if( 0==strcasecmp(str_crcAdd, "blake384") ) 
 					{
@@ -8039,7 +8022,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_BLAKE384;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]);
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}	
 					else if( 0==strcasecmp(str_crcAdd, "blake512") ) 
 					{
@@ -8048,7 +8031,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_BLAKE512;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]);
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}	
 				#endif
 
@@ -8060,7 +8043,7 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_RMD128;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]);
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}	
 					else if( 0==strcasecmp(str_crcAdd, "RipeMD160") || (0==strcasecmp(str_crcAdd, "RMD160")) )
 					{
@@ -8069,12 +8052,12 @@ int main(int argc, char *argv[])
 						isCRCtype = HDR_RMD160;
 						//isAttach |= ATT_DATEorCRC;
 						iUpper = isupper(str_crcAdd[0]);
-						printf(" is inserted as signed image.");
+						fprintf(stderr," is inserted as signed image.");
 					}	
 				#endif		
 					else
 					{
-						printf("\n\n WARNING:wrong option --cinfo [string]. Check option (%s) \r\n", str_crcAdd);
+						fprintf(stderr,"\n\n WARNING:wrong option --cinfo [string]. Check option (%s) \r\n", str_crcAdd);
 
 						beep(700,100);
 						AllFilesClosed();
@@ -8085,7 +8068,7 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
-					printf("\n\n WARNING:wrong option --cinfo [string]. Check options\r\n");
+					fprintf(stderr,"\n\n WARNING:wrong option --cinfo [string]. Check options\r\n");
 					beep(700,100);
 					AllFilesClosed();
 					exit(0);
@@ -8106,16 +8089,16 @@ int main(int argc, char *argv[])
 					memcpy(str_versionName, optarg, MAX_VERSION_LEN);
 					olen = strlen(str_versionName);
 					
-					printf("\n>>Version Name    : %s", str_versionName);
+					fprintf(stderr,"\n>>Version Name     : %s", str_versionName);
 
 					if( olen > MAX_VERSION_LEN )
 					{
-						printf("\n\n[++ERROR++] Version Name length is too long.. Max:%d Bytes\n\n", MAX_VERSION_LEN );
+						fprintf(stderr,"\n\n[++ERROR++] Version Name length is too long.. Max:%d Bytes\n\n", MAX_VERSION_LEN );
 					}
 				}
 				else
 				{
-					printf("\n\n WARNING:wrong option --version [string]. check option\r\n");
+					fprintf(stderr,"\n\n WARNING:wrong option --version [string]. check option\r\n");
 
 					beep(700,100);
 					AllFilesClosed(); // 2020.07.10
@@ -8139,16 +8122,16 @@ int main(int argc, char *argv[])
 					memcpy(str_MCUversion, optarg, MAX_32CHARS);
 					olen = strlen(str_MCUversion);
 					
-					printf("\n>>MCU Version     : %s", str_MCUversion);
+					fprintf(stderr,"\n>>MCU Version      : %s", str_MCUversion);
 
 					if( olen > MAX_32CHARS )
 					{
-						printf("\n\n[++ERROR++] MCU Version Name length is too long (%d Chars).. Max:%d Bytes\n\n", olen, MAX_32CHARS );
+						fprintf(stderr,"\n\n[++ERROR++] MCU Version Name length is too long (%d Chars).. Max:%d Bytes\n\n", olen, MAX_32CHARS );
 					}
 				}
 				else
 				{
-					printf("\n\n WARNING:wrong option --mcu [string]. check option\r\n");
+					fprintf(stderr,"\n\n WARNING:wrong option --mcu [string]. check option\r\n");
 
 					beep(700,100);
 					AllFilesClosed(); // 2020.07.10
@@ -8244,7 +8227,7 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
-					printf("\n\n[++ERROR++] Input file is NULL.  check option --input [filename]. \n\n" );
+					fprintf(stderr,"\n\n[++ERROR++] Input file is NULL.  check option --input [filename]. \n\n" );
 					
 					beep(700,100);
 
@@ -8279,7 +8262,7 @@ int main(int argc, char *argv[])
 					multifileindex = 1;
 					memcpy( &extfile_name[0], infile_name, iLenFile );
 
-					printf("\n>>Input files     : @.@ or $.$ ");
+					fprintf(stderr,"\n>>Input files      : @.@ or $.$ ");
 
 					/// opt_ok += CHECK_BIT_IN;
 				}
@@ -8287,15 +8270,15 @@ int main(int argc, char *argv[])
 				{
 					// no action!!
 					// case ah.exe --input *.* ( case of 2 more files )
-					//printf(" -i or --input *.* isAsteMode(%d) \n", isAsteMode);
-					printf("\n>>Input files     : *.* ");
+					//fprintf(stderr," -i or --input *.* isAsteMode(%d) \n", isAsteMode);
+					fprintf(stderr,"\n>>Input files      : *.* ");
 				}
 				else
 			#endif /// MD5_MULTI_INPUT_FILES
 				{
 					if( (retFiles = _findfirsti64( infile_name, &iFiles )) == -1L )
 					{
-						printf("\n\nNo input file [%s] \n", infile_name );
+						fprintf(stderr,"\n\nNo input file [%s] \n", infile_name );
 						_findclose( retFiles );
 
 						beep(700,100);
@@ -8315,7 +8298,7 @@ int main(int argc, char *argv[])
 						printf("\n>>Input file   : %s (%.3f kB)", infile_name, (iFiles.size/1024.0) );
 					else 
 				#endif
-						printf("\n>>Input file      : %s (%llu Bytes, %.2lfMB)", infile_name, iFiles.size, (iFiles.size/1024.0)/1024.0 );
+						fprintf(stderr,"\n>>Input file       : %s (%llu Bytes, %.2lfMB)", infile_name, iFiles.size, (iFiles.size/1024.0)/1024.0 );
 
 
 				#if 1 // 2017.04.05, 2nd file information
@@ -8323,7 +8306,7 @@ int main(int argc, char *argv[])
 					{
 						if( (retFiles = _findfirsti64( sefile_name, &iFiles )) == -1L )
 						{
-							printf("\r\nNo 2nd file [%s]. Check it! \n", sefile_name ); // 2nd input file check
+							fprintf(stderr,"\r\nNo 2nd file [%s]. Check it! \n", sefile_name ); // 2nd input file check
 							_findclose( retFiles );
 						
 							beep(700,100);
@@ -8337,7 +8320,7 @@ int main(int argc, char *argv[])
 						
 						sefile_size = iFiles.size; /// file size
 
-						printf("\n>>2nd input file  : %s (%llu Bytes)", sefile_name, sefile_size );
+						fprintf(stderr,"\n>>2nd input file   : %s (%llu Bytes)", sefile_name, sefile_size );
 
 					}
 				#endif
@@ -8346,7 +8329,7 @@ int main(int argc, char *argv[])
 
 					if( strlen(optarg) >= (MAX_CHARS*LENGTH_OF_FILENAME) )
 					{
-						printf("\n\n[++ERROR++] Input file name length is too long (%lld Chars).. Max:%d Bytes\n\n", strlen(optarg), (MAX_CHARS*LENGTH_OF_FILENAME) );
+						fprintf(stderr,"\n\n[++ERROR++] Input file name length is too long (%lld Chars).. Max:%d Bytes\n\n", strlen(optarg), (MAX_CHARS*LENGTH_OF_FILENAME) );
 
 						beep(700,100);
 						AllFilesClosed();
@@ -8374,12 +8357,12 @@ int main(int argc, char *argv[])
 			#endif
 					olen = strlen(outfile_name);
 
-					printf("\n>>Output file     : %s (%s)", outfile_name, (isAppend==1)? "append":"new create");
+					fprintf(stderr,"\n>>Output file      : %s (%s)", outfile_name, (isAppend==1)? "append":"new create");
 					opt_ok += CHECK_BIT_OUT;
 
 					if( strlen(optarg) >= (MAX_CHARS*LENGTH_OF_FILENAME) )
 					{
-						printf("\n\n[++ERROR++] Output file name length is too long (%lld Chars).. Max:%d Bytes \n\n", strlen(optarg), (MAX_CHARS*LENGTH_OF_FILENAME) );
+						fprintf(stderr,"\n\n[++ERROR++] Output file name length is too long (%lld Chars).. Max:%d Bytes \n\n", strlen(optarg), (MAX_CHARS*LENGTH_OF_FILENAME) );
 
 						beep(700,100);
 						AllFilesClosed();
@@ -8390,7 +8373,7 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
-					printf("\n\n[++ERROR++] Output file is NULL.  check option --output|--append [filename]. \n\n" );
+					fprintf(stderr,"\n\n[++ERROR++] Output file is NULL.  check option --output|--append [filename]. \n\n" );
 
 					beep(700,100);
 					AllFilesClosed();
@@ -8403,7 +8386,7 @@ int main(int argc, char *argv[])
 
 		    case 'z': /// printf, verbos ---
 
-				printf("\n");
+				fprintf(stderr,"\n");
 				memcpy(str_Verbos, optarg, MAX_CHARS);
 				olen = strlen(str_Verbos);
 
@@ -8431,8 +8414,8 @@ int main(int argc, char *argv[])
 					}
 					else
 					{
-						printf("\n\n[++ERROR++] str_Verbos parser is wrong [%s]-(%d) \n\n", str_Verbos, iVerbosType );
-						printf("  --verbose date or size or datesize or 1|2|3|4 \n");
+						fprintf(stderr,"\n\n[++ERROR++] str_Verbos parser is wrong [%s]-(%d) \n\n", str_Verbos, iVerbosType );
+						fprintf(stderr,"  --verbose date or size or datesize or 1|2|3|4 \n");
 
 						beep(700,100);
 						AllFilesClosed(); // 2020.07.10
@@ -8495,14 +8478,14 @@ int main(int argc, char *argv[])
 						{
 							iModeID = kk;
 							fprintf(stderr,"\n");
-							fprintf(stderr,">>PATs-ModeID     : <<%d>> %d, %s", 0, kk, arrPATs_ModeID[kk].ModeID ); 
+							fprintf(stderr,">>PATs-ModeID      : <<%d>> %d, %s", 0, kk, arrPATs_ModeID[kk].ModeID ); 
 							break;
 						}
 					}
 					if(iModeID == -1)
 					{
 						fprintf(stderr,"\n");
-						fprintf(stderr,">>PATs-ModeID	  : <<%d>> %d, Unknown ModeID +++", 0, iModeID ); 
+						fprintf(stderr,">>PATs-ModeID	   : <<%d>> %d, Unknown ModeID +++", 0, iModeID ); 
 					}
 
 					if(itmpFileDeleted) 
@@ -8520,52 +8503,63 @@ int main(int argc, char *argv[])
 						
 						switch(kk)
 						{
-						case 1: /* Power On/Off  APS Level */
+						case 1:
+							// 3>> SB repoint : SB decision times
+							iSBdecision = atoi( str_ShiftOp[kk] ); 
+							if(iSBdecision<10)
+							{
+								fprintf(stderr,"\n");
+								fprintf(stderr,">>SB decision Num  : <<%d>> %d (SB decision times, default:3 times)", kk, iSBdecision ); 
+							}
+							else
+							{
+								fprintf(stderr,"\n");
+								fprintf(stderr,">>SB decision Num  : <<%d>> %d - Warning: Too many number... Max 9", kk, iSBdecision ); 
+								fprintf(stderr,"\r\n\n");
+								exit(0);
+							}
+							break;
+							
+						case 2:
+							// 4>> Jerk#1
+							iJerkTimeLen = atoi( str_ShiftOp[kk] ); 
+							fprintf(stderr,"\n");
+							fprintf(stderr,">>Jerk Time Length : <<%d>> %d msec (unit: msec)", kk, iJerkTimeLen ); 
+							break;
+
+						case 3: /* Power On/Off  APS Level */
 							// 1>> APS POWER ON/OFF Level
 							olen = strlen(str_ShiftOp[kk]);
 							fAPSpwrLvl = atof( str_ShiftOp[kk] ); 
 							if(fAPSpwrLvl >= 3.0f) iPwrOnOff = SHI_PWR_ON;
 							else iPwrOnOff = SHI_PWR_OFF;
 							fprintf(stderr,"\n");
-							fprintf(stderr,">>APS Percent lvl : <<%d>> %.2lf%% -- default(3\%~5\%) \n", kk, fAPSpwrLvl ); 
-							fprintf(stderr,">>POWER ON/OFF    :       %s", (iPwrOnOff==SHI_PWR_ON?"PWR On":(iPwrOnOff==SHI_PWR_OFF?"PWR Off":(iPwrOnOff==SHI_STATIC?"Static":(iPwrOnOff==SHI_N_STOP_DN?"Stop Dn":"Unknown")))) ); 
-							break;
-							
-						case 2:
-							// 2>> APS tolerance
-							fAPStol = atof( str_ShiftOp[kk] ); 
-							fprintf(stderr,"\n");
-							fprintf(stderr,">>APS Tolerance   : <<%d>> %.1lf -- default(-/+1.0)", kk, fAPStol ); 
-							break;
-
-						case 3:
-							// 3>> SB repoint : SB decision times
-							iSBdecision = atoi( str_ShiftOp[kk] ); 
-							fprintf(stderr,"\n");
-							fprintf(stderr,">>SB decision Num : <<%d>> %d (SB decision times, default:3 times)", kk, iSBdecision ); 
+							fprintf(stderr,">>APS Percent lvl  : <<%d>> %.1lf%% -- default(3\%~5\%) \n", kk, fAPSpwrLvl ); 
+							fprintf(stderr,">>POWER ON/OFF     :       %s", (iPwrOnOff==SHI_PWR_ON?"PWR On":(iPwrOnOff==SHI_PWR_OFF?"PWR Off":(iPwrOnOff==SHI_STATIC?"Static":(iPwrOnOff==SHI_N_STOP_DN?"Stop Dn":"Unknown")))) ); 
 							break;
 							
 						case 4:
-							// 4>> Jerk#1
-							iJerkTimeLen = atoi( str_ShiftOp[kk] ); 
+							// 2>> APS tolerance
+							fAPStol = atof( str_ShiftOp[kk] ); 
 							fprintf(stderr,"\n");
-							fprintf(stderr,">>Jerk Time Length: <<%d>> %d msec (unit: msec)", kk, iJerkTimeLen ); 
+							fprintf(stderr,">>APS Tolerance    : <<%d>> %.1lf -- default(-/+1.0)", kk, fAPStol ); 
 							break;
-							
+
+
 						case 5:							
 							aps1 = atoi( str_ShiftOp[kk] ); 
 							fprintf(stderr,"\n");
-							fprintf(stderr,">>APS Table Init  : <<%d>> %.1lf ", kk, aps1 ); 
+							fprintf(stderr,">>APS Table Init   : <<%d>> %.1lf ", kk, aps1 ); 
 							break;
 						case 6:
 							aps2 = atof( str_ShiftOp[kk] ); 
 							fprintf(stderr,"\n");
-							fprintf(stderr,">>APS Table Last  : <<%d>> %.1lf ", kk, aps2 ); 
+							fprintf(stderr,">>APS Table Last   : <<%d>> %.1lf ", kk, aps2 ); 
 							break;
 						case 7:
 							apstep = atof( str_ShiftOp[kk] ); 
 							fprintf(stderr,"\n");
-							fprintf(stderr,">>APS Table Step  : <<%d>> %.1lf -- APS Table updated...", kk, apstep ); 
+							fprintf(stderr,">>APS Table Step   : <<%d>> %.1lf -- APS Table updated...", kk, apstep ); 
 
 							for(ll=0, aps=aps1; ((aps<=aps2) && (ll<APS_TABLE_NUM)); aps+=apstep, ll++)
 							{
@@ -8578,7 +8572,7 @@ int main(int argc, char *argv[])
 
 						default:
 							fprintf(stderr,"\n");
-							fprintf(stderr,">>upshift options : <<%d>> (%s) ", kk, str_ShiftOp[kk] ); 
+							fprintf(stderr,">>upshift options  : <<%d>> (%s) ", kk, str_ShiftOp[kk] ); 
 							break;
 						}
 
@@ -8649,14 +8643,14 @@ int main(int argc, char *argv[])
 						{
 							iModeID = kk;
 							fprintf(stderr,"\n");
-							fprintf(stderr,">>PATs-ModeID     : <<%d>> %d, %s", 0, kk, arrPATs_ModeID[kk].ModeID ); 
+							fprintf(stderr,">>PATs-ModeID      : <<%d>> %d, %s", 0, kk, arrPATs_ModeID[kk].ModeID ); 
 							break;
 						}
 					}
 					if(iModeID == -1)
 					{
 						fprintf(stderr,"\n");
-						fprintf(stderr,">>PATs-ModeID	  : <<%d>> %d, Unknown ModeID +++", 0, iModeID ); 
+						fprintf(stderr,">>PATs-ModeID	   : <<%d>> %d, Unknown ModeID +++", 0, iModeID ); 
 					}
 
 					if(itmpFileDeleted) 
@@ -8681,31 +8675,31 @@ int main(int argc, char *argv[])
 							if(fAPSpwrLvl >= 3.0f) iPwrOnOff = SHI_PWR_ON;
 							else iPwrOnOff = SHI_PWR_OFF;
 							fprintf(stderr,"\n");
-							fprintf(stderr,">>APS Percent lvl : <<%d>> %.2lf%% -- default(3\%~5\%) \n", kk, fAPSpwrLvl ); 
-							fprintf(stderr,">>POWER ON/OFF    :      %s", (iPwrOnOff==SHI_PWR_ON?"PWR On":(iPwrOnOff==SHI_PWR_OFF?"PWR Off":(iPwrOnOff==SHI_STATIC?"Static":(iPwrOnOff==SHI_N_STOP_DN?"Stop Dn":"Unknown")))) ); 
+							fprintf(stderr,">>APS Percent lvl  : <<%d>> %.2lf%% -- default(3\%~5\%) \n", kk, fAPSpwrLvl ); 
+							fprintf(stderr,">>POWER ON/OFF     :      %s", (iPwrOnOff==SHI_PWR_ON?"PWR On":(iPwrOnOff==SHI_PWR_OFF?"PWR Off":(iPwrOnOff==SHI_STATIC?"Static":(iPwrOnOff==SHI_N_STOP_DN?"Stop Dn":"Unknown")))) ); 
 							break;
 							
 						case 2:
 							// 2>> APS tolerance
 							fAPStol = atof( str_ShiftOp[kk] ); 
 							fprintf(stderr,"\n");
-							fprintf(stderr,">>APS Tolerance   : <<%d>> %.1lf -- default(-/+1.0)", kk, fAPStol ); 
+							fprintf(stderr,">>APS Tolerance    : <<%d>> %.1lf -- default(-/+1.0)", kk, fAPStol ); 
 							break;
 							
 						case 3:
 							aps1 = atof( str_ShiftOp[kk] ); 
 							fprintf(stderr,"\n");
-							fprintf(stderr,">>APS Table Init  : <<%d>> %.1lf ", kk, aps1 ); 
+							fprintf(stderr,">>APS Table Init   : <<%d>> %.1lf ", kk, aps1 ); 
 							break;
 						case 4:
 							aps2 = atof( str_ShiftOp[kk] ); 
 							fprintf(stderr,"\n");
-							fprintf(stderr,">>APS Table Last  : <<%d>> %.1lf ", kk, aps2 ); 
+							fprintf(stderr,">>APS Table Last   : <<%d>> %.1lf ", kk, aps2 ); 
 							break;
 						case 5:
 							apstep = atof( str_ShiftOp[kk] ); 
 							fprintf(stderr,"\n");
-							fprintf(stderr,">>APS Table Step  : <<%d>> %.1lf -- APS Table updated...", kk, apstep ); 
+							fprintf(stderr,">>APS Table Step   : <<%d>> %.1lf -- APS Table updated...", kk, apstep ); 
 
 							for(ll=0, aps=aps1; ((aps<=aps2) && (ll<APS_TABLE_NUM)); aps+=apstep, ll++)
 							{
@@ -8719,7 +8713,7 @@ int main(int argc, char *argv[])
 
 						default:
 							fprintf(stderr,"\n");
-							fprintf(stderr,">>upshift options : <<%d>> (%s) ", kk, str_ShiftOp[kk] ); 
+							fprintf(stderr,">>upshift options  : <<%d>> (%s) ", kk, str_ShiftOp[kk] ); 
 							break;
 						}
 
@@ -8747,7 +8741,7 @@ int main(int argc, char *argv[])
 
 			default:
 				//printf("\n\nWARNING : Unknwon option [%c]. Check options.... \r\n", opt);
-				printf("\n\n");
+				fprintf(stderr,"\n\n");
 				beep(700,100);
 
 				AllFilesClosed();
@@ -10656,7 +10650,7 @@ int main(int argc, char *argv[])
 	/* 3. CRC 생성하기 */
 	else if( 1 == isCRC )
 	{
-		int iLenSub=0;
+		unsigned int iLenSub=0;
 		char cdate[30];
 		time_t	sys_t;
 		int ilen;
@@ -13417,7 +13411,7 @@ int main(int argc, char *argv[])
 		{
 
 			int iLenFile = 0;
-			int iLenSub=0;
+			unsigned int iLenSub=0;
 			iLenFile = strlen(infile_name);
 			unsigned __int64 	kll = 0UL;
 
@@ -13711,7 +13705,7 @@ int main(int argc, char *argv[])
 		else if( multifileindex > 0 )
 		{
 			int iLenFile = 0;
-			int iLenSub=0;
+			unsigned int iLenSub=0;
 			iLenFile = strlen(infile_name);
 			unsigned __int64 	kll = 0UL;
 
@@ -13864,7 +13858,7 @@ int main(int argc, char *argv[])
 		size_t nBytes;
 		unsigned char md2_data[MD_HASH_BUFSIZ]; // 1024*16];
 		unsigned char md2_output[MD2_DIGEST_LENGTH] = {0,};
-		int iLenSub=0;
+		unsigned int iLenSub=0;
 		struct	tm *pTime;  // 2020.07.15
 	
 		pTime = current_time();	
@@ -14087,7 +14081,7 @@ int main(int argc, char *argv[])
 	    size_t nBytes;
 	    sha1_context ctx;
 		unsigned char sha1_buf[SHA_READ_BUFSIZ]; /// NERVER modified!!!!
-		int iLenSub=0;
+		unsigned int iLenSub=0;
 		struct	tm *pTime;  // 2020.07.15
 
 		//unsigned char *sha1_buf;
@@ -14327,7 +14321,7 @@ int main(int argc, char *argv[])
 		unsigned __int64 	kll=0UL, ll=0UL;
 		SHA256_CTX 		ctx256;
 		unsigned char	sha256_buf[SHA2_BUFLEN];
-		int iLenSub=0;
+		unsigned int iLenSub=0;
 		struct	tm *pTime;  // 2020.07.15
 	
 		pTime = current_time();
@@ -14551,7 +14545,7 @@ int main(int argc, char *argv[])
 		unsigned __int64 	kll=0, ll=0;
 		SHA384_CTX 		ctx384;
 		unsigned char	sha384_buf[SHA2_BUFLEN];
-		int iLenSub=0;
+		unsigned int iLenSub=0;
 		struct	tm *pTime;
 	
 		pTime = current_time();
@@ -14775,7 +14769,7 @@ int main(int argc, char *argv[])
 		unsigned __int64 	kll=0, ll=0;
 		SHA512_CTX 		ctx512;
 		unsigned char	sha512_buf[SHA2_BUFLEN];
-		int iLenSub=0;
+		unsigned int iLenSub=0;
 		struct	tm *pTime;  // 2020.07.15
 	
 		pTime = current_time();
@@ -15004,7 +14998,7 @@ int main(int argc, char *argv[])
 		unsigned __int64 	kll=0, ll=0;
 		sha224_ctx      ctx224;		
 		unsigned char	sha224_buf[SHA2_BUFLEN]; // 1024*10];
-		int iLenSub=0;
+		unsigned int iLenSub=0;
 		struct	tm *pTime;
 	
 		pTime = current_time();
@@ -15230,7 +15224,7 @@ int main(int argc, char *argv[])
 		unsigned char md6_data[1024*10]; // MD_HASH_BUFSIZ
 		//double elapsed_time = end_time - start_time;
 		//unsigned long long elapsed_ticks = end_ticks - start_ticks;
-		int iLenSub=0;
+		unsigned int iLenSub=0;
 		struct	tm *pTime;
 
 		pTime = current_time();
@@ -15475,7 +15469,7 @@ int main(int argc, char *argv[])
 		unsigned __int64 	kll=0;
 		size_t		ll=0;
 		int 		ret;
-		int iLenSub=0;
+		unsigned int iLenSub=0;
 	#if 1
 		struct	tm *pTime;
 
@@ -15719,7 +15713,7 @@ int main(int argc, char *argv[])
 		unsigned __int64 	kll=0;
 		size_t		ll=0;
 		int 		ret;
-		int iLenSub=0;
+		unsigned int iLenSub=0;
 	#if 1
 		struct	tm *pTime;
 
@@ -15962,7 +15956,7 @@ int main(int argc, char *argv[])
 		unsigned __int64 	kll=0;
 		size_t		ll=0;
 		int 		ret;
-		int iLenSub=0;
+		unsigned int iLenSub=0;
 		struct	tm *pTime;
 	
 		pTime = current_time();
@@ -16203,7 +16197,7 @@ int main(int argc, char *argv[])
 		unsigned __int64 	kll=0;
 		size_t		ll=0;
 		int 		ret;
-		int iLenSub=0;
+		unsigned int iLenSub=0;
 		struct	tm *pTime;
 	
 		pTime = current_time();
@@ -16445,7 +16439,7 @@ int main(int argc, char *argv[])
 		unsigned __int64 	kll=0;
 		size_t		ll=0;
 		int 		ret;
-		int iLenSub=0;
+		unsigned int iLenSub=0;
 	#if 1
 		struct	tm *pTime;
 	
@@ -16684,7 +16678,7 @@ int main(int argc, char *argv[])
 		unsigned __int64 	kll=0;
 		size_t		ll=0;
 		int 		ret;
-		int iLenSub=0;
+		unsigned int iLenSub=0;
 	#if 1
 		struct	tm *pTime;
 	
@@ -16932,7 +16926,7 @@ int main(int argc, char *argv[])
 		unsigned int  i, j; 		  /* counters					   */
 		unsigned long length[2];	  /* length in bytes of message   */
 		unsigned long offset;		  /* # of unprocessed bytes at	  */
-		int 		  iLenSub=0;
+		unsigned int iLenSub=0;
 		
 	#if 1
 		struct	tm *pTime;
@@ -17238,7 +17232,7 @@ int main(int argc, char *argv[])
 		unsigned int  i, j; 		  /* counters					   */
 		unsigned long length[2];	  /* length in bytes of message   */
 		unsigned long offset;		  /* # of unprocessed bytes at	  */
-		int 		  iLenSub=0;
+		unsigned int iLenSub=0;
 		
 	#if 1
 		struct	tm *pTime;
@@ -17536,7 +17530,7 @@ int main(int argc, char *argv[])
 		state224 blakeS; 
 		unsigned __int64 kll;
 		size_t		ll=0;
-		int iLenSub=0;
+		unsigned int iLenSub=0;
 		struct	tm *pTime = NULL;
 	
 		pTime = current_time();
