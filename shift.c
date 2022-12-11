@@ -728,10 +728,14 @@ void AllFilesClosed(void)
  --------------------------------------------------------- */
 
 #define MAX_TABLE_SIZ 			1000 //2000
-#define SB_DECISION_NUM 		100 /* SB decision times */
+#define SB_DECISION_NUM 		(10*3) /* SB decision times buffer */
 #define SB_DECISION_TIMES 		3
+#define SB_DECISION_MAX_TIMES 	10 /* upto 9 */
+
 #define SB_POINT_COUNT_NUM 		20 /* 5msec * 20 SB point + 5msec lines number */
 #define JERK_TIME_mSec 			300
+#define JERK_MAX_TIME_mSec 		3000 /* max 3sec */
+
 #define JERK_TIME_SCALE 		10 /* just scale */
 
 
@@ -860,6 +864,8 @@ void AllFilesClosed(void)
 #define SB_PNT_RPM_UPS 		(-30.0f) /* unit: rpm */
 #define SP_PNT_RPM_UPS 		(30.0f) /* unit: rpm */
 
+#define SB_PNT_RPM_DNS 		(30.0f) /* unit: rpm */
+#define SP_PNT_RPM_DNS 		(-30.0f) /* unit: rpm */
 
 
 //unsigned int iSBnewPoint[500] = {0,};
@@ -1642,8 +1648,10 @@ const tPATs_ModeType arrPATs_ModeID[MODE_ID_NUMS] = {
 
 typedef struct _SBTimePosition_ {
 	unsigned int Index;
+	unsigned int SSTime;
 	unsigned int SBTime;
 	unsigned int gmMxBegin; /* Defalt Value : before 300 msec */
+	unsigned int SPTime;
 } tSBtimePos_type;
 
 tSBtimePos_type  gMaxStart[MAX_TABLE_SIZ]; /* gMax Start Time Position for Jerk1 Calculation */
@@ -1770,7 +1778,8 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 	short iSBTimeSum = 0;
 	short ide=0;
 	unsigned int igMxTime = 0;
-
+	unsigned long long avg_t1=0ULL, avg_t2 = 0ULL;
+	
 	memset(QualData, 0x00, QUAL_DATA_MAX_SIZE*sizeof(char) );
 	memset(sq, 0x00, sizeof(sq) );
 	memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
@@ -1834,7 +1843,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 	fprintf(stderr,">>Shift Type       : %s \n", (iShiftType==SHI_PWR_ON?"PWR On":(iShiftType==SHI_PWR_OFF?"PWR Off":(iShiftType==SHI_STATIC?"Static":(iShiftType==SHI_N_STOP_DN?"Stop Dn":"Unknown")))) );
 	fprintf(stderr,">>Shift Direction  : Shift %s \n", (shiDir03==SHIFT_UP?"UP":(shiDir03==SHIFT_DN?"DOWN": \
 		(shiDir03==SHIFT_SKIP_DN?"SkipDown":(shiDir03==SHIFT_SKIP_UP?"SkipUp":"Unknown"))) ));			
-	fprintf(stderr,">>SB decision Num  : %d times \n", iSBdecision );
+	fprintf(stderr,">>SB decision Num  : %d times, such as %s.%s.%s \n", iSBdecision, TXT_SBSWING0, TXT_SBSWING0, TXT_SBTIME );
 	fprintf(stderr,">>Jerk Time length : %d msec ~ (SB point) ~ %d msec \n", iJerkTimeLen, 5*SB_POINT_COUNT_NUM );
 	/* ===================================================================================== */
 
@@ -2075,6 +2084,8 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 				{
 					isFindSS = 0;
 					strcpy(sTimePos, TXT_SSTIME);
+					gMaxStart[iSScount].SSTime = (unsigned int)( (sq[0].Time01)*1000*JERK_TIME_SCALE );
+
 					iSScount ++;
 					iOnce_SS = 1;
 
@@ -2130,7 +2141,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 								//fprintf(stderr,"  SB decision SBdecision: %d:(%d) \n", iSBdecCnt, SBdecision[iSBdecCnt] );
 							}
 							else
-								fprintf(stderr, "  SB decision point too many points... \n");
+								fprintf(stderr, "  SB decision point too many points... %d \n", iSBdecCnt );
 						}
 						else
 						{
@@ -2190,6 +2201,8 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 						{
 							iOnce_SP = FALSE;
 							strcpy(sTimePos, TXT_SPTIME);
+							gMaxStart[iSPcount].SPTime = (unsigned int)( (sq[0].Time01)*1000*JERK_TIME_SCALE );
+
 							iSPcount ++;
 
 							g_SPtime = sq[0].Time01;
@@ -2208,7 +2221,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 								 Synch Point (SP) 점 판단식 : Nt - No x 2단 기어비 ≥-30RPM 되는 싯점	 
 						--------------------------------------------------------------------------------- */
 
-						if( iOnce_SB && (gearShiftOne >= 30.0) ) /* Shift Begin (SB) -30 rpm under */
+						if( iOnce_SB && (gearShiftOne >= SB_PNT_RPM_DNS) ) /* Shift Begin (SB) -30 rpm under */
 						{
 							iOnce_SB = FALSE;
 							strcpy(sTimePos, TXT_SBTIME);
@@ -2216,7 +2229,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 
 							g_SBtime = sq[0].Time01;
 						}
-						else if( iOnce_SP && (gearShiftTwo >= -30.0) ) /* 30 rpm under */
+						else if( iOnce_SP && (gearShiftTwo >= SP_PNT_RPM_DNS) ) /* 30 rpm under */
 						{
 							iOnce_SP = FALSE;
 							strcpy(sTimePos, TXT_SPTIME);
@@ -2378,12 +2391,34 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 	if(shiFile) { fclose(shiFile); shiFile=NULL; }
 	if(inpfile) { fclose(inpfile); inpfile=NULL; }
 
+	avg_t1 = 0ULL;
+	avg_t2 = 0ULL;
+
+	//fprintf(stderr, "%d %d %d \n", iSScount, iSBcount, iSPcount );
+	for(ii=0; ii<iSPcount; ii++)
+	{
+		avg_t1 += (gMaxStart[ii].SBTime - gMaxStart[ii].SSTime)/JERK_TIME_SCALE;
+		avg_t2 += (gMaxStart[ii].SPTime - gMaxStart[ii].SBTime)/JERK_TIME_SCALE;
+
+		//fprintf(stderr, " %2d -> %10lld  %10lld  \n", ii, avg_t1, avg_t1 );
+ 	}
+	avg_t1 /= (iSPcount+1);
+	avg_t2 /= (iSPcount+1);
+	//fprintf(stderr, "** %2d -> %10llu  %10llu \n", ii, avg_t1, avg_t2 );
+	
+	//fprintf(stderr,"----------------------------------------------------------------------------------\n" );
+	//fprintf(stderr,">>ModeID %s files are saved. \n", arrPATs_ModeID[aiPATs05].ModeID);
+	fprintf(stderr,"  ModeID %s, 1st step sorting file: %s  \n", arrPATs_ModeID[aiPATs05].ModeID, shift_out );
+	//fprintf(stderr,"  ModeID file: %s \n", shift_file );
+
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
-	fprintf(stderr,">>Quality Data Sorting Summary... \n" );
-	fprintf(stderr,"  Data Time period ------------: %9u msec\n", (unsigned int)(avgTime/avgCount) );
-	fprintf(stderr,"  Total Records ---------------: %9llu lines \n", RecordCnt );
-	fprintf(stderr,"  Error Records (ignored) -----: %9u lines \n", iNGcount );
-	fprintf(stderr,"  Quality Records -------------: %9u lines \n", iOKcount );
+	fprintf(stderr,">>Quality Shift Data Sorting Summary... %s \n", arrPATs_ModeID[aiPATs05].ModeID );
+	fprintf(stderr,"  Shift Data Time Period ------: %9u msec \n", (unsigned int)(avgTime/avgCount) );
+	fprintf(stderr,"  Shift Average Time(t1:SS~SB)-: %9llu msec \n", avg_t1 );
+	fprintf(stderr,"  Shift Average Time(t2:SB~SP)-: %9llu msec \n", avg_t2 );
+	fprintf(stderr,"  Total Quality Shift Records -: %9llu lines \n", RecordCnt );
+	fprintf(stderr,"  Error Shift Records (NG) ----: %9u lines <- ignored shift data. \n", iNGcount );
+	fprintf(stderr,"  Quality Shift Records (OK) --: %9u lines \n", iOKcount );
 
 
 	totChkModeID = 0;
@@ -2409,11 +2444,6 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 
 	iavgTime = (unsigned int)(avgTime/avgCount);
 
-	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
-	fprintf(stderr,">>ModeID %s files are saved. \n", arrPATs_ModeID[aiPATs05].ModeID);
-	fprintf(stderr,"  1st step sorted file: %s  \n", shift_out );
-	//fprintf(stderr,"  ModeID file: %s \n", shift_file );
-	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
 	return iavgTime;
 }
@@ -2694,44 +2724,48 @@ int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsig
 	unsigned long long iOKcount = 0ULL;
 
 
+	// =========================================================
+	// =========================================================
+	memset(shi_inp, 0x00, sizeof(shi_inp));  
+	memset(chk_out, 0x00, sizeof(chk_out));  
+	memset(ignoredSScnt, 0x00, sizeof(ignoredSScnt));  
+	
+	strcpy(shi_inp, shift_file);
+	strcpy(chk_out, shift_file);
+	
+	isNaming = 0;
+	for(ii=strlen(chk_out)-1; ii>0; ii--)
+	{
+		if( shi_inp[ii]=='.' ) 
+		{
+			shi_inp[ii+1] = '\0';
+			chk_out[ii+1] = '\0';
+			strcat(shi_inp, arrPATs_ModeID[aiPATs05].ModeNm);
+	
+			strcat(chk_out, "c" );
+			strcat(chk_out, arrPATs_ModeID[aiPATs05].ModeNm);
+			isNaming = 1;
+			break;			
+		}
+	}
+	
+	if( 0==isNaming )
+	{
+		strcat(shi_inp, "."); 
+		strcat(shi_inp, arrPATs_ModeID[aiPATs05].ModeNm);
+	
+		strcat(chk_out, ".c"); 
+		strcat(chk_out, arrPATs_ModeID[aiPATs05].ModeNm);
+	}
+	// =========================================================
+	// =========================================================
+
 	if( SScnt==SBcnt && SBcnt==SPcnt && SScnt==SPcnt)
 	{
 		fprintf(stderr,">>Counter checking %s ...... SS(%d) SB(%d) SP(%d) - Same OK!!! \n", arrPATs_ModeID[aiPATs05].ModeID, SScnt, SBcnt, SPcnt);
 	}
 	else
 	{
-		memset(shi_inp, 0x00, sizeof(shi_inp));  
-		memset(chk_out, 0x00, sizeof(chk_out));  
-		memset(ignoredSScnt, 0x00, sizeof(ignoredSScnt));  
-
-		strcpy(shi_inp, shift_file);
-		strcpy(chk_out, shift_file);
-
-		isNaming = 0;
-		for(ii=strlen(chk_out)-1; ii>0; ii--)
-		{
-			if( shi_inp[ii]=='.' ) 
-			{
-				shi_inp[ii+1] = '\0';
-				chk_out[ii+1] = '\0';
-				strcat(shi_inp, arrPATs_ModeID[aiPATs05].ModeNm);
-
-				strcat(chk_out, "c" );
-				strcat(chk_out, arrPATs_ModeID[aiPATs05].ModeNm);
-				isNaming = 1;
-				break;			
-			}
-		}
-
-		if( 0==isNaming )
-		{
-			strcat(shi_inp, "."); 
-			strcat(shi_inp, arrPATs_ModeID[aiPATs05].ModeNm);
-
-			strcat(chk_out, ".c"); 
-			strcat(chk_out, arrPATs_ModeID[aiPATs05].ModeNm);
-		}
-
 		// read file OK
 		if( NULL == (inpfile = fopen( shi_inp, "rb")) ) 
 		{
@@ -2751,7 +2785,7 @@ int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsig
 		}
 
 
-		fprintf(stderr,">>Counter Checking %s ...... SS(%d) SB(%d) SP(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, SScnt, SBcnt, SPcnt);
+		fprintf(stderr,">>Counter Checking %s ...... SS(%d) SB(%d) SP(%d) -- NOT same as below! \n", arrPATs_ModeID[aiPATs05].ModeID, SScnt, SBcnt, SPcnt);
 
 
 		if( SScnt > SBcnt )
@@ -2950,6 +2984,160 @@ int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsig
 
 	if(fp2chk) fclose(fp2chk);
 	if(inpfile) fclose(inpfile);
+
+
+	// ========================================================================================
+	// ========================================================================================
+	// ========================================================================================
+	// Real Average Time (SS ~ SB)
+	// Real Average Time (SB ~ SP)
+	// read file OK
+	if(iSBck)
+	{
+		if( NULL == (inpfile = fopen( chk_out, "rb")) ) 
+		{
+			// FAIL
+			fprintf(stderr,"\r\n++ERROR++[%s]:Can not read file (%s) \n\n", __FUNCTION__, chk_out );
+			AllFilesClosed();
+			exit(0);
+		}
+	}
+	else
+	{
+		if( NULL == (inpfile = fopen( shi_inp, "rb")) ) 
+		{
+			// FAIL
+			fprintf(stderr,"\r\n++ERROR++[%s]:Can not read file (%s) \n\n", __FUNCTION__, shi_inp );
+			AllFilesClosed();
+			exit(0);
+		}
+	}
+	
+
+	{
+		unsigned long long avg_t1=0ULL, avg_t2 = 0ULL;
+
+		iSScount = 0U;
+		iSBcount = 0U;
+		iSPcount = 0U;
+
+		iNGcount   = 0ULL;
+		iOKcount   = 0ULL;
+
+		do
+		{
+			unsigned int i=0;
+
+			/* Read a line from input file. */
+			memset( QualData, 0x00, sizeof(QualData) );
+
+			if( NULL == fgets( QualData, QUAL_DATA_MAX_SIZE, inpfile ) )
+			{
+				ierr = ferror(inpfile);
+				//fprintf(stderr,">>Duplica~~~~~~~~te record check completed %s -- [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp );			
+				fclose(inpfile);
+				break;
+			}
+
+			RecordCnt++;
+
+
+			/* Remove carriage return/line feed at the end of line. */
+			i = strlen(QualData);
+			
+			if(i >= QUAL_DATA_MAX_SIZE)
+			{
+				fprintf(stderr,"ERROR:%6lld: Not enough Buffer length (%d) \r\n", RecordCnt, i );
+			}
+
+			if (--i > 0)
+			{
+				if (QualData[i] == '\n') QualData[i] = '\0';
+				if (QualData[i] == '\r') QualData[i] = '\0'; 
+
+				result = sscanf(QualData, RD_2ndFMT,
+						&sq2[0].Time01,  &sq2[0].iPATs05,	 &sq2[0].iPATs05S,	 &sq2[0].VSP03, 	&sq2[0].tqi07,	 &sq2[0].curGear08, 
+						&sq2[0].APS09,	 &sq2[0].No10,		 &sq2[0].tgtGear11,  &sq2[0].ShiNew12,	&sq2[0].ShiTy12, &sq2[0].arrGear, 
+						&sq2[0].TqFr13,  &sq2[0].ShiPh14,	 &sq2[0].Ne15,		 &sq2[0].Nt16,		&sq2[0].LAcc17,  &sq2[0].sTimePos, 
+						&sq2[0].gearRat, &sq2[0].gearShiOne, &sq2[0].gearShiTwo, &sq2[0].fJerk1,	&sq2[0].MaxNe,	 &sq2[0].MaxNt, 
+						&sq2[0].MaxAcc,  &sq2[0].minAcc );
+				
+
+				/* === 1 STEP : record (17 items check) =============== */
+				iSave = 0;
+				iItemCurOK = 0; /* NG - FAIL */
+				if(QUAL_2ND_DATA_ITEM_NUM==result)
+				{
+					iItemCurOK = 1; /* OK */
+					iOKcount ++;
+				}
+				else if( (QUAL_2ND_DATA_ITEM_NUM!=result) && (result!=-1 && i>0) ) 
+				{
+					iNGcount ++;
+					continue; /* reading Next item because of FAIL item */
+				}
+				/* === 1 STEP : record (17 items check) =============== */
+
+
+				if( 0==strcmp( sq2[0].sTimePos, TXT_SSTIME) ) 
+				{ 
+					gMaxStart[iSScount].SSTime = (unsigned int)( (sq2[0].Time01)*1000*JERK_TIME_SCALE );
+					iSScount++;
+				}
+				else if( 0==strncmp( sq2[0].sTimePos, TXT_SBTIME, 4) )
+				{ 
+					gMaxStart[iSBcount].SBTime = (unsigned int)( (sq2[0].Time01)*1000*JERK_TIME_SCALE );
+					iSBcount++;
+				}
+				else if( 0==strncmp( sq2[0].sTimePos, TXT_SPTIME, 4) ) 
+				{ 
+					gMaxStart[iSPcount].SPTime = (unsigned int)( (sq2[0].Time01)*1000*JERK_TIME_SCALE );
+					iSPcount++;
+				}
+
+				#if 0 //SAVEMODE
+				if(fp2chk) // && is2File)
+				{
+					fprintf(fp2chk, SAVE_ChkFMT,
+							sq2[0].Time01,	sq2[0].iPATs05,    sq2[0].iPATs05S,   sq2[0].VSP03, 	sq2[0].tqi07,	sq2[0].curGear08, 
+							sq2[0].APS09,	sq2[0].No10,	   sq2[0].tgtGear11,  sq2[0].ShiNew12,	sq2[0].ShiTy12, sq2[0].arrGear, 
+							sq2[0].TqFr13,	sq2[0].ShiPh14,    sq2[0].Ne15, 	  sq2[0].Nt16,		sq2[0].LAcc17,	sq2[0].sTimePos, 
+							sq2[0].gearRat, sq2[0].gearShiOne, sq2[0].gearShiTwo, sq2[0].fJerk1,	sq2[0].MaxNe,	sq2[0].MaxNt, 
+							sq2[0].MaxAcc,	sq2[0].minAcc );
+
+					fprintf(fp2chk, "\n");
+				}
+				#endif
+
+			}
+
+		}
+		while (!feof (inpfile));
+
+		if(fp2chk) fclose(fp2chk);
+		if(inpfile) fclose(inpfile);
+
+
+		avg_t1 = 0ULL;
+		avg_t2 = 0ULL;
+
+		//fprintf(stderr, "%d %d %d \n", iSScount, iSBcount, iSPcount );
+		for(ii=0; ii<iSPcount; ii++)
+		{
+			avg_t1 += (gMaxStart[ii].SBTime - gMaxStart[ii].SSTime)/JERK_TIME_SCALE;
+			avg_t2 += (gMaxStart[ii].SPTime - gMaxStart[ii].SBTime)/JERK_TIME_SCALE;
+
+			//fprintf(stderr, " %2d -> %10lld  %10lld  \n", ii, avg_t1, avg_t2 );
+	 	}
+		avg_t1 /= iSPcount;
+		avg_t2 /= iSPcount;
+
+		fprintf(stderr,">>Average Time after re-checking SS(%d), SB(%d), SP(%d) Records.. %s \n", iSScount, iSBcount, iSPcount, arrPATs_ModeID[aiPATs05].ModeID );
+		fprintf(stderr,"  Shift Average Time(t1:SS~SB)-: %9llu msec * \n", avg_t1 );
+		fprintf(stderr,"  Shift Average Time(t2:SB~SP)-: %9llu msec * \n", avg_t2 );
+		fprintf(stderr,"----------------------------------------------------------------------------------\n" );
+
+	}
 
 	if( iSBck ) return 1;
 	else return 0;
@@ -4078,7 +4266,7 @@ int Find2nd_gminMaxShiftData(short aiPATs05, int minMaxType, unsigned int SScnt,
 							if(fp2gmin)
 							{
 								fprintf(fp2gmin, gmin_FORMAT,
-										iSScount-1, sq2[0].Time01, g_min /* sq2[0].minAcc */);
+										iSScount, sq2[0].Time01, g_min /* sq2[0].minAcc */);
 
 								fprintf(fp2gmin, "\n");
 							}
@@ -4245,7 +4433,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 	else strcpy(TmpStr, "**Unknown**");
 
 
-	fprintf(stderr,"  %s values location (%s) checking... \n", TmpStr, shi_inp );
+	fprintf(stderr,"  %s values location (%s) checking... \r", TmpStr, shi_inp );
 	memset( mValue, 0x00, sizeof(mValue) );
 	memset( msTime, 0x00, sizeof(msTime) );
 	memset( iNum, 0x00, sizeof(iNum) );
@@ -5127,7 +5315,7 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 			ierr = ferror(inpfile);
 			fclose(inpfile);
 			fprintf(stderr,"----------------------------------------------------------------------------------\n" );
-			fprintf(stderr,">>Shift Quality Init condition check!! %s [%s] -> [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, output  );			
+			fprintf(stderr,">>Shift Quality Init condition check!!! %s [%s] -> [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, output  );			
 			break;
 		}
 
@@ -5382,7 +5570,7 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 
 
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
-	fprintf(stderr,">>Shift Quality Data Sorting finished!!! %s \r\n", arrPATs_ModeID[aiPATs05].ModeID ); 			
+	fprintf(stderr,">>Shift Quality Data Sorting finished!!! %s [%s] -> [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, output  ); 		
 
 	fprintf(stderr,">>Final Sorted result file: %s \n", output );
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
@@ -5481,7 +5669,8 @@ int CheckLicense(void)
 #define MAC_ADDR_NUM 		6
 #define MAC_ADDR_LINE_SIZ 	10
 #define HOSTPC_MAC_FILE 	"C:/Temp/ahLic.mac"
-#define HOSTPC_MAC_TEMP 	"C:/Temp/111.tmp"
+#define HOSTPC_MAC_TEMP 	"C:/Temp/tmp111.tmp"
+#define HOSTPC_SEND2ME 		"./send2me.gil"
 #define HOSTPC_LICENSE 		"./shift.lic"
 #define LICENSE_LEN 		128
 
@@ -5516,7 +5705,7 @@ int CheckLicense(void)
 	else
 	{
 	
-		if( 0 != remove( "./send2me.gil" ) )
+		if( 0 != remove( HOSTPC_SEND2ME ) )
 		{
 			//fprintf(stderr,"  Deleted temp file -> Failed \n");
 		}
@@ -5525,6 +5714,11 @@ int CheckLicense(void)
 		memset( LicFile, 0x00, sizeof(LicFile) );	
 		do {
 			fscanf(fr, "%s", LicFile[ii] );
+			if(LicFile[ii][0] == ' ' || LicFile[ii][0] == '\0' || LicFile[ii][0] == '\r' || LicFile[ii][0] == '\n' ) 
+			{
+				LicFile[ii][0] = '\0';
+				break;
+			}
 			//fprintf(stderr, "%d -> %s\n", ii, LicFile[ii]);
 			if(ii++ > MAC_ADDR_LINE_SIZ) break;
 		} while (!feof (fr));
@@ -5536,16 +5730,16 @@ int CheckLicense(void)
 	//fprintf(stderr, "fres = %d \n", fres );
 	if(0==fres)
 	{				
-		re = system("getmac > C:/Temp/111.tmp");
+		re = system("getmac > C:/Temp/tmp111.tmp");
 		if( 0!=re )
 		{
-			fprintf(stderr,"License temp check needed.. \n\n");
+			fprintf(stderr,"\r\nLicense check needed.. \n\n");
 			exit(0);
 		}
 
 		if( NULL == (fi = fopen( HOSTPC_MAC_TEMP, "rb")) ) 
 		{
-			fprintf(stderr,"\nCan not read temp file... \n\n");
+			fprintf(stderr,"\nCan not read license related file... \n\n");
 			exit(0);
 		}
 		else
@@ -5578,7 +5772,7 @@ int CheckLicense(void)
 			
 			if(i >= MAC_BUF_SIZ)
 			{
-				fprintf(stderr,"ERROR:Not enough Buffer length---(%u) \r\n", i );
+				fprintf(stderr,"\r\nERROR:Not enough Buffer length---(%u) \n\n", i );
 			}
 
 			if (--i > 0)
@@ -5640,12 +5834,13 @@ int CheckLicense(void)
 
 			if( NULL == (fi = fopen( HOSTPC_MAC_FILE, "rb")) ) 
 			{
-				fprintf(stderr,"\n++ERROR++:Can not read temp Lic file \n\n");
+				fprintf(stderr,"\r\n++ERROR++:Can not read temp Lic file \n\n");
 				exit(0);
 			}
 
 
-			iret = 0; 
+			memset(sha3digestTxt, 0x00, sizeof(sha3digestTxt) ); // initialized
+			iret = 0x8000; 
 			kll = 0UL;
 			licOk = 0;
 			//while((ll = fread(sha3Buf, 15, sizeof(sha3Buf), fi)) > 0) 
@@ -5673,20 +5868,20 @@ int CheckLicense(void)
 
 				for(ii=0; ii<MAC_ADDR_LINE_SIZ; ii++)
 				{
+					if( ll <= 0 ) break;
 					if( LicFile[ii][0] == '\0' || LicFile[ii][0]=='\n' || LicFile[ii][0]=='\r' ) 
 					{
-						//fprintf(stderr,"NULL break.1.. %d \n", ii);
+						LicFile[ii][0] = '\0';
 						break;
 					}
 
 					if( 0==strncmp(sha3digestTxt, &LicFile[ii][4], LICENSE_LEN ) ) 
 					{
 						licOk ++;
-						iret=0x8000;
-						//printf("1St -- Same OK index: %d \n", ii);
 					}
 				}
 				iret += licOk;
+				memset(sha3digestTxt, 0x00, sizeof(sha3digestTxt) ); // initialized
 			} while (!feof (fi));
 			if(fi) fclose(fi);
 			if(fo) fclose(fo);
@@ -5728,7 +5923,8 @@ int CheckLicense(void)
 		}
 
 
-		iret = 0; 
+		memset(sha3digestTxt, 0x00, sizeof(sha3digestTxt) ); // initialized
+		iret = 0x4000; 
 		kll = 0UL;
 		licOk = 0;
 		//while((ll = fread(sha3Buf, 15, sizeof(sha3Buf), fi)) > 0) 
@@ -5754,36 +5950,33 @@ int CheckLicense(void)
 
 			//if(outfile) fprintf(outfile,"%s", sha3digestTxt);
 			//printf("[%s] \r\n", sha3digestTxt  );
+			//fprintf(stderr,"%s -> ", sha3Buf );
 
 			for(ii=0; ii<MAC_ADDR_LINE_SIZ; ii++)
 			{
+				if( ll <= 0 ) break;
 				if( LicFile[ii][0] == '\0' || LicFile[ii][0]=='\n' || LicFile[ii][0]=='\r' ) 
 				{
-					//fprintf(stderr,"NULL break.2..  %d \n", ii);
+					LicFile[ii][0] = '\0';
 					break;
 				}
 				if( 0==strncmp(sha3digestTxt, &LicFile[ii][4], LICENSE_LEN) ) 
 				{
 					licOk++;
-					iret=0x4000;
-					//printf("2nd -- Same OK index: %d \n", ii);
+					//fprintf(stderr, "2nd -- Same OK: %d %s \n", ii, LicFile[ii]);
 				}
 			}
-			iret += licOk;			
+			iret += licOk;
+			memset(sha3digestTxt, 0x00, sizeof(sha3digestTxt) ); // initialized
+
 		} while (!feof (fi));
 		if(fi) fclose(fi);
 		if(fo) fclose(fo);
 		if(fr) fclose(fr);
 
-	#if 0
-		if( iret ) 
-		{
-			fprintf(stderr," ------->> Licensed OK on the PC.. (%#x) \n", iret);
-			fprintf(stderr,"---------------------------------------------------------------\n" );
-		}
-	#endif
 		return iret; /* License OK */
 	}
+
 
 	if(fi) fclose(fi);
 	if(fo) fclose(fo);
@@ -6274,7 +6467,7 @@ int main(int argc, char *argv[])
 	{
 		// License OK~~
 		//fprintf(stderr,"\n");		
-		fprintf(stderr," ------->> Licensed OK on the PC... (%#x) \n", iret);
+		fprintf(stderr," --->> Acquired the License on the PC... (%#x) \n", iret);
 		fprintf(stderr,"---------------------------------------------------------------\n" );
 	}
 	else
@@ -8490,8 +8683,7 @@ int main(int argc, char *argv[])
 
 					if(itmpFileDeleted) 
 					{
-						//fprintf(stderr,"\n");
-						fprintf(stderr," -- temp files to be deleted..."); 
+						fprintf(stderr," - temp files will be deleted."); 
 					}
 					
 					for(kk=1; kk<iTCnt; kk++)
@@ -8506,16 +8698,17 @@ int main(int argc, char *argv[])
 						case 1:
 							// 3>> SB repoint : SB decision times
 							iSBdecision = atoi( str_ShiftOp[kk] ); 
-							if(iSBdecision<10)
+							if(iSBdecision < SB_DECISION_MAX_TIMES)
 							{
 								fprintf(stderr,"\n");
-								fprintf(stderr,">>SB decision Num  : <<%d>> %d (SB decision times, default:3 times)", kk, iSBdecision ); 
+								fprintf(stderr,">>SB decision Num  : <<%d>> %d times (SB decision, default:3 times)", kk, iSBdecision ); 
 							}
 							else
 							{
 								fprintf(stderr,"\n");
-								fprintf(stderr,">>SB decision Num  : <<%d>> %d - Warning: Too many number... Max 9", kk, iSBdecision ); 
+								fprintf(stderr,">>SB decision Num  : <<%d>> %d - Warning: Too many number... Max %d", kk, iSBdecision, SB_DECISION_MAX_TIMES-1 ); 
 								fprintf(stderr,"\r\n\n");
+								AllFilesClosed();
 								exit(0);
 							}
 							break;
@@ -8523,8 +8716,19 @@ int main(int argc, char *argv[])
 						case 2:
 							// 4>> Jerk#1
 							iJerkTimeLen = atoi( str_ShiftOp[kk] ); 
-							fprintf(stderr,"\n");
-							fprintf(stderr,">>Jerk Time Length : <<%d>> %d msec (unit: msec)", kk, iJerkTimeLen ); 
+							if(iJerkTimeLen <= JERK_MAX_TIME_mSec)
+							{
+								fprintf(stderr,"\n");
+								fprintf(stderr,">>Jerk Time Length : <<%d>> %d msec (unit: msec)", kk, iJerkTimeLen ); 
+							}
+							else
+							{
+								fprintf(stderr,"\n");
+								fprintf(stderr,">>Jerk Time Length : <<%d>> %d msec - Warning: Too much previous time. Max %d msec", kk, iJerkTimeLen, JERK_MAX_TIME_mSec ); 
+								fprintf(stderr,"\r\n\n");
+								AllFilesClosed();
+								exit(0);
+							}
 							break;
 
 						case 3: /* Power On/Off  APS Level */
@@ -8544,8 +8748,6 @@ int main(int argc, char *argv[])
 							fprintf(stderr,"\n");
 							fprintf(stderr,">>APS Tolerance    : <<%d>> %.1lf -- default(-/+1.0)", kk, fAPStol ); 
 							break;
-
-
 						case 5:							
 							aps1 = atoi( str_ShiftOp[kk] ); 
 							fprintf(stderr,"\n");
@@ -12834,9 +13036,9 @@ int main(int argc, char *argv[])
 		if( 0==isNaming ) strcat(shi_ori, ".");
 
 		printf("\r\n");
-		fprintf(stderr,"---------------------------------------------------------------\n" );
+		fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 		fprintf(stderr,"Shift Quality Data Sorting --> UP Shift...   \n");
-		fprintf(stderr,"---------------------------------------------------------------\n" );
+		fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
 
 		// --------------------------------------------------------
@@ -12995,52 +13197,6 @@ int main(int argc, char *argv[])
 		// 7th temp file deleted!! --------------------------------
 		tempFileDeleteIt(itmpFileDeleted, iModeID, ichk);
 
-		#if 0
-		if(itmpFileDeleted)
-		{
-			// -------------------------------------------------------------
-			ii = remove( infile );
-			if( 0 != ii )
-				fprintf(stderr,"  Deleted temp file [%s] -> Failed(%d) \n", infile, ii );
-
-			if(ichk)
-			{
-				strcpy(shi_out, shi_ori);
-				strcat(shi_out,	"c");
-				strcat(shi_out, arrPATs_ModeID[iModeID].ModeNm);
-
-				ii = remove( shi_out );
-				if( 0 != ii )
-					fprintf(stderr,"  Deleted temp file [%s] -> Failed(%d) \n", shi_out, ii );
-			}
-
-			strcpy(shi_out, shi_ori);
-			strcat(shi_out, "d");
-			strcat(shi_out, arrPATs_ModeID[iModeID].ModeNm);
-			
-			ii = remove( shi_out );
-			if( 0 != ii )
-				fprintf(stderr,"  Deleted temp file [%s] -> Failed(%d) \n", shi_out, ii );
-
-			strcpy(shi_out, shi_ori);
-			strcat(shi_out,	"z");
-			strcat(shi_out, arrPATs_ModeID[iModeID].ModeNm);
-
-			ii = remove( shi_out );
-			if( 0 != ii )
-				fprintf(stderr,"  Deleted temp file [%s] -> Failed(%d) \n", shi_out, ii );
-
-			// -------------------------------------------------------------
-			strcpy(shi_out, shi_ori);
-			strcat(shi_out, arrPATs_ModeID[iModeID].ModeNm);
-
-			ii = remove( shi_out );
-			if( 0 != ii )
-				fprintf(stderr,"  Deleted temp file [%s] -> Failed(%d) \n", shi_out, ii );
-
-			//fprintf(stderr,"----------------------------------------------------------------------------------\n" );
-		}
-		#endif
 
 
 
@@ -13048,9 +13204,9 @@ int main(int argc, char *argv[])
 	else if( (1==isDownShift) && (1==isShift) )
 	{
 		printf("\r\n");
-		fprintf(stderr,"---------------------------------------------------------------\n" );
+		fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 		fprintf(stderr,"Shift Quality Data Sorting --> DOWN Shift...   \n");
-		fprintf(stderr,"---------------------------------------------------------------\n" );
+		fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
 
 
