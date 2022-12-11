@@ -1368,7 +1368,9 @@ typedef struct _tGear_ {
 #define PWR_OFF_67S 	27
 #define PWR_OFF_78S 	28
 
-const tGear_type arrGear[162] = {
+#define GEAR_SHI_NUMS 			162
+
+const tGear_type arrGear[GEAR_SHI_NUMS] = {
 		{  0, 	"(sN)"    },
 		{  1,	"(s1)"    },
 		{  2,	"(s2)"    },
@@ -1648,10 +1650,10 @@ const tPATs_ModeType arrPATs_ModeID[MODE_ID_NUMS] = {
 
 typedef struct _SBTimePosition_ {
 	unsigned int Index;
-	unsigned int SSTime;
-	unsigned int SBTime;
-	unsigned int gmMxBegin; /* Defalt Value : before 300 msec */
-	unsigned int SPTime;
+	unsigned long long SSTime;
+	unsigned long long SBTime;
+	unsigned long long gmMxBegin; /* Defalt Value : before 300 msec */
+	unsigned long long SPTime;
 } tSBtimePos_type;
 
 tSBtimePos_type  gMaxStart[MAX_TABLE_SIZ]; /* gMax Start Time Position for Jerk1 Calculation */
@@ -1708,6 +1710,119 @@ short vsKPHTableIndex(void)
 }
 
 
+typedef enum _gear_shift_type_ {
+	GEAR_SHI_NONE = 0,
+	GEAR_POWER_ON = 1,
+	GEAR_POWER_OFF = 2,
+	GEAR_PWRON_MAN = 3, // GEAR_POWER_ON_MANUAL 
+	GEAR_NEAR2STOP = 4,
+	GEAR_RETURN_SHI = 5,
+	GEAR_CURRENT   = 6,
+	GEAR_OTHER     = 7,
+
+	GEAR_MAX_NUM = 0xfe
+} eGearShi_enumType;
+
+typedef struct _gearShiKind_ {
+	short 	eGearMode;
+	char 	szModeTxt[10];
+	short 	iStart1;
+	short 	iEnd1;
+	short 	iStart2;
+	short 	iEnd2;
+	short 	iStart3;
+	short 	iEnd3;
+	short 	iStart4;
+	short 	iEnd4;
+	unsigned long long lSum;
+} tGearShi_type;
+
+tGearShi_type gMode[10] = {
+	{ GEAR_SHI_NONE,		"(****)",	  0, -1,   0, -1,   0, -1,  0, -1, 0ULL },
+	{ GEAR_POWER_ON, 		"(s**Z)",    15, 21,  36, 42,  57, 73,  0, -1, 0ULL }, /* Power On	(s**Z), 15~21,	36~42,	57~73 */
+	{ GEAR_POWER_OFF, 		"(s**S)",    22, 28,  43, 49,  74, 79,  0, -1, 0ULL }, /* Power Off	(s**S), 22~28,  43~49,  74~79 */
+	{ GEAR_PWRON_MAN, 		"(s**MZ)",   29, 35,  50, 56,  80, 85,  0, -1, 0ULL }, /* Power On Manual (s**MZ) 29~35, 80~85, 50~56 */
+	{ GEAR_NEAR2STOP,		"(s**R)",    86, 98,   0, -1,   0, -1,  0, -1, 0ULL }, /* Near to Stop (s**R) 86~98 */
+	{ GEAR_RETURN_SHI,		"(s***)",    99,123,   0, -1,   0, -1,  0, -1, 0ULL }, /* Return Shift (s???) 99~123 */
+	{ GEAR_CURRENT,			"(s*)",		  0, 10,   0, -1,	0, -1,	0, -1, 0ULL }, /* Return Shift (s???) 99~123 */
+	{ GEAR_OTHER,			"(s@^#)",	124,160,   11, 14,   0, -1,  0, -1, 0ULL }, /* Return Shift (s???) 99~123 */
+};
+
+unsigned long long Find_GearMode( unsigned long long *gShift, short iChoice )
+{
+	short ii=0;
+	unsigned int lTotalNums = 0;
+	unsigned int lPowerOnNums = 0;
+	unsigned int lPowerOffNums = 0;
+	unsigned int lPwrOnManualNums = 0;
+	unsigned int lnear2stopNums = 0;
+	unsigned int lreturnShiNums = 0;
+	unsigned int lcurrGearNums = 0;
+	unsigned int lotherNums = 0;
+	
+	lTotalNums = 0U;
+	for(ii=0; ii<GEAR_SHI_NUMS; ii++) lTotalNums += gShift[ii];
+	
+	lPowerOnNums = 0U;
+	for(ii=gMode[GEAR_POWER_ON].iStart1; ii<=gMode[GEAR_POWER_ON].iEnd1; ii++) lPowerOnNums += gShift[ii];
+	for(ii=gMode[GEAR_POWER_ON].iStart2; ii<=gMode[GEAR_POWER_ON].iEnd2; ii++) lPowerOnNums += gShift[ii];
+	for(ii=gMode[GEAR_POWER_ON].iStart3; ii<=gMode[GEAR_POWER_ON].iEnd3; ii++) lPowerOnNums += gShift[ii];
+	gMode[GEAR_POWER_ON].lSum = lPowerOnNums;
+	
+
+	lPowerOffNums = 0U;
+	for(ii=gMode[GEAR_POWER_OFF].iStart1; ii<=gMode[GEAR_POWER_OFF].iEnd1; ii++) lPowerOffNums += gShift[ii];
+	for(ii=gMode[GEAR_POWER_OFF].iStart2; ii<=gMode[GEAR_POWER_OFF].iEnd2; ii++) lPowerOffNums += gShift[ii];
+	for(ii=gMode[GEAR_POWER_OFF].iStart3; ii<=gMode[GEAR_POWER_OFF].iEnd3; ii++) lPowerOffNums += gShift[ii];
+	gMode[GEAR_POWER_OFF].lSum = lPowerOffNums;
+	
+	lPwrOnManualNums = 0U;
+	for(ii=gMode[GEAR_PWRON_MAN].iStart1; ii<=gMode[GEAR_PWRON_MAN].iEnd1; ii++) lPwrOnManualNums += gShift[ii];
+	for(ii=gMode[GEAR_PWRON_MAN].iStart2; ii<=gMode[GEAR_PWRON_MAN].iEnd2; ii++) lPwrOnManualNums += gShift[ii];
+	for(ii=gMode[GEAR_PWRON_MAN].iStart3; ii<=gMode[GEAR_PWRON_MAN].iEnd3; ii++) lPwrOnManualNums += gShift[ii];
+	gMode[GEAR_PWRON_MAN].lSum = lPwrOnManualNums;
+	
+	lnear2stopNums = 0U;
+	for(ii=gMode[GEAR_NEAR2STOP].iStart1; ii<=gMode[GEAR_NEAR2STOP].iEnd1; ii++) lnear2stopNums += gShift[ii];
+	for(ii=gMode[GEAR_NEAR2STOP].iStart2; ii<=gMode[GEAR_NEAR2STOP].iEnd2; ii++) lnear2stopNums += gShift[ii];
+	for(ii=gMode[GEAR_NEAR2STOP].iStart3; ii<=gMode[GEAR_NEAR2STOP].iEnd3; ii++) lnear2stopNums += gShift[ii];
+	gMode[GEAR_NEAR2STOP].lSum = lnear2stopNums;
+	
+	lreturnShiNums = 0U;
+	for(ii=gMode[GEAR_RETURN_SHI].iStart1; ii<=gMode[GEAR_RETURN_SHI].iEnd1; ii++) lreturnShiNums += gShift[ii];
+	for(ii=gMode[GEAR_RETURN_SHI].iStart2; ii<=gMode[GEAR_RETURN_SHI].iEnd2; ii++) lreturnShiNums += gShift[ii];
+	for(ii=gMode[GEAR_RETURN_SHI].iStart3; ii<=gMode[GEAR_RETURN_SHI].iEnd3; ii++) lreturnShiNums += gShift[ii];
+	gMode[GEAR_RETURN_SHI].lSum = lreturnShiNums;
+
+	lcurrGearNums = 0U;
+	for(ii=gMode[GEAR_CURRENT].iStart1; ii<=gMode[GEAR_CURRENT].iEnd1; ii++) lcurrGearNums += gShift[ii];
+	for(ii=gMode[GEAR_CURRENT].iStart2; ii<=gMode[GEAR_CURRENT].iEnd2; ii++) lcurrGearNums += gShift[ii];
+	for(ii=gMode[GEAR_CURRENT].iStart3; ii<=gMode[GEAR_CURRENT].iEnd3; ii++) lcurrGearNums += gShift[ii];
+	gMode[GEAR_CURRENT].lSum = lcurrGearNums;
+
+	lotherNums = 0U;
+	for(ii=gMode[GEAR_OTHER].iStart1; ii<=gMode[GEAR_OTHER].iEnd1; ii++) lotherNums += gShift[ii];
+	for(ii=gMode[GEAR_OTHER].iStart2; ii<=gMode[GEAR_OTHER].iEnd2; ii++) lotherNums += gShift[ii];
+	for(ii=gMode[GEAR_OTHER].iStart3; ii<=gMode[GEAR_OTHER].iEnd3; ii++) lotherNums += gShift[ii];
+	gMode[GEAR_OTHER].lSum = lotherNums;
+
+
+	fprintf(stderr,"  Quality Shift Records -------: %9u lines - Total lines \n", lTotalNums);
+	fprintf(stderr,"    POWER On Counts-%-8s   : %9u lines \n", gMode[GEAR_POWER_ON].szModeTxt, gMode[GEAR_POWER_ON].lSum );
+	fprintf(stderr,"    POWER Off Counts-%-8s  : %9u lines \n", gMode[GEAR_POWER_OFF].szModeTxt, gMode[GEAR_POWER_OFF].lSum );
+	fprintf(stderr,"    PwrON Man Counts-%-8s  : %9u lines \n", gMode[GEAR_PWRON_MAN].szModeTxt, gMode[GEAR_PWRON_MAN].lSum );
+	fprintf(stderr,"    Near2Stop Counts-%-8s  : %9u lines \n", gMode[GEAR_NEAR2STOP].szModeTxt, gMode[GEAR_NEAR2STOP].lSum );
+	fprintf(stderr,"    Return Shi Counts-%-8s : %9u lines \n", gMode[GEAR_RETURN_SHI].szModeTxt, gMode[GEAR_RETURN_SHI].lSum );
+	fprintf(stderr,"    Curr Gear Counts-%-8s  : %9u lines \n", gMode[GEAR_CURRENT].szModeTxt, gMode[GEAR_CURRENT].lSum );
+	fprintf(stderr,"    Others Counts-%-8s     : %9u lines \n", gMode[GEAR_OTHER].szModeTxt, gMode[GEAR_OTHER].lSum );
+	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
+
+	if(iChoice>GEAR_SHI_NONE && iChoice<=GEAR_OTHER)
+		return(gMode[iChoice].lSum);
+	else
+		return 0;
+}
+
 
 unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigned int *SScnt, unsigned int *SBcnt, unsigned int *SPcnt, unsigned int *SBswingcnt)
 {
@@ -1738,8 +1853,9 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 	int result;
 	unsigned long long RecordCnt=0ULL;
 
-	unsigned long long chkPATs_ModeID[MODE_ID_NUMS] = {0UL,};
+	unsigned long long chkPATs_ModeID[MODE_ID_NUMS] = {0ULL,};
 	unsigned int totChkModeID = 0;
+	unsigned long long gearShift[GEAR_SHI_NUMS] = {0ULL,};
 
 	unsigned int iNGcount = 0;
 	unsigned int iOKcount = 0;
@@ -1783,6 +1899,8 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 	memset(QualData, 0x00, QUAL_DATA_MAX_SIZE*sizeof(char) );
 	memset(sq, 0x00, sizeof(sq) );
 	memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
+	memset(gearShift, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
+
 	//memset(iSBnewPoint, 0x00, sizeof(iSBnewPoint) );
 
 	memset(SBdecision, 0x00, SB_DECISION_NUM*sizeof(short) );
@@ -1944,7 +2062,9 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 			/* === 1 STEP : record (17 items check) =============== */
 
 
-			chkPATs_ModeID[ sq[0].iPATs05 ]++; /* ModeID Counts */
+			chkPATs_ModeID[ sq[0].iPATs05 ] ++; /* ModeID Counts */
+
+			gearShift[ sq[0].ShiTy12 ] ++;
 
 			/* === 2 STEP : SKIP record check ===================== */
 			if(iItemCurOK)
@@ -2436,6 +2556,8 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 	fprintf(stderr,"     SB Point Counts--%-8s : %9u lines \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), iSBcount );
 	fprintf(stderr,"     SP Point Counts--%-8s : %9u lines \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), iSPcount );
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
+
+	Find_GearMode( gearShift, GEAR_POWER_ON );
 
 	*SScnt = iSScount;
 	*SBcnt = iSBcount;
@@ -5840,7 +5962,7 @@ int CheckLicense(void)
 
 
 			memset(sha3digestTxt, 0x00, sizeof(sha3digestTxt) ); // initialized
-			iret = 0x8000; 
+			iret = 0; 
 			kll = 0UL;
 			licOk = 0;
 			//while((ll = fread(sha3Buf, 15, sizeof(sha3Buf), fi)) > 0) 
@@ -5878,11 +6000,13 @@ int CheckLicense(void)
 					if( 0==strncmp(sha3digestTxt, &LicFile[ii][4], LICENSE_LEN ) ) 
 					{
 						licOk ++;
+						iret = 0x8000; 
 					}
 				}
-				iret += licOk;
 				memset(sha3digestTxt, 0x00, sizeof(sha3digestTxt) ); // initialized
 			} while (!feof (fi));
+			iret += licOk;
+
 			if(fi) fclose(fi);
 			if(fo) fclose(fo);
 			if(fr) fclose(fr);
@@ -5924,7 +6048,7 @@ int CheckLicense(void)
 
 
 		memset(sha3digestTxt, 0x00, sizeof(sha3digestTxt) ); // initialized
-		iret = 0x4000; 
+		iret = 0; 
 		kll = 0UL;
 		licOk = 0;
 		//while((ll = fread(sha3Buf, 15, sizeof(sha3Buf), fi)) > 0) 
@@ -5962,14 +6086,16 @@ int CheckLicense(void)
 				}
 				if( 0==strncmp(sha3digestTxt, &LicFile[ii][4], LICENSE_LEN) ) 
 				{
+					iret = 0x4000; 
 					licOk++;
 					//fprintf(stderr, "2nd -- Same OK: %d %s \n", ii, LicFile[ii]);
 				}
 			}
-			iret += licOk;
 			memset(sha3digestTxt, 0x00, sizeof(sha3digestTxt) ); // initialized
 
 		} while (!feof (fi));
+		iret += licOk;
+
 		if(fi) fclose(fi);
 		if(fo) fclose(fo);
 		if(fr) fclose(fr);
