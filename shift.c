@@ -5782,7 +5782,69 @@ int tempFileDeleteIt(short YesNo, short iModeID, int ichk)
 #endif /* SHIFT_QUALITY_DATA_SORTING */
 
 
+void FileSearch(char file_path[], char *findPath)
+{
+	struct _finddata_t fd;
+	intptr_t handle;
+	int check = 0;
+	char file_path2[_MAX_PATH];
 
+	memset(file_path2, 0x00, sizeof(file_path2));
+	memset( findPath, 0x00, sizeof(findPath) );
+
+	strcat(file_path, "\\");
+	strcpy(file_path2, file_path);
+	strcat(file_path, "*.*");
+ 
+	if ((handle = _findfirst(file_path, &fd)) == -1)
+	{
+		return;
+	}
+ 
+	while (_findnext(handle, &fd) == 0)
+	{
+		char file_pt[_MAX_PATH];
+		char find[_MAX_PATH] = "\\shiftLicense.gil";
+		int find_sol = 1;
+
+		memset(file_pt, 0x00, sizeof(file_pt) );
+		strcpy(file_pt, file_path2);
+		strcat(file_pt, fd.name);
+
+ 
+		//printf("findfolder : %s [%s] \n", fd.name, file_pt );
+        //check = isFileOrDir();    
+
+		if (fd.attrib & _A_SUBDIR) 
+		{
+			if ( fd.name[0] == '.' && fd.name[1] == '.' )
+			{
+				continue;
+			}
+			else // if ( fd.name[0] != '.' && fd.name[1] != '.' )
+			{
+				//findfolder : All Users [C:\Users\All Users]
+				//findfolder : Default [C:\Users\Default]
+				//findfolder : Default User [C:\Users\Default User]
+				//findfolder : Public [C:\Users\Public]
+				//printf("findfolder : %s [%s] \n", fd.name, file_pt );
+
+				strcat(file_pt, find);
+
+				find_sol = isFileExist(file_pt, 0);
+				if( 1==find_sol /*&& (0==check)*/ )
+				{
+					//printf("FINDIT : [ %s ]  \n", file_pt );
+					strcpy(findPath, file_pt);
+					break;
+				}
+				FileSearch(file_pt, findPath);
+			}
+		}      
+    }
+    _findclose(handle);
+
+}
 
 
 int CheckLicense(void)
@@ -5807,13 +5869,17 @@ int CheckLicense(void)
 	int re = 0, fres, ii=0, licOk=0;
 	unsigned int iOKc=0, iNGc=0, lloop=0;
 	int iret = -10;
-
-
+	char userPath[_MAX_PATH] = "C:\\Users";
+	char findPath[_MAX_PATH]; 
 	///////////////////////////////////////////////////////////
-	memset( LicFile, 0x00, sizeof(LicFile) );	
-	if( NULL == (fr = fopen( HOSTPC_LICENSE, "rb")) ) 
+	memset( LicFile, 0x00, sizeof(LicFile) );
+	memset( findPath, 0x00, sizeof(findPath) );
+	
+ 
+    FileSearch(userPath, findPath);
+	if( NULL == (fr = fopen( findPath /*HOSTPC_LICENSE*/, "rb")) ) 
 	{
-		fprintf(stderr,"\r\nCan not read License file (%s) \n\n", HOSTPC_LICENSE );
+		fprintf(stderr,"\r\nCan not read License file. [%s] / shiftLicense.gil \n\n", findPath /*HOSTPC_LICENSE */ );
 		re = system("getmac > send2me.gil");
 		if( 0!=re )
 		{
