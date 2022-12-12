@@ -808,6 +808,9 @@ void AllFilesClosed(void)
 #define TXT_MXNegX 			"(MXNegX)"
 #define TXT_MXNegm 			"(MXNegm)"
 
+#define TXT_MXNtNegMX 		"(MXNtNe)gX"
+#define TXT_MXNtNegmn 		"(MXNtNe)gm"
+
 #define TXT_NEW_MaxNt 		"(xNt)"
 #define TXT_NEW_MaxNe 		"(xNe)"
 #define TXT_NEW_gMAX 		"(gMax)"
@@ -4806,6 +4809,8 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 								strcpy( sq2[0].sTimePos, TXT_MXNtgX);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_MaxNe) )
 								strcpy( sq2[0].sTimePos, TXT_MXNegX);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_MXNtNe) )  
+								strcpy( sq2[0].sTimePos, TXT_MXNtNegMX);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING0) )
 								strcpy( sq2[0].sTimePos, TXT_SB0_MaxgX);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING1) )
@@ -4873,8 +4878,10 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 								strcpy( sq2[0].sTimePos, TXT_SBmigm);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_MaxNt) )
 								strcpy( sq2[0].sTimePos, TXT_MXNtgm);
-							else if( 0==strcmp(sq2[0].sTimePos, TXT_MaxNe) )
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_MaxNe) )  
 								strcpy( sq2[0].sTimePos, TXT_MXNegm);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_MXNtNe) )  
+								strcpy( sq2[0].sTimePos, TXT_MXNtNegmn);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING0) )
 								strcpy( sq2[0].sTimePos, TXT_SB0_Mingm);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING1) )
@@ -5236,6 +5243,13 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime)
 					gMaxVal  = sq3[0].LAcc17;
 					//fprintf(stderr, "==TXT_MXNegX +++++ %u %d \n", 1000*gMaxTime, ig_min);
 				}
+				else if( 0==strcmp( sq3[0].sTimePos, TXT_MXNtNegMX) ) /* MX Nt&Ne & gX */
+				{
+					ig_Max = 1;
+					gMaxTime = sq3[0].Time01;
+					gMaxVal  = sq3[0].LAcc17;
+					//fprintf(stderr, "==TXT_MXNegX +++++ %u %d \n", 1000*gMaxTime, ig_min);
+				}
 				else if( 0==strcmp( sq3[0].sTimePos, TXT_SB0_MaxgX) ) /* SB0 & gX */
 				{
 					ig_Max = 1;
@@ -5243,6 +5257,8 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime)
 					gMaxVal  = sq3[0].LAcc17;
 					//fprintf(stderr, "==TXT_MXNegX +++++ %u %d \n", 1000*gMaxTime, ig_min);
 				}			
+
+
 
 				//else
 				//{
@@ -5274,6 +5290,13 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime)
 					//fprintf(stderr, "min TXT_MXNtgm ++++ %u %d \n", 1000*(gminTime-gMaxTime), ig_Max);
 				}
 				else if( 0==strcmp( sq3[0].sTimePos, TXT_MXNegm) ) /* MX Ne & g_min */
+				{
+					ig_min = 1;
+					gminTime = sq3[0].Time01;
+					gminVal  = sq3[0].LAcc17;
+					//fprintf(stderr, "min TXT_MXNegm ++++ %u %d \n", 1000*(gminTime-gMaxTime), ig_Max);
+				}
+				else if( 0==strcmp( sq3[0].sTimePos, TXT_MXNtNegmn) ) /* MX Ne & g_min */
 				{
 					ig_min = 1;
 					gminTime = sq3[0].Time01;
