@@ -592,7 +592,7 @@ void help(void)
 
 
 	#if 1
-	exit(0);
+	//exit(0);
 	#else
 	printf("Press [ENTER]...\r");
 	#endif
@@ -1758,7 +1758,7 @@ tGearShi_type gMode[10] = {
 	{ GEAR_OTHER,			"(s@^#)",	124,160,   11, 14,   0, -1,  0, -1, 0ULL }, /* Return Shift (s???) 99~123 */
 };
 
-unsigned long long Find_GearMode( unsigned long long *gShift, short iChoice )
+unsigned long long Find_GearMode( unsigned long long *gShift, short iChoice, unsigned int iavgTime )
 {
 	short ii=0;
 	unsigned int lTotalNums = 0;
@@ -1817,14 +1817,14 @@ unsigned long long Find_GearMode( unsigned long long *gShift, short iChoice )
 	gMode[GEAR_OTHER].lSum = lotherNums;
 
 
-	fprintf(stderr,"  Quality Shift Records -------: %9u lines - Total lines \n", lTotalNums);
-	fprintf(stderr,"    POWER On Counts-%-8s   : %9u lines \n", gMode[GEAR_POWER_ON].szModeTxt, gMode[GEAR_POWER_ON].lSum );
-	fprintf(stderr,"    POWER Off Counts-%-8s  : %9u lines \n", gMode[GEAR_POWER_OFF].szModeTxt, gMode[GEAR_POWER_OFF].lSum );
-	fprintf(stderr,"    PwrON Man Counts-%-8s  : %9u lines \n", gMode[GEAR_PWRON_MAN].szModeTxt, gMode[GEAR_PWRON_MAN].lSum );
-	fprintf(stderr,"    Near2Stop Counts-%-8s  : %9u lines \n", gMode[GEAR_NEAR2STOP].szModeTxt, gMode[GEAR_NEAR2STOP].lSum );
-	fprintf(stderr,"    Return Shift Counts-%-7s: %9u lines \n", gMode[GEAR_RETURN_SHI].szModeTxt, gMode[GEAR_RETURN_SHI].lSum );
-	fprintf(stderr,"    Curr Gear Counts-%-8s  : %9u lines \n", gMode[GEAR_CURRENT].szModeTxt, gMode[GEAR_CURRENT].lSum );
-	fprintf(stderr,"    Others Counts-%-8s     : %9u lines \n", gMode[GEAR_OTHER].szModeTxt, gMode[GEAR_OTHER].lSum );
+	fprintf(stderr,"  Quality Shift Records -------: %9u lines, %6.1f min - Total lines \n", lTotalNums, (double)(lTotalNums*iavgTime)/1000.0/60 );
+	fprintf(stderr,"    POWER On Counts-%-8s   : %9u lines, %6.1f min \n", gMode[GEAR_POWER_ON].szModeTxt, gMode[GEAR_POWER_ON].lSum, (double)(gMode[GEAR_POWER_ON].lSum*iavgTime)/1000.0/60 );
+	fprintf(stderr,"    POWER Off Counts-%-8s  : %9u lines, %6.1f min \n", gMode[GEAR_POWER_OFF].szModeTxt, gMode[GEAR_POWER_OFF].lSum, (double)(gMode[GEAR_POWER_OFF].lSum*iavgTime)/1000/60 );
+	fprintf(stderr,"    PwrON Man Counts-%-8s  : %9u lines, %6.1f min \n", gMode[GEAR_PWRON_MAN].szModeTxt, gMode[GEAR_PWRON_MAN].lSum, (double)(gMode[GEAR_PWRON_MAN].lSum*iavgTime)/1000/60 );
+	fprintf(stderr,"    Near2Stop Counts-%-8s  : %9u lines, %6.1f min \n", gMode[GEAR_NEAR2STOP].szModeTxt, gMode[GEAR_NEAR2STOP].lSum, (double)(gMode[GEAR_NEAR2STOP].lSum*iavgTime)/1000/60 );
+	fprintf(stderr,"    Return Shift Counts-%-7s: %9u lines, %6.1f min \n", gMode[GEAR_RETURN_SHI].szModeTxt, gMode[GEAR_RETURN_SHI].lSum, (double)(gMode[GEAR_RETURN_SHI].lSum*iavgTime)/1000/60 );
+	fprintf(stderr,"    Curr Gear Counts-%-8s  : %9u lines, %6.1f min \n", gMode[GEAR_CURRENT].szModeTxt, gMode[GEAR_CURRENT].lSum, (double)(gMode[GEAR_CURRENT].lSum*iavgTime)/1000/60 );
+	fprintf(stderr,"    Others Counts-%-8s     : %9u lines, %6.1f min \n", gMode[GEAR_OTHER].szModeTxt, gMode[GEAR_OTHER].lSum, (double)(gMode[GEAR_OTHER].lSum*iavgTime)/1000.0/60 );
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
 	if(iChoice>GEAR_SHI_NONE && iChoice<=GEAR_OTHER)
@@ -1971,7 +1971,13 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 	fprintf(stderr,">>Shift Type       : %s \n", (iShiftType==SHI_PWR_ON?"PWR On":(iShiftType==SHI_PWR_OFF?"PWR Off":(iShiftType==SHI_STATIC?"Static":(iShiftType==SHI_N_STOP_DN?"Stop Dn":"Unknown")))) );
 	fprintf(stderr,">>Shift Direction  : Shift %s \n", (shiDir03==SHIFT_UP?"UP":(shiDir03==SHIFT_DN?"DOWN": \
 		(shiDir03==SHIFT_SKIP_DN?"SkipDown":(shiDir03==SHIFT_SKIP_UP?"SkipUp":"Unknown"))) ));			
-	fprintf(stderr,">>SB decision Num  : %d times, such as %s.%s.%s \n", iSBdecision, TXT_SBSWING0, TXT_SBSWING0, TXT_SBTIME );
+	if(iSBdecision>=3)
+		fprintf(stderr,">>SB decision Num  : %d times, such as %s.%s..%s \n", iSBdecision, TXT_SBSWING0, TXT_SBSWING0, TXT_SBTIME );
+	else if(iSBdecision==2)
+		fprintf(stderr,">>SB decision Num  : %d times, such as %s.%s \n", iSBdecision, TXT_SBSWING0, TXT_SBTIME );
+	else if(iSBdecision<=1)
+		fprintf(stderr,">>SB decision Num  : %d times \n", iSBdecision );
+
 	fprintf(stderr,">>Jerk Time length : %d msec ~ (SB point) ~ %d msec \n", iJerkTimeLen, 5*SB_POINT_COUNT_NUM );
 	/* ===================================================================================== */
 
@@ -2534,6 +2540,10 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
  	}
 	avg_t1 /= (iSPcount+1);
 	avg_t2 /= (iSPcount+1);
+
+	iavgTime = (unsigned int)(avgTime/avgCount);
+
+	
 	//fprintf(stderr, "** %2d -> %10llu  %10llu \n", ii, avg_t1, avg_t2 );
 	
 	//fprintf(stderr,"----------------------------------------------------------------------------------\n" );
@@ -2543,12 +2553,12 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 	fprintf(stderr,">>Quality Shift Data Sorting Summary... %s \n", arrPATs_ModeID[aiPATs05].ModeID );
-	fprintf(stderr,"  Shift Data Time Period ------: %9u msec \n", (unsigned int)(avgTime/avgCount) );
+	fprintf(stderr,"  Shift Data Time Period ------: %9u msec \n", iavgTime );
 	fprintf(stderr,"  Shift Average Time(t1:SS~SB)-: %9llu msec \n", avg_t1 );
 	fprintf(stderr,"  Shift Average Time(t2:SB~SP)-: %9llu msec \n", avg_t2 );
 	fprintf(stderr,"  Total Quality Shift Records -: %9llu lines \n", RecordCnt );
 	fprintf(stderr,"  Error Shift Records (NG) ----: %9u lines <- ignored shift data. \n", iNGcount );
-	fprintf(stderr,"  Quality Shift Records (OK) --: %9u lines \n", iOKcount );
+	fprintf(stderr,"  Quality Shift Records (OK) --: %9u lines, %6.1lf min \n", iOKcount, (double)(iOKcount*iavgTime)/1000.0/60 );
 
 
 	totChkModeID = 0;
@@ -2556,7 +2566,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 	{
 		if( chkPATs_ModeID[ii] > 0UL )
 		{
-			fprintf(stderr,"    %3u:%-22s : %9lu lines %s \n", ii, arrPATs_ModeID[ii].ModeID, chkPATs_ModeID[ii], (aiPATs05==ii?"* Used":" ") );
+			fprintf(stderr,"    %3u:%-22s : %9lu lines, %6.1lf min  %s \n", ii, arrPATs_ModeID[ii].ModeID, chkPATs_ModeID[ii], (double)(chkPATs_ModeID[ii]*iavgTime)/1000.0/60, (aiPATs05==ii?"* Used":" ") );
 			totChkModeID += chkPATs_ModeID[ii];
 		}
 	}
@@ -2567,14 +2577,12 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 	fprintf(stderr,"     SP Point Counts--%-8s : %9u lines \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), iSPcount );
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
-	Find_GearMode( gearShift, GEAR_POWER_ON );
+	Find_GearMode( gearShift, GEAR_POWER_ON, iavgTime );
 
 	*SScnt = iSScount;
 	*SBcnt = iSBcount;
 	*SPcnt = iSPcount;
 	*SBswingcnt = iSBswingCnt;
-
-	iavgTime = (unsigned int)(avgTime/avgCount);
 
 
 	return iavgTime;
@@ -6650,11 +6658,7 @@ int main(int argc, char *argv[])
 	------------------------------------------------------------------------*/
 
 
-#if 1 
 	while( EOF != (opt = getopt_long(argc, argv, strOpt, long_options, &option_index)) ) 
-#else
-	while( EOF != (opt = getopt(argc, argv, strOpt) ) ) 
-#endif
 	{
 
 		switch(opt) 
@@ -8860,7 +8864,7 @@ int main(int argc, char *argv[])
 						case 1:
 							// 3>> SB repoint : SB decision times
 							iSBdecision = atoi( str_ShiftOp[kk] ); 
-							if(iSBdecision < SB_DECISION_MAX_TIMES)
+							if( (iSBdecision < SB_DECISION_MAX_TIMES) || (iSBdecision >= 0) )
 							{
 								fprintf(stderr,"\n");
 								fprintf(stderr,">>SB decision Num  : <<%d>> %d times (SB decision, default:3 times)", kk, iSBdecision ); 
