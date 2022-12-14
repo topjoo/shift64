@@ -3208,6 +3208,11 @@ int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsig
 	}
 
 
+#if SAVEMODE
+	if(fp2chk)
+	fprintf(fp2chk, TITLE_SHI1 "\n");
+#endif
+
 	{
 		unsigned long long avg_t1=0ULL, avg_t2 = 0ULL;
 
@@ -5848,7 +5853,7 @@ int CheckLicense(void)
 	FILE *fr = NULL;
 	
 	unsigned char macAdd[MAC_ADDR_LINE_SIZ][7];
-	unsigned char LicFile[MAC_ADDR_LINE_SIZ][MAC_BUF_SIZ] = {0,};
+	char LicFile[MAC_ADDR_LINE_SIZ][MAC_BUF_SIZ] = {0,};
 	int result;
 	int re = 0, fres, ii=0, licOk=0;
 	unsigned int iOKc=0, iNGc=0, lloop=0;
@@ -6354,7 +6359,7 @@ int main(int argc, char *argv[])
 	char str_help[MAX_CHARS+1];
 	char str_BMPType[MAX_CHARS+1];
 	char str_hash[MAX_CHARS+1];
-	unsigned char str_float[MAX_CHARS*LENGTH_OF_FILENAME+1];
+	char str_float[MAX_CHARS*LENGTH_OF_FILENAME+1];
 #if MODIFIED_JULIAN_DATE 
 	char str_mjd[MAX_CHARS+1];
 	char str_cur_date[MAX_CHARS+1];
@@ -10026,7 +10031,7 @@ int main(int argc, char *argv[])
 
 				unsigned __int64 	kll=0, ll=0;
 				SHA384_CTX 		ctx384;
-				unsigned char	sha384_buf[SHA2_BUFLEN];
+				char	sha384_buf[SHA2_BUFLEN];
 
 				//printf("SHA2>> SHA-384 hashing... \n");
 
@@ -10092,7 +10097,7 @@ int main(int argc, char *argv[])
 			}
 			else if(HDR_SHA3_224 == isCRCtype )
 			{
-				char	sha3Buf[SHA3_BUFLEN] = {0,};
+				unsigned char sha3Buf[SHA3_BUFLEN] = {0,};
 				char	sha3digestTxt[SHA3_OUTPUT_SIZ] = {0,};
 				unsigned char sha3out[SHA3_OUTPUT_SIZ] = { 0, };
 				
@@ -10135,7 +10140,7 @@ int main(int argc, char *argv[])
 			}
 			else if(HDR_SHA3_256 == isCRCtype )
 			{
-				char	sha3Buf[SHA3_BUFLEN] = {0,};
+				unsigned char sha3Buf[SHA3_BUFLEN] = {0,};
 				char	sha3digestTxt[SHA3_OUTPUT_SIZ] = {0,};
 				unsigned char sha3out[SHA3_OUTPUT_SIZ] = { 0, };
 				
@@ -10176,7 +10181,7 @@ int main(int argc, char *argv[])
 			}
 			else if(HDR_SHA3_384 == isCRCtype )
 			{
-				char	sha3Buf[SHA3_BUFLEN] = {0,};
+				unsigned char sha3Buf[SHA3_BUFLEN] = {0,};
 				char	sha3digestTxt[SHA3_OUTPUT_SIZ] = {0,};
 				unsigned char sha3out[SHA3_OUTPUT_SIZ] = { 0, };
 				
@@ -10217,7 +10222,7 @@ int main(int argc, char *argv[])
 			}
 			else if(HDR_SHA3_512 == isCRCtype )
 			{
-				char	sha3Buf[SHA3_BUFLEN] = {0,};
+				unsigned char sha3Buf[SHA3_BUFLEN] = {0,};
 				char	sha3digestTxt[SHA3_OUTPUT_SIZ] = {0,};
 				unsigned char sha3out[SHA3_OUTPUT_SIZ] = { 0, };
 				
@@ -10259,7 +10264,7 @@ int main(int argc, char *argv[])
 			}
 			else if( HDR_SHAKE128 == isCRCtype )
 			{
-				char	sha3Buf[SHA3_BUFLEN] = {0,};
+				unsigned char sha3Buf[SHA3_BUFLEN] = {0,};
 				char	sha3digestTxt[SHA3_OUTPUT_SIZ] = {0,};
 				unsigned char sha3out[SHA3_OUTPUT_SIZ] = { 0, };
 				
@@ -10301,7 +10306,7 @@ int main(int argc, char *argv[])
 			}
 			else if( HDR_SHAKE256 == isCRCtype )
 			{
-				char	sha3Buf[SHA3_BUFLEN] = {0,};
+				unsigned char sha3Buf[SHA3_BUFLEN] = {0,};
 				char	sha3digestTxt[SHA3_OUTPUT_SIZ] = {0,};
 				unsigned char sha3out[SHA3_OUTPUT_SIZ] = { 0, };
 				
@@ -11522,14 +11527,14 @@ int main(int argc, char *argv[])
 
 		memset(data_buf, 0x00, MAX_BUF_SIZ*sizeof(unsigned char));
 		fr_size = fread(data_buf, sizeof(unsigned char), NK_BIN_ID, inpfile );
-		if( (0==strncmp(data_buf, (char*)"B000FF", NK_BIN_ID-1)) && (0x0A==data_buf[NK_BIN_ID-1]) )
+		if( (0==strncmp((char*)data_buf, (char*)"B000FF", NK_BIN_ID-1)) && (0x0A==data_buf[NK_BIN_ID-1]) )
 		{
 			data_buf[NK_BIN_ID-1] = '\0';
 			printf("%s Inform> Standard BIN Format              : %s+0x0A \r\n", infile_name, data_buf);
 			if(outfile) fprintf(outfile,"%s Inform> Standard BIN Format              : %s+0x0A \r\n", infile_name, data_buf);
 			is_BIN_OK = 1;	
 		}
-		else if( (0==strncmp(data_buf, (char*)"X000FF", NK_BIN_ID-1)) && (0x0A==data_buf[NK_BIN_ID-1]) )
+		else if( (0==strncmp( (char*)data_buf, (char*)"X000FF", NK_BIN_ID-1)) && (0x0A==data_buf[NK_BIN_ID-1]) )
 		{
 			data_buf[NK_BIN_ID-1] = '\0';
 			printf("%s Inform> Extended BIN Format              : %s+0x0A \r\n", infile_name, data_buf);
@@ -14886,7 +14891,7 @@ int main(int argc, char *argv[])
 	{
 		unsigned __int64 	kll=0, ll=0;
 		SHA384_CTX 		ctx384;
-		unsigned char	sha384_buf[SHA2_BUFLEN];
+		char	sha384_buf[SHA2_BUFLEN];
 		unsigned int iLenSub=0;
 		struct	tm *pTime;
 	
@@ -15563,7 +15568,7 @@ int main(int argc, char *argv[])
 	else if(1 == isMD6)
 	{
 		unsigned long long nBytes = 0UL, kll = 0UL;
-		unsigned char md6_data[1024*10]; // MD_HASH_BUFSIZ
+		char md6_data[1024*10]; // MD_HASH_BUFSIZ
 		//double elapsed_time = end_time - start_time;
 		//unsigned long long elapsed_ticks = end_ticks - start_ticks;
 		unsigned int iLenSub=0;
@@ -15804,7 +15809,7 @@ int main(int argc, char *argv[])
 #if SHA3_KECCAK_224_256_384_512 // SHA3, 2017.08.22
 	else if(1 == isSHA3_KECCAK_224)
 	{
-		char	sha3Buf[SHA3_BUFLEN] = {0,};
+		unsigned char sha3Buf[SHA3_BUFLEN] = {0,};
 		char	sha3digestTxt[SHA3_OUTPUT_SIZ] = {0,};
 		unsigned char sha3out[SHA3_OUTPUT_SIZ] = { 0, };
 		
@@ -16048,7 +16053,7 @@ int main(int argc, char *argv[])
 	}
 	else if(1 == isSHA3_KECCAK_256)
 	{
-		char	sha3Buf[SHA3_BUFLEN] = {0,};
+		unsigned char sha3Buf[SHA3_BUFLEN] = {0,};
 		char	sha3digestTxt[SHA3_OUTPUT_SIZ] = {0,};
 		unsigned char sha3out[SHA3_OUTPUT_SIZ] = { 0, };
 		
@@ -16291,7 +16296,7 @@ int main(int argc, char *argv[])
 	}
 	else if(1 == isSHA3_KECCAK_384)
 	{
-		char	sha3Buf[SHA3_BUFLEN] = {0,};
+		unsigned char sha3Buf[SHA3_BUFLEN] = {0,};
 		char	sha3digestTxt[SHA3_OUTPUT_SIZ] = {0,};
 		unsigned char sha3out[SHA3_OUTPUT_SIZ] = { 0, };
 		
@@ -16532,7 +16537,7 @@ int main(int argc, char *argv[])
 	}
 	else if(1 == isSHA3_KECCAK_512)
 	{
-		char	sha3Buf[SHA3_BUFLEN] = {0,};
+		unsigned char sha3Buf[SHA3_BUFLEN] = {0,};
 		char	sha3digestTxt[SHA3_OUTPUT_SIZ] = {0,};
 		unsigned char sha3out[SHA3_OUTPUT_SIZ] = { 0, };
 		
@@ -16774,7 +16779,7 @@ int main(int argc, char *argv[])
 	}
 	else if(1 == isShake128)
 	{
-		char	sha3Buf[SHA3_BUFLEN] = {0,};
+		unsigned char sha3Buf[SHA3_BUFLEN] = {0,};
 		char	sha3digestTxt[SHA3_OUTPUT_SIZ] = {0,};
 		unsigned char sha3out[SHA3_OUTPUT_SIZ] = { 0, };
 		
@@ -17013,7 +17018,7 @@ int main(int argc, char *argv[])
 	}
 	else if(1 == isShake256)
 	{
-		char	sha3Buf[SHA3_BUFLEN] = {0,};
+		unsigned char sha3Buf[SHA3_BUFLEN] = {0,};
 		char	sha3digestTxt[SHA3_OUTPUT_SIZ] = {0,};
 		unsigned char sha3out[SHA3_OUTPUT_SIZ] = { 0, };
 		
@@ -19052,7 +19057,7 @@ int main(int argc, char *argv[])
 		unsigned __int64	fSize=0UL, fUsize=0UL, fRead=0UL;
 
 		SHA256_CTX		ctx256;
-		unsigned char	sha256_buf[SHA2_BUFLEN];
+		char	sha256_buf[SHA2_BUFLEN];
 	
 
 		if( NULL != (inpfile = fopen( extractFile, "rb")) ) 
@@ -19185,7 +19190,7 @@ int main(int argc, char *argv[])
 
 	unsigned __int64	kll=0UL, ll=0UL;
 	SHA256_CTX		ctx256;
-	unsigned char	sha256_buf[SHA2_BUFLEN];
+	char	sha256_buf[SHA2_BUFLEN];
 
 		//==1== Total Counter
 		printf("\n>>Total merged file count : %d \n",  fileNum-1) ;
