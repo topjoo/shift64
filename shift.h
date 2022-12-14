@@ -43,7 +43,7 @@
 
 
 
-const char AttVersion[] = "1.0.15"; /* ver 1.0.12 : 2022.12.11 : Shift Quality Data Sorting */
+const char AttVersion[] = "1.0.16"; /* ver 1.0.12 : 2022.12.11 : Shift Quality Data Sorting */
 const char EmailText[]  = "tp.joo@daum.net";
 
 
@@ -333,8 +333,8 @@ typedef struct _RGBTRIPLE			 // 24비트 비트맵 이미지의 픽셀 구조체
 
 #define MONTH_LEN 	12
 typedef struct {
-	unsigned char 	mon[3];
-	unsigned char   amon;	
+	char 	mon[3];
+	char   amon;	
 } _month_table_ ;
 
 _month_table_ month_table[MONTH_LEN] = 

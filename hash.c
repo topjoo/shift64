@@ -5709,7 +5709,7 @@ void SHA256_Final(sha2_byte digest[], SHA256_CTX* context)
 	usedspace = 0;
 }
 
-char *SHA256_End(SHA256_CTX* context, char buffer[]) 
+char *SHA256_End(SHA256_CTX* context, char *buffer) 
 {
 	sha2_byte	digest[SHA256_DIGEST_LENGTH], *d = digest;
 	int		i;
@@ -5717,7 +5717,8 @@ char *SHA256_End(SHA256_CTX* context, char buffer[])
 	/* Sanity check: */
 	assert(context != (SHA256_CTX*)0);
 
-	if (buffer != (char*)0) {
+	if (buffer != (char*)0) 
+	{
 		SHA256_Final(digest, context);
 
 		for (i = 0; i < SHA256_DIGEST_LENGTH; i++) {
@@ -6048,7 +6049,7 @@ void SHA512_Final(sha2_byte digest[], SHA512_CTX* context)
 	MEMSET_BZERO(context, sizeof(SHA512_CTX));
 }
 
-char *SHA512_End(SHA512_CTX* context, char buffer[]) 
+char *SHA512_End(SHA512_CTX* context, unsigned char *buffer) 
 {
 	sha2_byte	digest[SHA512_DIGEST_LENGTH], *d = digest;
 	int		i;
@@ -6056,7 +6057,9 @@ char *SHA512_End(SHA512_CTX* context, char buffer[])
 	/* Sanity check: */
 	assert(context != (SHA512_CTX*)0);
 
-	if (buffer != (char*)0) {
+	//if (buffer != (char*)0) 
+	if (buffer != NULL) 
+	{
 		SHA512_Final(digest, context);
 
 		for (i = 0; i < SHA512_DIGEST_LENGTH; i++) {
@@ -6136,7 +6139,9 @@ char *SHA384_End(SHA384_CTX* context, char buffer[])
 	/* Sanity check: */
 	assert(context != (SHA384_CTX*)0);
 
-	if (buffer != (char*)0) {
+	//if (buffer != (char*)0) 
+	if (buffer != NULL) 
+	{
 		SHA384_Final(digest, context);
 
 		for (i = 0; i < SHA384_DIGEST_LENGTH; i++) {

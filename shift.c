@@ -734,6 +734,7 @@ void AllFilesClosed(void)
 
 #define SB_POINT_COUNT_NUM 		20 /* 5msec * 20 SB point + 5msec lines number */
 #define JERK_TIME_mSec 			300
+#define JERK_min_TIME_mSec 		100 /* unit: msec, min 100 msec */
 #define JERK_MAX_TIME_mSec 		2000 /* unit: msec, max 2sec */
 
 #define JERK_TIME_SCALE 		10 /* just scale */
@@ -1642,7 +1643,7 @@ const tPATs_ModeType arrPATs_ModeID[MODE_ID_NUMS] = {
 
 #define TITLE_SHI1	"    time   iPAT  ModeID     vsp    tqi    cg   Aps      No    tg ct iShi txt        TqFr ShiPh Ne       Nt    LAccel  TimPos  Ratio   ShiOne   ShiTwo  Jerk0 MaxNe   MaxNt  g_Max  g_min"
 
-#define TITLE_TXT   "    time   iPAT  ModeID    cG tG   vsp    tqi      Aps      No    ct iShi txt        TqFr ShiPh Ne       Nt     LAccel DiffTime TimPos       Ratio Jerk_%dms    Jerk1 (msec)"
+#define TITLE_TXT   "    time   iPAT  ModeID    cG tG   vsp    tqi      Aps      No    ct iShi txt        TqFr ShiPh Ne       Nt     LAccel DiffTime TimPos       Ratio Jerk_%dms    Jerk1 (msec)/%dms"
 
 #endif /* SHIFT_QUALITY_DATA_SORTING */
 
@@ -1974,7 +1975,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 	else if(iSBdecision==2)
 		fprintf(stderr,">>SB decision Num  : %d times, such as %s.%s \n", iSBdecision, TXT_SBTIME, TXT_SBSWING0 );
 	else if(iSBdecision<=1)
-		fprintf(stderr,">>SB decision Num  : %d times \n", iSBdecision );
+		fprintf(stderr,">>SB decision Num  : %d (Just One) - SB-point can be determined wrongly. \n", iSBdecision );
 
 	fprintf(stderr,">>Jerk Time length : %d msec ~ (SB point) ~ %d msec \n", iJerkTimeLen, 5*SB_POINT_COUNT_NUM );
 	/* ===================================================================================== */
@@ -2094,22 +2095,6 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 				fprintf(stderr,"++ERROR++ ShiftType errors = %u, line:%u \n", sq[0].ShiTy12, iOKcount );
 			}
 
-		///////////////////////////////////////////
-		#if 0 
-		{
-		int retcode;
-		static fpos_t pos, prePos;
- 
-			retcode = fgetpos(inpfile, &pos);
-			if( 0==retcode )
-				printf("Current position %12lld  -> %12lld \n", pos, pos-prePos);
-			else
-				printf("Current position Error : %d \n", retcode);
-
-			prePos = pos;
-		}
-		#endif 
-		///////////////////////////////////////////
 
 			/* === 2 STEP : SKIP record check ===================== */
 			if(iItemCurOK)
@@ -2615,7 +2600,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 	*SScnt = iSScount;
 	*SBcnt = iSBcount;
 	*SPcnt = iSPcount;
-	*SBswingcnt = iSBswingCnt;
+	*SBswingcnt = iSBdecCnt; /* One checking */
 
 
 	return iavgTime;
@@ -2869,7 +2854,7 @@ unsigned int SBtxtCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, 
 #endif
 
 
-int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsigned int SPcnt)
+int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsigned int SPcnt, unsigned int iSBchk)
 {
 	FILE *fp2chk = NULL;
 	char chk_out[MAX_CHARS*LENGTH_OF_FILENAME+1];
@@ -3034,6 +3019,24 @@ int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsig
 						continue; /* reading Next item because of FAIL item */
 					}
 					/* === 1 STEP : record (17 items check) =============== */
+
+
+					///////////////////////////////////////////
+					#if 0
+					{
+					int retcode;
+					static fpos_t pos, prePos;
+					
+						retcode = fgetpos(inpfile, &pos);
+						if( 0==retcode )
+							printf("Current position %12lld  -> %12lld \n", pos, pos-prePos);
+						else
+							printf("Current position Error : %d \n", retcode);
+					
+						prePos = pos;
+					}
+					#endif 
+					///////////////////////////////////////////
 
 
 					if( 0==strcmp( sq2[0].sTimePos, TXT_SSTIME) ) iSScount++;
@@ -3300,7 +3303,14 @@ int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsig
 
 				else if( 0==strcmp( sq2[0].sTimePos, TXT_SBTIME) )
 				{
-					strcpy( sq2[0].sTimePos, TXT_UPCASE );  /* Last SB0(3) -> (*u*) */
+					if( iSBdecision > 1 )
+					{
+						strcpy( sq2[0].sTimePos, TXT_UPCASE );  /* Last SB0(3) -> (*u*) */
+					}
+					else
+					{
+						// SB -> SB Keeping
+					}
 				}
 	
 				else if( 0==strncmp( sq2[0].sTimePos, TXT_SPTIME, 4) ) 
@@ -5089,7 +5099,7 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime)
 
 #if SAVEMODE
 	if(fp2out)
-		fprintf(fp2out,TITLE_TXT "\n", avgTime);
+		fprintf(fp2out, TITLE_TXT "\n", avgTime, iJerkTimeLen);
 #endif
 
 
@@ -5251,6 +5261,7 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime)
 				//	fprintf(stderr,"Jerk2 Calc Error>> g_Max time posistion error.  %s \n", sq3[0].sTimePos );
 				//}
 
+				
 
 				// ------------------------------------
 				// -- g min time
@@ -5258,6 +5269,7 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime)
 				if( 0==strcmp( sq3[0].sTimePos, TXT_gmin) || /* min g_min */
 					0==strcmp( sq3[0].sTimePos, TXT_SBmigm) || /* SB & g_min */
 					0==strcmp( sq3[0].sTimePos, TXT_MXNegm) || /* MX Ne & g_min */
+					0==strcmp( sq3[0].sTimePos, TXT_MXNtgm) || /* MX Nt & g_min */
 					0==strcmp( sq3[0].sTimePos, TXT_MXNtNegm) || /* MX Ne & g_min */
 					0==strcmp( sq3[0].sTimePos, TXT_SB0_Mingm) ) /* SB0 & g_min */
 				{
@@ -5401,7 +5413,7 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 
 #if SAVEMODE
 	if(outfile)
-		fprintf(outfile, TITLE_TXT "\n", avgTime);
+		fprintf(outfile, TITLE_TXT "\n", avgTime, iJerkTimeLen);
 #endif
 
 	do
@@ -5997,7 +6009,7 @@ int CheckLicense(void)
 
 		#if 1
 		{
-			char	sha3Buf[20] = {0,};
+			unsigned char sha3Buf[20] = {0,};
 			char	sha3digestTxt[SHA3_OUTPUT_SIZ] = {0,};
 			unsigned char sha3out[SHA3_OUTPUT_SIZ] = { 0, };
 			
@@ -6026,7 +6038,7 @@ int CheckLicense(void)
 				sha3_init(SHA3_512_HASH_BIT, SHA3_SHAKE_NONE);	
 
 				fscanf(fi, "%s", sha3Buf );
-				ll = strlen(sha3Buf);
+				ll = strlen( (char *)sha3Buf);
 				{
 					//printf("[ll=%d[%s]]\n", ll, sha3Buf	);
 					kll += ll;
@@ -6080,7 +6092,7 @@ int CheckLicense(void)
 	}
 	else
 	{
-		char	sha3Buf[20] = {0,};
+		unsigned char sha3Buf[20] = {0,};
 		char	sha3digestTxt[SHA3_OUTPUT_SIZ] = {0,};
 		unsigned char sha3out[SHA3_OUTPUT_SIZ] = { 0, };
 		
@@ -6112,7 +6124,7 @@ int CheckLicense(void)
 			sha3_init(SHA3_512_HASH_BIT, SHA3_SHAKE_NONE);	
 
 			fscanf(fi, "%s", sha3Buf );
-			ll = strlen(sha3Buf);
+			ll = strlen( (char*) sha3Buf);
 			if(ll<1) break;
 			{
 				//printf("[ll=%d[%s]]\n", ll,sha3Buf	);
@@ -8886,7 +8898,7 @@ int main(int argc, char *argv[])
 						case 1:
 							// 3>> SB repoint : SB decision times
 							iSBdecision = atoi( str_ShiftOp[kk] ); 
-							if( (iSBdecision < SB_DECISION_MAX_TIMES) && (iSBdecision >= 0) )
+							if( (iSBdecision < SB_DECISION_MAX_TIMES) && (iSBdecision > 0) )
 							{
 								fprintf(stderr,"\n");
 								fprintf(stderr,">>SB decision Num  : <<%d>> %d times (SB decision, default:3 times)", kk, iSBdecision ); 
@@ -8894,17 +8906,17 @@ int main(int argc, char *argv[])
 							else
 							{
 								fprintf(stderr,"\n");
-								fprintf(stderr,">>SB decision Num  : <<%d>> %d - Warning: Too many number... Max %d", kk, iSBdecision, SB_DECISION_MAX_TIMES-1 ); 
+								fprintf(stderr,">>SB decision Num  : <<%d>> %d - Warning times... available range:1~%d ", kk, iSBdecision, SB_DECISION_MAX_TIMES-1 ); 
 								fprintf(stderr,"\r\n\n");
 								AllFilesClosed();
-								exit(0);
+								exit(EXIT_FAILURE);
 							}
 							break;
 							
 						case 2:
 							// 4>> Jerk#1
 							iJerkTimeLen = atoi( str_ShiftOp[kk] ); 
-							if( (iJerkTimeLen <= JERK_MAX_TIME_mSec) && (iJerkTimeLen > 0) )
+							if( (iJerkTimeLen <= JERK_MAX_TIME_mSec) && (iJerkTimeLen >= JERK_min_TIME_mSec) )
 							{
 								fprintf(stderr,"\n");
 								fprintf(stderr,">>Jerk Time Length : <<%d>> %d msec (unit: msec)", kk, iJerkTimeLen ); 
@@ -8912,10 +8924,10 @@ int main(int argc, char *argv[])
 							else
 							{
 								fprintf(stderr,"\n");
-								fprintf(stderr,">>Jerk Time Length : <<%d>> %d msec - Warning: Too much previous time. Max %d msec", kk, iJerkTimeLen, JERK_MAX_TIME_mSec ); 
+								fprintf(stderr,">>Jerk Time Length : <<%d>> %d msec - Warning previous time... available arrange:%d~%d msec", kk, iJerkTimeLen, JERK_min_TIME_mSec, JERK_MAX_TIME_mSec ); 
 								fprintf(stderr,"\r\n\n");
 								AllFilesClosed();
-								exit(0);
+								exit(EXIT_FAILURE);
 							}
 							break;
 
@@ -9995,7 +10007,7 @@ int main(int argc, char *argv[])
 			{
 				unsigned __int64 	kll=0, ll=0;
 				SHA256_CTX 		ctx256;
-				unsigned char	sha256_buf[SHA2_BUFLEN];
+				char	sha256_buf[SHA2_BUFLEN];
 
 		
 				//printf("SHA2>> SHA-256 hashing... \n");
@@ -13244,7 +13256,7 @@ int main(int argc, char *argv[])
 		// 2nd STEP -----------------------------------------------
 		// input  : *.ECO
 		// output : *.cECO if return value ichk==1
-		ichk = SSCounterCheck(iModeID, SScnt, SBcnt, SPcnt);
+		ichk = SSCounterCheck(iModeID, SScnt, SBcnt, SPcnt, iSBchk);
 
 		// --------------------------------------------------------
 		// 3rd-1 STEP -----------------------------------------------
@@ -14667,7 +14679,7 @@ int main(int argc, char *argv[])
 	{
 		unsigned __int64 	kll=0UL, ll=0UL;
 		SHA256_CTX 		ctx256;
-		unsigned char	sha256_buf[SHA2_BUFLEN];
+		char	sha256_buf[SHA2_BUFLEN];
 		unsigned int iLenSub=0;
 		struct	tm *pTime;  // 2020.07.15
 	
