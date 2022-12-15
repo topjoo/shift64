@@ -741,7 +741,7 @@ void AllFilesClosed(void)
 #define JERK_MAX_TIME_mSec 		2000 /* unit: msec, max 2sec */
 
 #define JERK_TIME_SCALE 		10 /* just scale */
-
+#define SS2SP_MAX_TIME 			2000 /* 2000 msec */
 
 #define MODE_NOR 		8  /* 8: (md_NOR) */
 #define MODE_ECO 		9  /* 9: (md_ECO) */
@@ -873,6 +873,8 @@ void AllFilesClosed(void)
 #define SB_PNT_RPM_DNS 		(30.0f) /* unit: rpm */
 #define SP_PNT_RPM_DNS 		(-30.0f) /* unit: rpm */
 
+#define PRINT_TXT_SB_SEQ_FIRST 	(TXT_SBTIME "." TXT_SBSWING0 ".." TXT_SBSWING0)
+#define PRINT_TXT_SB_SEQ_LAST 	(TXT_SBSWING0 ".." TXT_SBSWING0 "." TXT_SBTIME)
 
 //unsigned int iSBnewPoint[500] = {0,};
 
@@ -1660,6 +1662,7 @@ typedef struct _SBTimePosition_ {
 	unsigned long long SBTime;
 	unsigned long long gmMxBegin; /* Defalt Value : before 300 msec */
 	unsigned long long SPTime;
+	short ignored; /* SS ~ SP time >= 2000 msec -> ignored */
 } tSBtimePos_type;
 
 tSBtimePos_type  gMaxStart[MAX_TABLE_SIZ]; /* gMax Start Time Position for Jerk1 Calculation */
@@ -1973,14 +1976,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 	fprintf(stderr,">>Shift Type       : %s \n", (iShiftType==SHI_PWR_ON?"PWR On":(iShiftType==SHI_PWR_OFF?"PWR Off":(iShiftType==SHI_STATIC?"Static":(iShiftType==SHI_N_STOP_DN?"Stop Dn":"Unknown")))) );
 	fprintf(stderr,">>Shift Direction  : Shift %s \n", (shiDir03==SHIFT_UP?"UP":(shiDir03==SHIFT_DN?"DOWN": \
 		(shiDir03==SHIFT_SKIP_DN?"SkipDown":(shiDir03==SHIFT_SKIP_UP?"SkipUp":"Unknown"))) ));			
-	if(iSBdecision>=3)
-		fprintf(stderr,">>SB decision Num  : %d times, such as %s.%s..%s \n", iSBdecision, TXT_SBTIME , TXT_SBSWING0, TXT_SBSWING0 );
-	else if(iSBdecision==2)
-		fprintf(stderr,">>SB decision Num  : %d times, such as %s.%s \n", iSBdecision, TXT_SBTIME, TXT_SBSWING0 );
-	else if(iSBdecision<=1)
-		fprintf(stderr,">>SB decision Num  : %d (Just One) - SB-point can be determined wrongly. \n", iSBdecision );
 
-	fprintf(stderr,">>Jerk Time length : %d msec ~ (SB point) ~ %d msec \n", iJerkTimeLen, 5*SB_POINT_COUNT_NUM );
 	/* ===================================================================================== */
 
 	memset(shift_out, 0x00, sizeof(shift_out)); // 2022.11.22
@@ -2362,6 +2358,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 							iOnce_SP = FALSE;
 							strcpy(sTimePos, TXT_SPTIME);
 							gMaxStart[iSPcount].SPTime = (unsigned int)( (sq[0].Time01)*1000*JERK_TIME_SCALE );
+							gMaxStart[iSPcount].ignored = 0; /* saved !! */
 
 							iSPcount ++;
 
@@ -2573,8 +2570,34 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 	fprintf(stderr,"  ModeID %s, 1st step sorting file: %s  \n", arrPATs_ModeID[aiPATs05].ModeID, shift_out );
 	//fprintf(stderr,"  ModeID file: %s \n", shift_file );
 
+
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 	fprintf(stderr,">>Quality Shift Data Sorting Summary... %s \n", arrPATs_ModeID[aiPATs05].ModeID );
+	if(iSBdecision>=3)
+	{
+		if(0==SBposDecision)
+			fprintf(stderr,"  continuous SB decision Number: %d times, such as %s ", iSBdecision, PRINT_TXT_SB_SEQ_FIRST );
+		else
+			fprintf(stderr,"  continuous SB decision Number: %d times, such as %s ", iSBdecision, PRINT_TXT_SB_SEQ_LAST );
+
+		if(SBposDecision) fprintf(stderr,"- last SB position \n"); 
+		else fprintf(stderr,"- first SB position \n"); 
+	}
+	else if(iSBdecision==2)
+	{
+		if(0==SBposDecision)
+			fprintf(stderr,"  continuous SB decision Number: %d times, such as %s.%s ", iSBdecision, TXT_SBTIME, TXT_SBSWING0 );
+		else
+			fprintf(stderr,"  continuous SB decision Number: %d times, such as %s.%s ", iSBdecision, TXT_SBSWING0, TXT_SBTIME );
+
+		if(SBposDecision) fprintf(stderr,"- last SB position \n"); 
+		else fprintf(stderr,"- first SB position \n"); 
+	}
+	else if(iSBdecision<=1)
+		fprintf(stderr,"  continuous SB decision Number: %d (Just One) - SB-point can be determined wrongly. \n", iSBdecision );
+
+	fprintf(stderr,"  Jerk Time length (gMax/gmin) : %d msec ~ (SB point) ~ %d msec \n", iJerkTimeLen, iavgTime*SB_POINT_COUNT_NUM );
+
 	fprintf(stderr,"  Shift Data Time Period ------: %9u msec \n", iavgTime );
 	fprintf(stderr,"  Shift Average Time(t1:SS~SB)-: %9llu msec <- 1st average time \n", avg_t1 );
 	fprintf(stderr,"  Shift Average Time(t2:SB~SP)-: %9llu msec <- 1st average time \n", avg_t2 );
@@ -3344,6 +3367,18 @@ int SSCounterCheck(short aiPATs05, short SBposDecision, unsigned int SScnt, unsi
 				if( 0==strncmp( sq2[0].sTimePos, TXT_SPTIME, 4) ) 
 				{ 
 					gMaxStart[iSPcount].SPTime = (unsigned int)( (sq2[0].Time01)*1000*JERK_TIME_SCALE );
+
+					if( (gMaxStart[iSPcount].SPTime - gMaxStart[iSPcount].SSTime) >  SS2SP_MAX_TIME*JERK_TIME_SCALE )
+					{
+						gMaxStart[iSPcount].ignored = 1; /* ignored */
+						fprintf(stderr," %5d (SS time: %12.4lf) : %4.1lf sec (SS~SP diff time) <- ignored. \n", 
+							iSPcount, (double)((gMaxStart[iSPcount].SSTime)/1000.0/JERK_TIME_SCALE), (double)((gMaxStart[iSPcount].SPTime - gMaxStart[iSPcount].SSTime)/1000.0/JERK_TIME_SCALE) );
+					}
+					else
+					{
+						gMaxStart[iSPcount].ignored = 0; /* saved !! */
+					}
+
 					iSPcount++;
 				}
 
@@ -3369,6 +3404,8 @@ int SSCounterCheck(short aiPATs05, short SBposDecision, unsigned int SScnt, unsi
 		if(fp2chk) fclose(fp2chk);
 		if(inpfile) fclose(inpfile);
 
+
+		fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
 		avg_t1 = 0ULL;
 		avg_t2 = 0ULL;
@@ -3683,7 +3720,8 @@ int Find2nd_NtNeminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigne
 			while (!feof (inpfile));
 
 		}
-		fprintf(stderr,">>Searched Nt Max %s [%s] -- SS(%d), SB(%d), SP(%d) points \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, SScnt,SBcnt,SPcnt );
+		//fprintf(stderr,">>Searched Nt Max %s [%s] -- SS(%d), SB(%d), SP(%d) points \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, SScnt,SBcnt,SPcnt );
+		fprintf(stderr,">>Searched Nt Max %s -- SS(%d), SB(%d), SP(%d) points \r\n", arrPATs_ModeID[aiPATs05].ModeID, SScnt,SBcnt,SPcnt );
 
 		fclose(fp2NtMax);
 	}
@@ -3806,7 +3844,8 @@ int Find2nd_NtNeminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigne
 			while (!feof (inpfile));
 
 		}
-		fprintf(stderr,">>Searched Ne Max %s [%s] -- SS(%d), SB(%d), SP(%d) points \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, SScnt,SBcnt,SPcnt );
+		//fprintf(stderr,">>Searched Ne Max %s [%s] -- SS(%d), SB(%d), SP(%d) points \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, SScnt,SBcnt,SPcnt );
+		fprintf(stderr,">>Searched Ne Max %s -- SS(%d), SB(%d), SP(%d) points \r\n", arrPATs_ModeID[aiPATs05].ModeID, SScnt,SBcnt,SPcnt );
 
 		fclose(fp2NeMax);
 	}
@@ -4080,7 +4119,7 @@ int MakeShiftData4gMax_Table(short aiPATs05, int chk, int minMaxType)
 	while (!feof (fpginp));
 
 	//fprintf(stderr,">>Re-Mapped g_Max %s [%s] - %u msec before SB point > %s \n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, iJerkTimeLen, shi_out );
-	fprintf(stderr,">>Re-Mapped g_Max %s [%s] - %u msec before SB point (%d times) \n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, iJerkTimeLen, iSBdecision );
+	fprintf(stderr,">>Re-Mapped g_Max %s -- %u msec before SB point (continuous SB %d times) \n", arrPATs_ModeID[aiPATs05].ModeID, iJerkTimeLen, iSBdecision );
 
 	fclose(fpginp);
 	fclose(fpgout);
@@ -4421,9 +4460,11 @@ int Find2nd_gminMaxShiftData(short aiPATs05, int minMaxType, unsigned int SScnt,
 			while (!feof (inpfile));
 
 		}
-		fprintf(stderr,">>Searched g_Max  %s [%s] -- SS(%d), SB(%d), SP(%d) points \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, SScnt,SBcnt,SPcnt );
 
-		fclose(fp2gMax);
+		//fprintf(stderr,">>Searched g_Max  %s [%s] -- SS(%d), SB(%d), SP(%d) points \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, SScnt,SBcnt,SPcnt );
+		fprintf(stderr,">>Searched g_Max  %s -- SS(%d), SB(%d), SP(%d) points \r\n", arrPATs_ModeID[aiPATs05].ModeID, SScnt,SBcnt,SPcnt );
+
+		if(fp2gMax) { fclose(fp2gMax); fp2gMax=NULL; }
 	}
 
 
@@ -4557,15 +4598,16 @@ int Find2nd_gminMaxShiftData(short aiPATs05, int minMaxType, unsigned int SScnt,
 			while (!feof (inpfile));
 
 		}
-		fprintf(stderr,">>Searched g_min  %s [%s] -- SS(%d), SB(%d), SP(%d) points \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, SScnt,SBcnt,SPcnt );
+		//fprintf(stderr,">>Searched g_min  %s [%s] -- SS(%d), SB(%d), SP(%d) points \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, SScnt,SBcnt,SPcnt );
+		fprintf(stderr,">>Searched g_min  %s -- SS(%d), SB(%d), SP(%d) points \r\n", arrPATs_ModeID[aiPATs05].ModeID, SScnt,SBcnt,SPcnt );
 
 		fclose(fp2gmin);
 	}
 
 	if(inpfile) fclose(inpfile);
 
-	if(fp2gMax) fclose(fp2gMax);
-	if(fp2gmin) fclose(fp2gmin);
+	if(fp2gMax) { fclose(fp2gMax); fp2gMax=NULL; }
+	if(fp2gmin) { fclose(fp2gmin); fp2gmin=NULL; }
 
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
@@ -5070,6 +5112,11 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, short iSBcho
 	unsigned long long iNGcount = 0ULL;
 	unsigned long long iOKcount = 0ULL;
 
+	unsigned int iSScount = 0;
+	unsigned int iSBcount = 0;
+	unsigned int iSPcount = 0;
+	unsigned int iignoredCnt = 0;
+	
 	double gTimeDiff = 0.0f;
 	double gSStime = 0.0f;
 	double gSBtime = 0.0f;
@@ -5126,6 +5173,10 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, short iSBcho
 	iNGcount   = 0ULL;
 	iOKcount   = 0ULL;
 
+	iSScount   = 0U;
+	iSBcount   = 0U;
+	iSPcount   = 0U;
+	iignoredCnt = 0U;
 
 #if SAVEMODE
 	if(fp2out)
@@ -5195,10 +5246,21 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, short iSBcho
 			{
 				continue;
 			}
-			else if( 0==strcmp( sq3[0].sTimePos, TXT_SSTIME) ) /* SS point */
+
+			if( 0==strcmp( sq3[0].sTimePos, TXT_SSTIME) ) /* SS point */
 			{
 				ig_Max = 0;
 				ig_min = 0;
+
+			#if SS2SP_MAX_TIME
+				if( 1==gMaxStart[iSScount].ignored ) 
+				{
+					iSScount ++;
+					continue;
+				}
+			#endif
+
+				iSScount ++;
 
 				is2File = 1;
 				isSSpoint = TRUE;
@@ -5216,6 +5278,16 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, short iSBcho
 				isSBpoint = TRUE;
 				gSBtime = sq3[0].Time01;
 
+			#if SS2SP_MAX_TIME
+				if( 1==gMaxStart[iSBcount].ignored ) 
+				{
+					iSBcount ++;
+					continue;
+				}
+			#endif
+			
+				iSBcount++;
+
 				gTimeDiff = (gSBtime - gSStime);
 				//fprintf(stderr, "%s - %lf \n", TXT_SBTIME, gTimeDiff );
 			}
@@ -5231,6 +5303,16 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, short iSBcho
 				isSBpoint = TRUE;
 				gSBtime = sq3[0].Time01;
 
+			#if SS2SP_MAX_TIME
+				if( 1==gMaxStart[iSBcount].ignored ) 
+				{
+					iSBcount ++;
+					continue;
+				}
+			#endif
+			
+				iSBcount++;
+
 				gTimeDiff = (gSBtime - gSStime);
 				//fprintf(stderr, "%s - %lf \n", TXT_SBMXNe, gTimeDiff  );
 			}
@@ -5244,6 +5326,15 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, short iSBcho
 				isSBpoint = TRUE;
 				gSBtime = sq3[0].Time01;
 
+			#if SS2SP_MAX_TIME
+				if( 1==gMaxStart[iSBcount].ignored ) 
+				{
+					iSBcount ++;
+					continue;
+				}
+			#endif
+			
+				iSBcount++;
 				gTimeDiff = (gSBtime - gSStime);
 				//fprintf(stderr, "%s - %lf %d \n", TXT_SBmigm, gTimeDiff, 1000*(gminTime-gMaxTime) );
 
@@ -5260,6 +5351,18 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, short iSBcho
 				gMaxTime = -1.0f;
 				gminTime = -1.0f;
 
+			#if SS2SP_MAX_TIME
+				if( 1==gMaxStart[iSPcount].ignored ) 
+				{
+					iSPcount ++;
+					iignoredCnt ++;
+					continue;
+				}
+			#endif
+
+			
+				iSPcount ++;
+
 				isSSpoint = 0;
 				isSBpoint = 0;
 				isSPpoint = 0;
@@ -5272,6 +5375,13 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, short iSBcho
 				is2File = 1;
 				gTimeDiff = (sq3[0].Time01 - gSStime);
 
+			#if SS2SP_MAX_TIME
+				if( iSScount )
+				{
+					if( 1==gMaxStart[iSScount-1].ignored ) continue;
+				}
+			#endif
+			
 				// ------------------------------------
 				// -- g Max time
 				// ------------------------------------
@@ -5339,6 +5449,8 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, short iSBcho
 			/* Calc Jerk											 */
 			/* ----------------------------------------------------- */
 
+
+
 		#if SAVEMODE
 			if(fp2out && is2File)
 			{
@@ -5367,12 +5479,12 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, short iSBcho
 	fprintf(stderr,">>Sorted result file: %s \n", shift_file );
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
-	return 1;
+	return iignoredCnt;
 }
 
 
 
-int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTime, short iSBchoicePnt, unsigned int SScnt, unsigned int SBcnt, unsigned int SPcnt)
+int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTime, short iSBchoicePnt, unsigned int SScnt, unsigned int SBcnt, unsigned int SPcnt, unsigned int ignoredCnt)
 {
 	sqdflt_type sq4[2];  /* 0:SS, 1:SB, 2:MaxNt, 3:MaxNe, 4:g_Max, 5:g_min, 6:SP */
 	
@@ -5401,7 +5513,8 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 
 	unsigned int ireSScnt = 1;
 	unsigned int ireSPcnt = 1;
-	unsigned int llLoop = 0, llLastNum=0;
+	unsigned int llLoop = 0, llLastNum=0, ii=0;
+	unsigned long long avg_t1=0ULL, avg_t2 = 0ULL;
 
 	AllFilesClosed();
 
@@ -5502,7 +5615,8 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 			}
 
 			if( 0==strcmp( sq4[0].sTimePos, TXT_SPTIME) ) iSPcount ++;
-			if( 0==strcmp( sq4[0].sTimePos, TXT_SSTIME) ) /* SS point */
+
+			if( 0==strcmp( sq4[0].sTimePos, TXT_SSTIME) ) /* first Start poision : SS point */
 			{
 				icurGear = sq4[0].curGear08;
 				itgtGear = sq4[0].tgtGear11;
@@ -5521,8 +5635,9 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 	iNGcount   = 0ULL;
 	iOKcount   = 0ULL;
 
-	iSScount   = 0; 
-	iSPcount   = 0; 
+	iSScount   = 0U; 
+	iSBcount   = 0U; 
+	iSPcount   = 0U; 
 
 	ireSScnt   = 1;
 	ireSPcnt   = 1;
@@ -5543,7 +5658,8 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 
 	// ==================================================
 
-	llLastNum = SPcnt;
+	llLastNum = SPcnt - ignoredCnt;
+	//fprintf(stderr," llLastNum (%d) = SPcnt (%d) - ignoredCnt (%d) \n", llLastNum, SPcnt, ignoredCnt );
 
 	//if( TYPE_MAX_NT == minMaxType )
 	{
@@ -5554,8 +5670,9 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 			iNGcount   = 0ULL;
 			iOKcount   = 0ULL;
 			
-			iSScount   = 0; 
-			iSPcount   = 0; 
+			iSScount   = 0U; 
+			iSBcount   = 0U; 
+			iSPcount   = 0U;
 
 			do
 			{
@@ -5620,11 +5737,22 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 					is2File = 1;
 					if( 0==strcmp( sq4[0].sTimePos, TXT_SSTIME) ) /* SS point */
 					{
+						gMaxStart[iSScount].SSTime = (unsigned int)( (sq4[0].Time01)*1000*JERK_TIME_SCALE );
+
 						iSScount ++;
+						is2File = 1;
+					}
+					else if( 0==strncmp( sq4[0].sTimePos, TXT_SBTIME, 4) ) /* SP point */
+					{
+						gMaxStart[iSBcount].SBTime = (unsigned int)( (sq4[0].Time01)*1000*JERK_TIME_SCALE );
+
+						iSBcount ++;
 						is2File = 1;
 					}
 					else if( 0==strcmp( sq4[0].sTimePos, TXT_SPTIME) ) /* SP point */
 					{
+						gMaxStart[iSPcount].SPTime = (unsigned int)( (sq4[0].Time01)*1000*JERK_TIME_SCALE );
+
 						iSPcount ++;
 						is2File = 2;
 					}
@@ -5633,7 +5761,7 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 						is2File = 1;
 					}
 
-					if( SPcnt == iSPcount )
+					if( (SPcnt - ignoredCnt) == iSPcount )
 					{
 
 					#if SAVEMODE
@@ -5712,6 +5840,28 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 		fprintf(stderr, "  %s SKIPDOWN shift Ended ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, iBigcurGear, iBigtgtGear );
 	else
 		fprintf(stderr, "  %s STATIC shift Ended ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, iBigcurGear, iBigtgtGear );
+
+
+	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
+	
+	avg_t1 = 0ULL;
+	avg_t2 = 0ULL;
+	
+	//fprintf(stderr, "%d %d %d \n", iSScount, iSBcount, iSPcount );
+	for(ii=0; ii<iSPcount; ii++)
+	{
+		avg_t1 += (gMaxStart[ii].SBTime - gMaxStart[ii].SSTime)/JERK_TIME_SCALE;
+		avg_t2 += (gMaxStart[ii].SPTime - gMaxStart[ii].SBTime)/JERK_TIME_SCALE;
+	
+		//fprintf(stderr, " %2d -> %10lld  %10lld  \n", ii, avg_t1, avg_t2 );
+	}
+	avg_t1 /= iSPcount;
+	avg_t2 /= iSPcount;
+	
+	fprintf(stderr,">>Average Time after Last Sorting... SS(%d), SB(%d), SP(%d) Records.. %s \n", iSScount, iSBcount, iSPcount, arrPATs_ModeID[aiPATs05].ModeID );
+	fprintf(stderr,"  Shift Average Time(t1:SS~SB)-: %9llu msec <- 3rd average time  \n", avg_t1 );
+	fprintf(stderr,"  Shift Average Time(t2:SB~SP)-: %9llu msec <- 3rd average time  \n", avg_t2 );
+	//fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
 
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
@@ -13267,6 +13417,7 @@ int main(int argc, char *argv[])
 	else if( (1==isUpShift) && (1==isShift) )
 	{
 		unsigned int SScnt=0, SBcnt=0, SPcnt=0, iSBchk=0;
+		unsigned int ignoredCnt = 0;
 		int ii=0, ichk=0, iavgtm=0;
 		short isNaming = 0;
 		char shi_ori[MAX_CHARS*LENGTH_OF_FILENAME+1];
@@ -13445,7 +13596,7 @@ int main(int argc, char *argv[])
 		// 5th STEP -----------------------------------------------
 		// input  : *.zECO 
 		// output : *.txt
-		ShiftData_Filtering(shi_out, iModeID, iavgtm, iSBchoicePnt);
+		ignoredCnt = ShiftData_Filtering(shi_out, iModeID, iavgtm, iSBchoicePnt);
 
 
 
@@ -13453,7 +13604,7 @@ int main(int argc, char *argv[])
 		strcat(outfile, "gil");
 		// --------------------------------------------------------
 		// 6th STEP -----------------------------------------------
-		ShiftData_LastSorting(shi_out, outfile, iModeID, iavgtm, iSBchoicePnt, SScnt, SBcnt, SPcnt);
+		ShiftData_LastSorting(shi_out, outfile, iModeID, iavgtm, iSBchoicePnt, SScnt, SBcnt, SPcnt, ignoredCnt);
 
 
 		// --------------------------------------------------------
