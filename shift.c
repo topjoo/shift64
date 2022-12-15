@@ -551,21 +551,24 @@ void help(void)
 	#if SHIFT_QUALITY_DATA_SORTING /* 2022-11-13 */
            " \n"
            "--[ Shift Quality Data Sorting ]-------- -------------------------------------------------------------------------\n"
-           "  -U or --upshift [ModeID] [SB#1] [Jerk#1] [APS#1] [APS#2] \n" 
+           "  -U or --upshift [ModeID][SB Pos] [SB#1] [Jerk#1] [APS#1] [APS#2] \n" 
+           "               SB Pos : SB positioning first or last (default: first SB position) .last \n"
+           " Ex) Last SB position case  : --upshift eco.last 3 300 3 2 \n"
+           "     First SB position case : --upshift eco 3 300 3 2 \n"
            "               SB#1   : SB point decision continuous count. (default 3 times) \n"
            "               Jerk#1 : Unit: msec, Reverse time length at SB point for Jerk1 calcution. (default 300msec) \n"
            "               APS#1  : APS level as 3, or 4.5. -> Power On/Off decision \n"
            "               APS#2  : APS tolerance as 1%%, or 2%% \n"
            "\n"
-           " Ex) ah.exe --input 5ms_16select.tsv --output 5ms_eco.txt --upshift eco 3.5 1 1.5 \n"
-           "     ah.exe --input 5ms_16select.tsv --output 5ms_spt.txt --upshift spt 4 1.5 0.5 \n"
-           "     ah.exe --input 5ms_16select.tsv --output 5ms_nor.txt --upshift NOR 4 1 2  \n"
+           " Ex) ah.exe --input 5ms_16select.tsv --output 5ms_eco.txt --upshift eco.last 3 300 3 1.5 \n"
+           "     ah.exe --input 5ms_16select.tsv --output 5ms_spt.txt --upshift spt 4 300 3   1.5 \n"
+           "     ah.exe --input 5ms_16select.tsv --output 5ms_nor.txt --upshift NOR 4 300 3.5 2  \n"
            "        -> Sorted result output : 5ms_eco.txt \n"
            "        -> Generated temp files : 5ms_eco.ECO, 5ms_eco.cECO, 5ms_eco.zECO, ... \n"
            "\n" 
-           "  -D or --downshift [ModeID] [APS lvl] [APS tol(1\%)] [VS start] [VS end] [VS step] \n" 
+           "  -D or --downshift [ModeID][SB Pos] [SB#1] [Jerk#1] [APS#1] [APS#2] [VS start] [VS end] [VS step] \n" 
            "\n"
-           " Ex) ah.exe --input 5ms_16select.tsv --output 5ms_spt.txt --downshift SPT 5 1 1 160 60 -10 \n"
+           " Ex) ah.exe --input 5ms_16select.tsv --output 5ms_spt.txt --downshift SPT 5 300 3 2 160 60 -10 \n"
            "        -> Sorted result output : 5ms_spt.txt \n"
            "        -> Generated temp files : 5ms_spt.SPT, 5ms_spt.cSPT, 5ms_spt.zSPT, ... \n"
            "\n"
@@ -1643,7 +1646,7 @@ const tPATs_ModeType arrPATs_ModeID[MODE_ID_NUMS] = {
 
 #define TITLE_SHI1	"    time   iPAT  ModeID     vsp    tqi    cg   Aps      No    tg ct iShi txt        TqFr ShiPh Ne       Nt    LAccel  TimPos  Ratio   ShiOne   ShiTwo  Jerk0 MaxNe   MaxNt  g_Max  g_min"
 
-#define TITLE_TXT   "    time   iPAT  ModeID    cG tG   vsp    tqi      Aps      No    ct iShi txt        TqFr ShiPh Ne       Nt     LAccel DiffTime TimPos       Ratio Jerk_%dms    Jerk1 (msec)/%dms"
+#define TITLE_TXT   "    time   iPAT  ModeID    cG tG   vsp    tqi      Aps      No    ct iShi txt        TqFr ShiPh Ne       Nt     LAccel DiffTime TimPos(%d)%s   Ratio   Jerk_%dms  Jerk1 (msec)_%dms"
 
 #endif /* SHIFT_QUALITY_DATA_SORTING */
 
@@ -1832,7 +1835,7 @@ unsigned long long Find_GearMode( unsigned long long *gShift, short iChoice, uns
 }
 
 
-unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigned int *SScnt, unsigned int *SBcnt, unsigned int *SPcnt, unsigned int *SBswingcnt)
+unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short SBposDecision, unsigned int *SScnt, unsigned int *SBcnt, unsigned int *SPcnt, unsigned int *SBswingcnt)
 {
 	FILE *shiFile=NULL;
 
@@ -2328,7 +2331,8 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, unsigne
 							#if 0 // OLD
 								gMaxStart[iSBcount].SBTime    = (sq[0].Time01)*1000*JERK_TIME_SCALE;  /* Last One Choice */
 							#else
-								gMaxStart[iSBcount].SBTime    = SBdecision[0].SBTime;  /* first One choice */
+								//gMaxStart[iSBcount].SBTime    = SBdecision[0].SBTime;  /* first One time choice */ 
+								gMaxStart[iSBcount].SBTime    = SBdecision[SBposDecision].SBTime;  /* first One time choice */ 
 							#endif
 								gMaxStart[iSBcount].gmMxBegin = gMaxStart[iSBcount].SBTime - iJerkTimeLen*JERK_TIME_SCALE;  /* JERK_TIME_mSec */
 
@@ -2854,7 +2858,7 @@ unsigned int SBtxtCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, 
 #endif
 
 
-int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsigned int SPcnt, unsigned int iSBchk)
+int SSCounterCheck(short aiPATs05, short SBposDecision, unsigned int SScnt, unsigned int SBcnt, unsigned int SPcnt, unsigned int iSBchk)
 {
 	FILE *fp2chk = NULL;
 	char chk_out[MAX_CHARS*LENGTH_OF_FILENAME+1];
@@ -3288,32 +3292,56 @@ int SSCounterCheck(short aiPATs05, unsigned int SScnt, unsigned int SBcnt, unsig
 				}
 
 
-				else if( 0==strcmp( sq2[0].sTimePos, TXT_SBSWING0) )
-				{ 
-					if( (unsigned int)(gMaxStart[iSBcount].SBTime/JERK_TIME_SCALE)  == (unsigned int)((sq2[0].Time01)*1000) )
-					{
-						strcpy( sq2[0].sTimePos, TXT_SBTIME); /* SB point fix */
-						iSBcount++;
+				/* ======================================================== */
+				/* ======================================================== */
+				/* ======================================================== */
+
+				if( 0==SBposDecision ) /* VERSY IMPORTANT!!! first Position decision ++++++++ */
+				{
+					if( 0==strcmp( sq2[0].sTimePos, TXT_SBSWING0) )
+					{ 
+						if( (unsigned int)(gMaxStart[iSBcount].SBTime/JERK_TIME_SCALE)  == (unsigned int)((sq2[0].Time01)*1000) )
+						{
+							strcpy( sq2[0].sTimePos, TXT_SBTIME); /* SB point fix */
+							iSBcount++;
+						}
+						else //if( (gMaxStart[iSBcount].SBTime)*1000*JERK_TIME_SCALE != (unsigned int)( (sq2[0].Time01)*1000*JERK_TIME_SCALE) )
+						{
+							strcpy( sq2[0].sTimePos, TXT_UPCASE); 
+						}
 					}
-					else //if( (gMaxStart[iSBcount].SBTime)*1000*JERK_TIME_SCALE != (unsigned int)( (sq2[0].Time01)*1000*JERK_TIME_SCALE) )
+
+					else if( 0==strcmp( sq2[0].sTimePos, TXT_SBTIME) )
 					{
-						strcpy( sq2[0].sTimePos, TXT_UPCASE); 
+						if( iSBdecision > 1 )
+						{
+							strcpy( sq2[0].sTimePos, TXT_UPCASE );  /* Last SB0(3) -> (*u*) */
+						}
+						else
+						{
+							// SB -> SB Keeping
+						}
 					}
 				}
-
-				else if( 0==strcmp( sq2[0].sTimePos, TXT_SBTIME) )
+				else //if( SBposDecision>1 ) /* Last position */
 				{
-					if( iSBdecision > 1 )
-					{
-						strcpy( sq2[0].sTimePos, TXT_UPCASE );  /* Last SB0(3) -> (*u*) */
+					if( 0==strcmp( sq2[0].sTimePos, TXT_SBSWING0) )
+					{ 
+						strcpy( sq2[0].sTimePos, TXT_UPCASE); 
 					}
-					else
+					else if( 0==strcmp( sq2[0].sTimePos, TXT_SBTIME) )
 					{
+						iSBcount++;
 						// SB -> SB Keeping
 					}
 				}
-	
-				else if( 0==strncmp( sq2[0].sTimePos, TXT_SPTIME, 4) ) 
+				/* ======================================================== */
+				/* ======================================================== */
+				/* ======================================================== */
+
+
+				
+				if( 0==strncmp( sq2[0].sTimePos, TXT_SPTIME, 4) ) 
 				{ 
 					gMaxStart[iSPcount].SPTime = (unsigned int)( (sq2[0].Time01)*1000*JERK_TIME_SCALE );
 					iSPcount++;
@@ -4051,7 +4079,8 @@ int MakeShiftData4gMax_Table(short aiPATs05, int chk, int minMaxType)
 	}
 	while (!feof (fpginp));
 
-	fprintf(stderr,">>Re-Mapped g_Max %s [%s] - %u msec before SB point > %s \n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, iJerkTimeLen, shi_out );
+	//fprintf(stderr,">>Re-Mapped g_Max %s [%s] - %u msec before SB point > %s \n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, iJerkTimeLen, shi_out );
+	fprintf(stderr,">>Re-Mapped g_Max %s [%s] - %u msec before SB point (%d times) \n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, iJerkTimeLen, iSBdecision );
 
 	fclose(fpginp);
 	fclose(fpgout);
@@ -4698,7 +4727,8 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 		{
 			ierr = ferror(fpinput);
 			fclose(fpinput);
-			fprintf(stderr,">>%s min/Max Table is applied!!! [%s + %s] -> [%s] \r\n", maxType, infile, shi_inp, shi_out);
+			//fprintf(stderr,">>%s min/Max Table is applied!!! [%s + %s] -> [%s] \r\n", maxType, infile, shi_inp, shi_out);
+			fprintf(stderr,">>%s min/Max Table is applied!!!                            \r\n", maxType );
 			break;
 		}
 
@@ -5022,7 +5052,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 
 
 
-int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime)
+int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, short iSBchoicePnt)
 {
 	FILE *fp2in = NULL;
 	FILE *fp2out = NULL;
@@ -5099,7 +5129,7 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime)
 
 #if SAVEMODE
 	if(fp2out)
-		fprintf(fp2out, TITLE_TXT "\n", avgTime, iJerkTimeLen);
+		fprintf(fp2out, TITLE_TXT "\n", iSBdecision, iSBchoicePnt?"L":"F", avgTime, iJerkTimeLen);
 #endif
 
 
@@ -5115,7 +5145,8 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime)
 			ierr = ferror(fp2in);
 			fclose(fp2in);
 			fprintf(stderr,"----------------------------------------------------------------------------------\n" );
-			fprintf(stderr,">>Shift Quality Data Filtering completed!!! %s [%s] -> [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, shift_file ); 			
+			//fprintf(stderr,">>Shift Quality Data Filtering completed!!! %s [%s] -> [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, shift_file ); 			
+			fprintf(stderr,">>Shift Quality Data Filtering completed!!! %s      \r\n", arrPATs_ModeID[aiPATs05].ModeID ); 			
 			break;
 		}
 
@@ -5341,7 +5372,7 @@ int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime)
 
 
 
-int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTime, unsigned int SScnt, unsigned int SBcnt, unsigned int SPcnt)
+int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTime, short iSBchoicePnt, unsigned int SScnt, unsigned int SBcnt, unsigned int SPcnt)
 {
 	sqdflt_type sq4[2];  /* 0:SS, 1:SB, 2:MaxNt, 3:MaxNe, 4:g_Max, 5:g_min, 6:SP */
 	
@@ -5413,7 +5444,7 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 
 #if SAVEMODE
 	if(outfile)
-		fprintf(outfile, TITLE_TXT "\n", avgTime, iJerkTimeLen);
+		fprintf(outfile, TITLE_TXT "\n", iSBdecision, iSBchoicePnt?"L":"F", avgTime, iJerkTimeLen);
 #endif
 
 	do
@@ -6416,7 +6447,7 @@ int main(int argc, char *argv[])
 	short iModeID = -1; /* 8:md_NOR */
 	short iPwrOnOff = -1; /* POWER ON, POWER OFF*/
 	short itmpFileDeleted = 1;
-
+	short iSBchoicePnt = 0;
 	char currPath[PATH_MAX];
 #endif //SHIFT_QUALITY_DATA_SORTING /* 2022-11-13 */
 
@@ -8855,14 +8886,33 @@ int main(int argc, char *argv[])
 					int i, len;
 
 						itmpFileDeleted = 0; /* temp file Live ~~~ */
-
 						len = strlen( str_ShiftOp[0] );
-						for(i=0; i<len; i++)
+						for(i=len; i>0; i--)
 						{
-							if( '.' == str_ShiftOp[0][i] || '_' == str_ShiftOp[0][i] ) str_ShiftOp[0][i]='\0';
+							if( '.' == str_ShiftOp[0][i] || '_' == str_ShiftOp[0][i] ) 
+							{
+								str_ShiftOp[0][i]='\0';
+								break;
+							}
 						}
 					}
 
+					iSBchoicePnt = 0; /* SB first position */
+					if( strstr(str_ShiftOp[0], ".last") || strstr(str_ShiftOp[0], "_last") )
+					{
+					int i, len;
+
+						iSBchoicePnt = 1; /* SB Last position */
+						len = strlen( str_ShiftOp[0] );
+						for(i=len; i>0; i--)
+						{
+							if( '.' == str_ShiftOp[0][i] || '_' == str_ShiftOp[0][i] ) 
+							{
+								str_ShiftOp[0][i]='\0';
+								break;
+							}
+						}
+					}
 
 					iModeID = -1;
 					for(kk=0; kk<MODE_ID_NUMS-1; kk++)
@@ -8900,8 +8950,18 @@ int main(int argc, char *argv[])
 							iSBdecision = atoi( str_ShiftOp[kk] ); 
 							if( (iSBdecision < SB_DECISION_MAX_TIMES) && (iSBdecision > 0) )
 							{
-								fprintf(stderr,"\n");
-								fprintf(stderr,">>SB decision Num  : <<%d>> %d times (SB decision, default:3 times)", kk, iSBdecision ); 
+								if(iSBchoicePnt) 
+								{
+									iSBchoicePnt = iSBdecision-1;
+									fprintf(stderr,"\n");
+									fprintf(stderr,">>SB decision Num  : <<%d>> %d times (default:3 times) - last SB position", kk, iSBdecision ); 
+								}
+								else
+								{
+									iSBchoicePnt = 0;
+									fprintf(stderr,"\n");
+									fprintf(stderr,">>SB decision Num  : <<%d>> %d times (default:3 times) - first SB position", kk, iSBdecision ); 
+								}
 							}
 							else
 							{
@@ -13245,7 +13305,7 @@ int main(int argc, char *argv[])
 		// 1st STEP -----------------------------------------------
 		// input  : key-in~~~~
 		// output : ~~.ECO
-		iavgtm = ShiftQualData(iModeID, iPwrOnOff, SHIFT_UP, &SScnt, &SBcnt, &SPcnt, &iSBchk);
+		iavgtm = ShiftQualData(iModeID, iPwrOnOff, SHIFT_UP, iSBchoicePnt, &SScnt, &SBcnt, &SPcnt, &iSBchk);
 	    //rewind(inpfile);
 
 		#if 0
@@ -13256,7 +13316,7 @@ int main(int argc, char *argv[])
 		// 2nd STEP -----------------------------------------------
 		// input  : *.ECO
 		// output : *.cECO if return value ichk==1
-		ichk = SSCounterCheck(iModeID, SScnt, SBcnt, SPcnt, iSBchk);
+		ichk = SSCounterCheck(iModeID, iSBchoicePnt, SScnt, SBcnt, SPcnt, iSBchk);
 
 		// --------------------------------------------------------
 		// 3rd-1 STEP -----------------------------------------------
@@ -13385,7 +13445,7 @@ int main(int argc, char *argv[])
 		// 5th STEP -----------------------------------------------
 		// input  : *.zECO 
 		// output : *.txt
-		ShiftData_Filtering(shi_out, iModeID, iavgtm);
+		ShiftData_Filtering(shi_out, iModeID, iavgtm, iSBchoicePnt);
 
 
 
@@ -13393,7 +13453,7 @@ int main(int argc, char *argv[])
 		strcat(outfile, "gil");
 		// --------------------------------------------------------
 		// 6th STEP -----------------------------------------------
-		ShiftData_LastSorting(shi_out, outfile, iModeID, iavgtm, SScnt, SBcnt, SPcnt);
+		ShiftData_LastSorting(shi_out, outfile, iModeID, iavgtm, iSBchoicePnt, SScnt, SBcnt, SPcnt);
 
 
 		// --------------------------------------------------------
