@@ -552,25 +552,23 @@ void help(void)
            " \n"
            "--[ Shift Quality Data Sorting ]-------- -------------------------------------------------------------------------\n"
            "  -U or --upshift [ModeID][SB Pos] [SB#1] [Jerk#1] [APS#1] [APS#2] \n" 
-           "               SB Pos : SB positioning first or last (default: first SB position) .last \n"
+           "             SB/SP Pos : SB/SP positioning first or last (default: first SB/SP position) \n"
            " Ex) Last SB position case  : --upshift eco.last 3 300 3 2 \n"
            "     First SB position case : --upshift eco 3 300 3 2 \n"
-           "               SB#1   : SB point decision continuous count. (default 3 times) \n"
-           "               Jerk#1 : Unit: msec, Reverse time length at SB point for Jerk1 calcution. (default 300msec) \n"
-           "               APS#1  : APS level as 3, or 4.5. -> Power On/Off decision \n"
-           "               APS#2  : APS tolerance as 1%%, or 2%% \n"
+           "             SB#1   : SB point decision continuous count. (default 3 times) \n"
+           "             Jerk#1 : Unit: msec, Reverse time length at SB point for Jerk1 calcution. (default 300msec) \n"
+           "             APS#1  : APS level as 3, or 4.5. -> Power On/Off decision \n"
+           "             APS#2  : APS tolerance as 1%%, or 2%% \n"
            "\n"
            " Ex) ah.exe --input 5ms_16select.tsv --output 5ms_eco.txt --upshift eco.last 3 300 3 1.5 \n"
            "     ah.exe --input 5ms_16select.tsv --output 5ms_spt.txt --upshift spt 4 300 3   1.5 \n"
            "     ah.exe --input 5ms_16select.tsv --output 5ms_nor.txt --upshift NOR 4 300 3.5 2  \n"
-           "        -> Sorted result output : 5ms_eco.txt \n"
-           "        -> Generated temp files : 5ms_eco.ECO, 5ms_eco.cECO, 5ms_eco.zECO, ... \n"
+           "        -> Sorted result output : 5ms_eco.txt and 5ms_eco.gil \n"
            "\n" 
            "  -D or --downshift [ModeID][SB Pos] [SB#1] [Jerk#1] [APS#1] [APS#2] [VS start] [VS end] [VS step] \n" 
            "\n"
            " Ex) ah.exe --input 5ms_16select.tsv --output 5ms_spt.txt --downshift SPT 5 300 3 2 160 60 -10 \n"
-           "        -> Sorted result output : 5ms_spt.txt \n"
-           "        -> Generated temp files : 5ms_spt.SPT, 5ms_spt.cSPT, 5ms_spt.zSPT, ... \n"
+           "        -> Sorted result output : 5ms_spt.txt and 5ms_spt.gil \n"
            "\n"
            "  ModeID: HOT WUP MNL DN2 DN1 UP1 UP2 UP3 NOR ECO ECODN2 ECODN1 ECOUP1 ECOUP2 ECOUP3 \n" 
            "          CRZ CRZUP1 CRZUP2 BRK1 BRK2 HUP1 HUP2 HUP3 SPTDN2 SPTDN1 SPT SPTUP1 SPTUP2 \n" 
@@ -2740,25 +2738,25 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 	if(iSBdecision>=3)
 	{
 		if(0==SBposDecision)
-			fprintf(stderr,"  continuous SB decision Number: %d times, such as %s ", iSBdecision, PRINT_TXT_SB_SEQ_FIRST );
+			fprintf(stderr,"  cont. SB/SP decision Number  : %d times, such as %s ", iSBdecision, PRINT_TXT_SB_SEQ_FIRST );
 		else
-			fprintf(stderr,"  continuous SB decision Number: %d times, such as %s ", iSBdecision, PRINT_TXT_SB_SEQ_LAST );
+			fprintf(stderr,"  cont. SB/SP decision Number  : %d times, such as %s ", iSBdecision, PRINT_TXT_SB_SEQ_LAST );
 
-		if(SBposDecision) fprintf(stderr,"- last SB position \n"); 
-		else fprintf(stderr,"- first SB position \n"); 
+		if(SBposDecision) fprintf(stderr,"- last SB/SP position \n"); 
+		else fprintf(stderr,"- first SB/SP position \n"); 
 	}
 	else if(iSBdecision==2)
 	{
 		if(0==SBposDecision)
-			fprintf(stderr,"  continuous SB decision Number: %d times, such as %s.%s ", iSBdecision, TXT_SBTIME, TXT_SBSWING0 );
+			fprintf(stderr,"  cont. SB/SP decision Number  : %d times, such as %s.%s ", iSBdecision, TXT_SBTIME, TXT_SBSWING0 );
 		else
-			fprintf(stderr,"  continuous SB decision Number: %d times, such as %s.%s ", iSBdecision, TXT_SBSWING0, TXT_SBTIME );
+			fprintf(stderr,"  cont. SB/SP decision Number  : %d times, such as %s.%s ", iSBdecision, TXT_SBSWING0, TXT_SBTIME );
 
-		if(SBposDecision) fprintf(stderr,"- last SB position \n"); 
-		else fprintf(stderr,"- first SB position \n"); 
+		if(SBposDecision) fprintf(stderr,"- last SB/SP position \n"); 
+		else fprintf(stderr,"- first SB/SP position \n"); 
 	}
 	else if(iSBdecision<=1)
-		fprintf(stderr,"  continuous SB decision Number: %d (Just One) - SB-point can be determined wrongly. \n", iSBdecision );
+		fprintf(stderr,"  cont. SB/SP decision Number  : %d (Just One) - SB/SP-point can be determined wrongly. \n", iSBdecision );
 
 	fprintf(stderr,"  Jerk Time length (gMax/gmin) : %d msec ~ (SB point) ~ %d msec \n", iJerkTimeLen, iavgTime*SB_POINT_COUNT_NUM );
 
@@ -5992,10 +5990,14 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 	unsigned long long iNGcount = 0ULL;
 	unsigned long long iOKcount = 0ULL;
 	short is2File = 0;
-	short icurGear = -1;
-	short itgtGear = -1;
+	short icurGear = 99; // -1;
+	short icurMaxGear = 0;
+	short itgtGear = 99; // -1;
+	short itgtMaxGear = 0; // -1;
 	short iShiftNu = -1;
-	short iAPSindex = -1;
+	short iAPSminIdx = 99; 
+	short iAPSMAXIdx = 0;
+	short iAPSidx = 0;
 	short iOnce = 1;
 	short iLastLinecurGear = 0;
 	short iLastLinetgtGear = 0;
@@ -6006,7 +6008,9 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 	unsigned int iSScount = 0;
 	unsigned int iSBcount = 0;
 	unsigned int iSPcount = 0;
-
+	unsigned int iSScountot = 0;
+	unsigned int iSBcountot = 0;
+	unsigned int iSPcountot = 0;
 	unsigned int ireSScnt = 1;
 	unsigned int ireSPcnt = 1;
 	unsigned int llLoop = 0, llLastNum=0, ii=0;
@@ -6047,6 +6051,7 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 
 	iSScount   = 0; 
 	iSPcount   = 0; 
+	iSPcountot = 0;
 
 	ireSScnt   = 1;
 	ireSPcnt   = 1;
@@ -6065,8 +6070,10 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 
 		if( NULL == fgets( QualData, QUAL_DATA_MAX_SIZE, inpfile ) )
 		{
-			ierr = ferror(inpfile);
-			fclose(inpfile);
+			//ierr = ferror(inpfile);
+			//fclose(inpfile);
+
+			rewind(inpfile); 
 			fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 			fprintf(stderr,">>Shift Quality Init APS condition check!!! %s [%s] -> [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, output  );			
 			break;
@@ -6110,15 +6117,27 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 				continue;
 			}
 
-			if( 0==strcmp( sq4[0].sTimePos, TXT_SPTIME) ) iSPcount ++;
+			if( 0==strncmp( sq4[0].sTimePos, TXT_SPTIME, 4) ) iSPcountot ++;
+
+			if( 0==strncmp( sq4[0].sTimePos, TXT_SBTIME, 4) ) iSBcountot ++;
 
 			if( 0==strcmp( sq4[0].sTimePos, TXT_SSTIME) ) /* first Start poision : SS point */
 			{
-				icurGear = sq4[0].curGear08;
-				itgtGear = sq4[0].tgtGear11;
-				iShiftNu = sq4[0].ShiNew12;
-				break;
+				iSScountot ++;
 			}
+
+			/* min value saved !! -> Start point */
+			if( icurGear > sq4[0].curGear08 ) icurGear = sq4[0].curGear08;
+			if( icurMaxGear < sq4[0].curGear08 ) icurMaxGear = sq4[0].curGear08;
+
+			if( itgtGear > sq4[0].tgtGear11 ) itgtGear = sq4[0].tgtGear11;
+			if( itgtMaxGear < sq4[0].tgtGear11 ) itgtMaxGear = sq4[0].tgtGear11;
+
+			if( iShiftNu > sq4[0].ShiNew12 ) iShiftNu = sq4[0].ShiNew12;
+
+			if( iAPSminIdx > sq4[0].apsIdx ) iAPSminIdx = sq4[0].apsIdx;
+			if( iAPSMAXIdx < sq4[0].apsIdx ) iAPSMAXIdx = sq4[0].apsIdx;
+
 		}
 	}
 	while (!feof (inpfile));
@@ -6127,19 +6146,14 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 	
 	// ==================================================
 
-	RecordCnt  = 0ULL;
-	iNGcount   = 0ULL;
-	iOKcount   = 0ULL;
-
-	iSScount   = 0U; 
-	iSBcount   = 0U; 
-	iSPcount   = 0U; 
-
 	ireSScnt   = 1;
 	ireSPcnt   = 1;
 	iOnce = 1;
 
 	rewind(inpfile); 
+
+	// APS start index
+	iAPSidx = iAPSminIdx;
 
 
 	if( icurGear+1 == itgtGear )
@@ -6154,13 +6168,17 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 
 	// ==================================================
 
-	llLastNum = SPcnt; // - ignoredCnt;
+	llLastNum = iOKcount; // SPcnt; // - ignoredCnt;
 	//fprintf(stderr," llLastNum (%d) = SPcnt (%d) - ignoredCnt (%d) \n", llLastNum, SPcnt, ignoredCnt );
+
+
+	//fprintf(stderr, " iAPSmin/Max(%d/%d) = cur(%d:<%d>:%d) tgt(%d:%d) iOKcount(%d)/%d \n", iAPSminIdx, iAPSMAXIdx, icurGear, icurMaxGear, sq4[0].curGear08, itgtGear, sq4[0].tgtGear11, iOKcount, SPcnt  );
 
 	//if( TYPE_MAX_NT == minMaxType )
 	{
 		/* ======================================================= */
-		for(llLoop=1; llLoop<=llLastNum; llLoop++)
+		//for(llLoop=1; llLoop<=llLastNum; llLoop++)
+		for(;;)
 		{
 			RecordCnt  = 0ULL;
 			iNGcount   = 0ULL;
@@ -6169,6 +6187,8 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 			iSScount   = 0U; 
 			iSBcount   = 0U; 
 			iSPcount   = 0U;
+
+			if( icurGear > icurMaxGear ) break;
 
 			do
 			{
@@ -6180,9 +6200,24 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 				if( NULL == fgets( QualData, QUAL_DATA_MAX_SIZE, inpfile ) )
 				{
 					ierr = ferror(inpfile);
-					fclose(inpfile);
+					//fclose(inpfile);
 					//fprintf(stderr,"----------------------------------------------------------------------------------\n" );
-					fprintf(stderr,">>Shift Sorting ~~~~ \r\n" );
+
+					if( iAPSidx > iAPSMAXIdx )
+					{
+						// Next Gear
+						icurGear ++;
+						itgtGear ++;
+						iAPSidx = iAPSminIdx;
+					}
+					else
+					{
+						iAPSidx ++;
+					}
+
+					rewind(inpfile);
+
+					//fprintf(stderr,">>Shift Sorting ~~~~ curGear(%d), tgtGear(%d), APS[%2d:%6.1lf] \r\n", icurGear, itgtGear, iAPSidx, ApsTble[iAPSidx] );
 					break;
 				}
 
@@ -6257,91 +6292,58 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 						is2File = 1;
 					}
 
-					//if( (SPcnt - ignoredCnt) == iSPcount )
-					if( SPcnt == iSPcount )
-					{
 
-					#if SAVEMODE
-						if(outfile && is2File && iOnce && (icurGear == iLastLinecurGear) && (itgtGear == iLastLinetgtGear) )
+					if( (icurGear == sq4[0].curGear08) && (itgtGear == sq4[0].tgtGear11) && (iAPSidx == sq4[0].apsIdx) )
+					{
+						//fprintf(stderr, " iAPSindex = cur(%d:%d) tgt(%d:%d) apsIdx %d \n", icurGear, sq4[0].curGear08, itgtGear, sq4[0].tgtGear11, sq4[0].apsIdx );
+
+				#if SAVEMODE
+						if(outfile && is2File)
 						{
-							iOnce = 0;
 							fprintf(outfile, SAVE_FltFMT,
 									sq4[0].Time01,	 sq4[0].iPATs05,	sq4[0].iPATs05S,  sq4[0].curGear08, sq4[0].tgtGear11,  sq4[0].VSP03, 
 									sq4[0].tqi07,	 sq4[0].APS09,		sq4[0].No10,	  sq4[0].ShiNew12,	sq4[0].ShiTy12,    sq4[0].arrGear, 
 									sq4[0].TqFr13,	 sq4[0].ShiPh14,	sq4[0].Ne15,	  sq4[0].Nt16,		sq4[0].LAcc17,	   sq4[0].DiffTime, 
 									sq4[0].sTimePos, sq4[0].gearRat,	sq4[0].fJerk1,	  sq4[0].fJerk2,	sq4[0].deltams );
-			
+					
 							if(1==is2File) fprintf(outfile, "\n");
 							if(2==is2File) fprintf(outfile, "\n\n");
 						}
-					#endif
-
-						llLastNum = iBigtgtGear;
-
-						rewind(inpfile);
-						break;
-					}
-
-					//fprintf(stderr, " iAPSindex %d <> sq4[0].apsIdx %d \n", iAPSindex, sq4[0].apsIdx );
-
-
-					if( (icurGear != sq4[0].curGear08) || (itgtGear != sq4[0].tgtGear11) )
-					{
-						if( 1==llLoop )
-						{
-							iLastLinecurGear = sq4[0].curGear08;
-							iLastLinetgtGear = sq4[0].tgtGear11;
-
-							if( iBigcurGear < iLastLinecurGear ) iBigcurGear = iLastLinecurGear;
-							if( iBigtgtGear < iLastLinetgtGear ) iBigtgtGear = iLastLinetgtGear;
-						}
-						continue;
-					}
-					
-					icurGear = sq4[0].curGear08;
-					itgtGear = sq4[0].tgtGear11;
-
-					iAPSindex = sq4[0].apsIdx;
-
-				#if SAVEMODE
-					if(outfile && is2File)
-					{
-						fprintf(outfile, SAVE_FltFMT,
-								sq4[0].Time01,	 sq4[0].iPATs05,    sq4[0].iPATs05S,  sq4[0].curGear08, sq4[0].tgtGear11,  sq4[0].VSP03, 
-								sq4[0].tqi07,	 sq4[0].APS09,      sq4[0].No10, 	  sq4[0].ShiNew12,	sq4[0].ShiTy12,    sq4[0].arrGear, 
-								sq4[0].TqFr13,	 sq4[0].ShiPh14,    sq4[0].Ne15, 	  sq4[0].Nt16,		sq4[0].LAcc17,	   sq4[0].DiffTime, 
-								sq4[0].sTimePos, sq4[0].gearRat,    sq4[0].fJerk1,    sq4[0].fJerk2,    sq4[0].deltams );
-
-						if(1==is2File) fprintf(outfile, "\n");
-						if(2==is2File) fprintf(outfile, "\n\n");
-					}
 				#endif
 
+					}
+
+					if( 1==llLoop )
+					{
+						iLastLinecurGear = sq4[0].curGear08;
+						iLastLinetgtGear = sq4[0].tgtGear11;
+					
+						if( iBigcurGear < iLastLinecurGear ) iBigcurGear = iLastLinecurGear;
+						if( iBigtgtGear < iLastLinetgtGear ) iBigtgtGear = iLastLinetgtGear;
+					}
+		
 				}
 
 			}
 			while (!feof (inpfile));
 
-			// Next Gear
-			icurGear ++;
-			itgtGear ++;
-
 		}
 	}
-
 
 	if(inpfile) fclose(inpfile);
 	if(outfile) fclose(outfile);
 
+	icurGear--;
+	itgtGear--;
 
 	if( icurGear+1 == itgtGear )
-		fprintf(stderr, "  %s UP shift Ended ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, iBigcurGear, iBigtgtGear );
+		fprintf(stderr, "  %s UP shift Ended ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, icurGear, itgtGear  );
 	else if( icurGear == itgtGear+1 )
-		fprintf(stderr, "  %s DOWN shift Ended ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, iBigcurGear, iBigtgtGear );
+		fprintf(stderr, "  %s DOWN shift Ended ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, icurGear, itgtGear  );
 	else if( icurGear > itgtGear+1 )
-		fprintf(stderr, "  %s SKIPDOWN shift Ended ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, iBigcurGear, iBigtgtGear );
+		fprintf(stderr, "  %s SKIPDOWN shift Ended ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, icurGear, itgtGear  );
 	else
-		fprintf(stderr, "  %s STATIC shift Ended ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, iBigcurGear, iBigtgtGear );
+		fprintf(stderr, "  %s STATIC shift Ended ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, icurGear, itgtGear  );
 
 
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
@@ -6350,17 +6352,17 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 	avg_t2 = 0ULL;
 	
 	//fprintf(stderr, "%d %d %d \n", iSScount, iSBcount, iSPcount );
-	for(ii=0; ii<iSPcount; ii++)
+	for(ii=0; ii<iSPcountot; ii++)
 	{
 		avg_t1 += (gMaxStart[ii].SBTime - gMaxStart[ii].SSTime)/JERK_TIME_SCALE;
 		avg_t2 += (gMaxStart[ii].SPTime - gMaxStart[ii].SBTime)/JERK_TIME_SCALE;
 	
 		//fprintf(stderr, " %2d -> %10lld  %10lld  \n", ii, avg_t1, avg_t2 );
 	}
-	avg_t1 /= iSPcount;
-	avg_t2 /= iSPcount;
+	avg_t1 /= iSPcountot;
+	avg_t2 /= iSPcountot;
 	
-	fprintf(stderr,">>Average Time after Last Sorting... SS(%d), SB(%d), SP(%d) Records.. %s \n", iSScount, iSBcount, iSPcount, arrPATs_ModeID[aiPATs05].ModeID );
+	fprintf(stderr,">>Average Time after Last Sorting... SS(%d), SB(%d), SP(%d) Records.. %s \n", iSScountot, iSBcountot, iSPcountot, arrPATs_ModeID[aiPATs05].ModeID );
 	fprintf(stderr,"  Shift Average Time(t1:SS~SB) : %9llu msec <- 3rd average time  \n", avg_t1 );
 	fprintf(stderr,"  Shift Average Time(t2:SB~SP) : %9llu msec <- 3rd average time  \n", avg_t2 );
 	//fprintf(stderr,"----------------------------------------------------------------------------------\n" );
@@ -6543,22 +6545,24 @@ int CheckLicense(void)
 #define MAC_BUF_SIZ 		300
 #define MAC_ADDR_NUM 		6
 #define MAC_ADDR_LINE_SIZ 	10
-#define HOSTPC_MAC_FILE 	"C:/Temp/ahLic.mac"
+//#define HOSTPC_MAC_FILE 	"C:/Temp/ahLic.mac"
 #define HOSTPC_MAC_TEMP 	"C:/Temp/tmp111.tmp"
 #define HOSTPC_SEND2ME 		"./send2me.gil"
-#define HOSTPC_LICENSE 		"./shift.lic"
-#define LICENSE_LEN 		128
+//#define HOSTPC_LICENSE 		"./shift.lic"
+#define SHA3_512_LICENSE_LEN 		128
 
 	char tmpData[MAC_BUF_SIZ];
 	FILE *fi = NULL;
-	FILE *fo = NULL;
 	FILE *fr = NULL;
+	//FILE *fo = NULL;
 	
+	unsigned char sha3Buf[MAC_ADDR_LINE_SIZ][20] = {0xff,};
+
 	unsigned char macAdd[MAC_ADDR_LINE_SIZ][7];
 	char LicFile[MAC_ADDR_LINE_SIZ][MAC_BUF_SIZ] = {0,};
 	int result;
 	int re = 0, fres, ii=0, licOk=0;
-	unsigned int iOKc=0, iNGc=0, lloop=0;
+	unsigned int iOKc=0, iNGc=0, lloop=0, iFinal=0;
 	int iret = -10;
 	char userPath[_MAX_PATH] = "C:\\Users";
 	char findPath[_MAX_PATH]; 
@@ -6566,6 +6570,7 @@ int CheckLicense(void)
 	memset( LicFile, 0x00, sizeof(LicFile) );
 	memset( findPath, 0x00, sizeof(findPath) );
 	
+	memset( sha3Buf, 0xFF, sizeof(sha3Buf) );
  
     FileSearch(userPath, findPath);
 	if( NULL == (fr = fopen( findPath /*HOSTPC_LICENSE*/, "rb")) ) 
@@ -6574,7 +6579,7 @@ int CheckLicense(void)
 		re = system("getmac > send2me.gil");
 		if( 0!=re )
 		{
-			fprintf(stderr,"\rLicense temp check needed.. (%d) \n\n", re);
+			fprintf(stderr,"\r\nLicense temp check needed.. (%d) \n\n", re);
 			exit(0);
 		}
 
@@ -6583,7 +6588,6 @@ int CheckLicense(void)
 	}
 	else
 	{
-	
 		if( 0 != remove( HOSTPC_SEND2ME ) )
 		{
 			//fprintf(stderr,"  Deleted temp file -> Failed \n");
@@ -6605,184 +6609,116 @@ int CheckLicense(void)
 	}
 	///////////////////////////////////////////////////////////
 
-	fres = isFileExist(HOSTPC_MAC_FILE, 0 );
+	//fres = isFileExist(HOSTPC_MAC_FILE, 0 );
+	fres = isFileExist(HOSTPC_MAC_TEMP, 0 );
 	//fprintf(stderr, "fres = %d \n", fres );
 	if(0==fres)
-	{				
+	{	
 		re = system("getmac > C:/Temp/tmp111.tmp");
 		if( 0!=re )
 		{
 			fprintf(stderr,"\r\nLicense check needed.. \n\n");
 			exit(0);
 		}
-
-		if( NULL == (fi = fopen( HOSTPC_MAC_TEMP, "rb")) ) 
-		{
-			fprintf(stderr,"\nCan not read license related file... \n\n");
-			exit(0);
-		}
-		else
-		{
-			if( NULL == (fo = fopen( HOSTPC_MAC_FILE, "wb")) ) 
-			{
-				fprintf(stderr,"\nCan not write alLic.mac temp file.. \n\n");
-				if(fi) fclose(fi);
-				if(fo) fclose(fo);
-				exit(0);
-			}
-		}
-		memset(macAdd, 0x00, sizeof(macAdd) );
-		lloop = 0;
-		do
-		{
-			unsigned int i=0;
-
-			/* Read a line from input file. */
-			memset( tmpData, 0x00, sizeof(tmpData) );
-
-			if( NULL == fgets( tmpData, MAC_BUF_SIZ, fi ) )
-			{
-				//fprintf(stderr,"temp Lic ended.. \n" );
-				break;
-			}
-
-			/* Remove carriage return/line feed at the end of line. */
-			i = strlen(tmpData);
-			
-			if(i >= MAC_BUF_SIZ)
-			{
-				fprintf(stderr,"\r\nERROR:Not enough Buffer length---(%u) \n\n", i );
-			}
-
-			if (--i > 0)
-			{
-				if (tmpData[i] == '\n') tmpData[i] = '\0';
-				if (tmpData[i] == '\r') tmpData[i] = '\0'; 
-				if (tmpData[i-1] == '\n') tmpData[i-1] = '\0';
-				if (tmpData[i-1] == '\r') tmpData[i-1] = '\0'; 
-
-				result = sscanf(tmpData, "%x-%x-%x-%x-%x-%x",
-							&macAdd[lloop][0], &macAdd[lloop][1], &macAdd[lloop][2], &macAdd[lloop][3], &macAdd[lloop][4], &macAdd[lloop][5] );
-
-				
-				/* === 1 STEP : record (17 items check) =============== */
-				if(MAC_ADDR_NUM==result)
-				{
-					//fprintf(stderr, "%d [%02x-%02x-%02x-%02x-%02x-%02x] \n", lloop, macAdd[lloop][0], macAdd[lloop][1], macAdd[lloop][2], macAdd[lloop][3], macAdd[lloop][4], macAdd[lloop][5] );
-
-					// 3 uppercase + 3 lowercase
-					if(fo) fprintf(fo, "%02X-%02X-%02X-%02x-%02x-%02x\n", 
-								macAdd[lloop][0], macAdd[lloop][1], macAdd[lloop][2], macAdd[lloop][3], macAdd[lloop][4], macAdd[lloop][5] );
-					iOKc ++;
-					lloop ++;
-				}
-				else if( (MAC_ADDR_NUM!=result) && (result!=-1 && i>0) ) 
-				{
-					iNGc ++;
-					continue; /* reading Next item because of FAIL item */
-				}
-
-				if( lloop > MAC_ADDR_LINE_SIZ ) break;
-				/* === 1 STEP : record (17 items check) =============== */
-			}
-		}
-		while (!feof (fi));
-			
-		if(fi) { fclose(fi); fi=NULL; }
-		if(fo) { fclose(fo); fo=NULL; }
-		if(fr) { fclose(fr); fr=NULL; }
-
-		if( 0 != remove( HOSTPC_MAC_TEMP ) )
-		{
-			//fprintf(stderr,"  Deleted temp file -> Failed \n");
-		}
-
-		#if 1
-		{
-			unsigned char sha3Buf[20] = {0,};
-			char	sha3digestTxt[SHA3_OUTPUT_SIZ] = {0,};
-			unsigned char sha3out[SHA3_OUTPUT_SIZ] = { 0, };
-			
-			unsigned __int64 	kll=0;
-			size_t		ll=0;
-			int 		ret, ii;
-
-			memset( sha3Buf, 0x00, sizeof(sha3Buf) );
-			memset( sha3out, 0x00, sizeof(sha3out) );
-			memset( sha3digestTxt, 0x00, sizeof(sha3digestTxt) );
-
-			if( NULL == (fi = fopen( HOSTPC_MAC_FILE, "rb")) ) 
-			{
-				fprintf(stderr,"\r\n++ERROR++:Can not read temp Lic file \n\n");
-				exit(0);
-			}
+	}
 
 
-			memset(sha3digestTxt, 0x00, sizeof(sha3digestTxt) ); // initialized
-			iret = 0; 
-			kll = 0UL;
-			licOk = 0;
-			//while((ll = fread(sha3Buf, 15, sizeof(sha3Buf), fi)) > 0) 
-			do {
-				// Initialize the SHA3-512 context
-				sha3_init(SHA3_512_HASH_BIT, SHA3_SHAKE_NONE);	
-
-				fscanf(fi, "%s", sha3Buf );
-				ll = strlen( (char *)sha3Buf);
-				{
-					//printf("[ll=%d[%s]]\n", ll, sha3Buf	);
-					kll += ll;
-					sha3_update(sha3Buf, ll);
-				}
-				
-				ret = sha3_final(sha3out, SHA3_OUT_512);
-				
-				for (ii = 0; ii < SHA3_OUT_512; ii++)
-				{
-					sprintf(&sha3digestTxt[ii*2], "%02x", sha3out[ii]);
-				}
-
-				//if(outfile) fprintf(outfile,"%s", sha3digestTxt);
-				//printf("[%s] \r\n", sha3digestTxt  );
-
-				for(ii=0; ii<MAC_ADDR_LINE_SIZ; ii++)
-				{
-					if( ll <= 0 ) break;
-					if( LicFile[ii][0] == '\0' || LicFile[ii][0]=='\n' || LicFile[ii][0]=='\r' ) 
-					{
-						LicFile[ii][0] = '\0';
-						break;
-					}
-
-					if( 0==strncmp(sha3digestTxt, &LicFile[ii][4], LICENSE_LEN ) ) 
-					{
-						licOk ++;
-						iret = 0x8000; 
-					}
-				}
-				memset(sha3digestTxt, 0x00, sizeof(sha3digestTxt) ); // initialized
-			} while (!feof (fi));
-			iret += licOk;
-
-			if(fi) fclose(fi);
-			if(fo) fclose(fo);
-			if(fr) fclose(fr);
-		}
-		#endif
-
-		#if 0
-		if( iret ) 
-		{
-			fprintf(stderr," ------->> Licensed OK on the PC. (%#x)\n", iret);
-			fprintf(stderr,"---------------------------------------------------------------\n" );
-		}
-		#endif
-		
-		return iret; /* License OK */
+	if( NULL == (fi = fopen( HOSTPC_MAC_TEMP, "rb")) ) 
+	{
+		fprintf(stderr,"\nCan not read license related file... \n\n");
+		exit(0);
 	}
 	else
 	{
-		unsigned char sha3Buf[20] = {0,};
+		#if 0
+		if( NULL == (fo = fopen( HOSTPC_MAC_FILE, "wb")) ) 
+		{
+			fprintf(stderr,"\nCan not write alLic.mac temp file.. \n\n");
+			if(fi) fclose(fi);
+			if(fo) fclose(fo);
+			exit(0);
+		}
+		#endif
+	}
+	memset(macAdd, 0x00, sizeof(macAdd) );
+	memset(sha3Buf, 0xFF, sizeof(sha3Buf) );
+	lloop = 0;
+	do
+	{
+		unsigned int i=0;
+
+		/* Read a line from input file. */
+		memset( tmpData, 0x00, sizeof(tmpData) );
+
+		if( NULL == fgets( tmpData, MAC_BUF_SIZ, fi ) )
+		{
+			//fprintf(stderr,"temp Lic ended.. \n" );
+			break;
+		}
+
+		/* Remove carriage return/line feed at the end of line. */
+		i = strlen(tmpData);
+		
+		if(i >= MAC_BUF_SIZ)
+		{
+			fprintf(stderr,"\r\nERROR:Not enough Buffer length---(%u) \n\n", i );
+		}
+
+		if (--i > 0)
+		{
+			if (tmpData[i] == '\n') tmpData[i] = '\0';
+			if (tmpData[i] == '\r') tmpData[i] = '\0'; 
+			if (tmpData[i-1] == '\n') tmpData[i-1] = '\0';
+			if (tmpData[i-1] == '\r') tmpData[i-1] = '\0'; 
+
+			result = sscanf(tmpData, "%x-%x-%x-%x-%x-%x",
+						&macAdd[lloop][0], &macAdd[lloop][1], &macAdd[lloop][2], &macAdd[lloop][3], &macAdd[lloop][4], &macAdd[lloop][5] );
+
+			
+			/* === 1 STEP : record (17 items check) =============== */
+			if(MAC_ADDR_NUM==result)
+			{
+				//fprintf(stderr, "%d [%02x-%02x-%02x-%02x-%02x-%02x] \n", lloop, macAdd[lloop][0], macAdd[lloop][1], macAdd[lloop][2], macAdd[lloop][3], macAdd[lloop][4], macAdd[lloop][5] );
+				
+
+				// 3 uppercase + 3 lowercase
+		#if 0
+				if(fo) fprintf(fo, "%02X-%02X-%02X-%02x-%02x-%02x\n", 
+							macAdd[lloop][0], macAdd[lloop][1], macAdd[lloop][2], macAdd[lloop][3], macAdd[lloop][4], macAdd[lloop][5] );
+		#else
+				sprintf(sha3Buf[lloop], "%02X-%02X-%02X-%02x-%02x-%02x\0", 
+							macAdd[lloop][0], macAdd[lloop][1], macAdd[lloop][2], macAdd[lloop][3], macAdd[lloop][4], macAdd[lloop][5] );
+		#endif
+		
+				iOKc ++;
+				lloop ++;
+			}
+			else if( (MAC_ADDR_NUM!=result) && (result!=-1 && i>0) ) 
+			{
+				iNGc ++;
+				continue; /* reading Next item because of FAIL item */
+			}
+
+			if( lloop > MAC_ADDR_LINE_SIZ ) break;
+			/* === 1 STEP : record (17 items check) =============== */
+		}
+	}
+	while (!feof (fi));
+
+	iFinal = lloop;
+	
+	if(fr) { fclose(fr); fr=NULL; }
+	if(fi) { fclose(fi); fi=NULL; }
+	//if(fo) { fclose(fo); fo=NULL; }
+
+	//if( 0 != remove( HOSTPC_MAC_TEMP ) )
+	//{
+	//	//fprintf(stderr,"  Deleted temp file -> Failed \n");
+	//}
+
+	#if 1
+	{
+		//unsigned char sha3Buf[20] = {0,};
 		char	sha3digestTxt[SHA3_OUTPUT_SIZ] = {0,};
 		unsigned char sha3out[SHA3_OUTPUT_SIZ] = { 0, };
 		
@@ -6790,36 +6726,34 @@ int CheckLicense(void)
 		size_t		ll=0;
 		int 		ret, ii;
 
-		memset( sha3Buf, 0x00, sizeof(sha3Buf) );
+		//memset( sha3Buf, 0x00, sizeof(sha3Buf) );
 		memset( sha3out, 0x00, sizeof(sha3out) );
 		memset( sha3digestTxt, 0x00, sizeof(sha3digestTxt) );
 
+	#if 0
 		if( NULL == (fi = fopen( HOSTPC_MAC_FILE, "rb")) ) 
 		{
-			fprintf(stderr,"\n++ERROR++:Can not read temp Lic file \n\n");
-			if(fi) fclose(fi);
-			if(fo) fclose(fo);
-			if(fr) fclose(fr);
+			fprintf(stderr,"\r\n++ERROR++:Can not read temp Lic file \n\n");
 			exit(0);
 		}
-
+	#endif
 
 		memset(sha3digestTxt, 0x00, sizeof(sha3digestTxt) ); // initialized
 		iret = 0; 
 		kll = 0UL;
 		licOk = 0;
+		lloop = 0;
 		//while((ll = fread(sha3Buf, 15, sizeof(sha3Buf), fi)) > 0) 
 		do {
 			// Initialize the SHA3-512 context
 			sha3_init(SHA3_512_HASH_BIT, SHA3_SHAKE_NONE);	
 
-			fscanf(fi, "%s", sha3Buf );
-			ll = strlen( (char*) sha3Buf);
-			if(ll<1) break;
+			//fscanf(fi, "%s", sha3Buf );
+			ll = strlen( (char *)sha3Buf[lloop] );
 			{
-				//printf("[ll=%d[%s]]\n", ll,sha3Buf	);
+				//printf("[ll=%d[%s]]\n", ll, sha3Buf	);
 				kll += ll;
-				sha3_update(sha3Buf, ll);
+				sha3_update(sha3Buf[lloop], ll);
 			}
 			
 			ret = sha3_final(sha3out, SHA3_OUT_512);
@@ -6831,7 +6765,6 @@ int CheckLicense(void)
 
 			//if(outfile) fprintf(outfile,"%s", sha3digestTxt);
 			//printf("[%s] \r\n", sha3digestTxt  );
-			//fprintf(stderr,"%s -> ", sha3Buf );
 
 			for(ii=0; ii<MAC_ADDR_LINE_SIZ; ii++)
 			{
@@ -6841,30 +6774,34 @@ int CheckLicense(void)
 					LicFile[ii][0] = '\0';
 					break;
 				}
-				if( 0==strncmp(sha3digestTxt, &LicFile[ii][4], LICENSE_LEN) ) 
+
+				if( 0==strncmp(sha3digestTxt, &LicFile[ii][4], SHA3_512_LICENSE_LEN ) ) 
 				{
-					iret = 0x4000; 
-					licOk++;
-					//fprintf(stderr, "2nd -- Same OK: %d %s \n", ii, LicFile[ii]);
+					licOk ++;
+					iret = 0x8000; 
 				}
 			}
 			memset(sha3digestTxt, 0x00, sizeof(sha3digestTxt) ); // initialized
+			lloop ++;
 
-		} while (!feof (fi));
+			if( lloop > MAC_ADDR_LINE_SIZ || lloop > iFinal) break;
+		} while (1); // (!feof (fi));
 		iret += licOk;
 
-		if(fi) fclose(fi);
-		if(fo) fclose(fo);
 		if(fr) fclose(fr);
-
-		return iret; /* License OK */
 	}
+	#endif
 
+	#if 0
+	if( iret ) 
+	{
+		fprintf(stderr," ------->> Licensed OK on the PC. (%#x)\n", iret);
+		fprintf(stderr,"---------------------------------------------------------------\n" );
+	}
+	#endif
+	
+	return iret; /* License OK */
 
-	if(fi) fclose(fi);
-	if(fo) fclose(fo);
-	if(fr) fclose(fr);
-	return 0;
 }
 
 
@@ -9526,6 +9463,8 @@ int main(int argc, char *argv[])
 					isDownShift  = 0;
 					iModeID      = -1;
 
+					iPwrOnOff    = SHI_PWR_ON;
+
 					memset(str_ShiftOp, 0x00, sizeof(str_ShiftOp) );
 
 					// ------------------------------------------------
@@ -9613,13 +9552,13 @@ int main(int argc, char *argv[])
 								{
 									iSBchoicePnt = iSBdecision-1;
 									fprintf(stderr,"\n");
-									fprintf(stderr,">>SB decision Num  : <<%d>> %d times (default:3 times) - last SB position", kk, iSBdecision ); 
+									fprintf(stderr,">>SB decision Num  : <<%d>> %d times (default:3 times) - last SB/SP position", kk, iSBdecision ); 
 								}
 								else
 								{
 									iSBchoicePnt = 0;
 									fprintf(stderr,"\n");
-									fprintf(stderr,">>SB decision Num  : <<%d>> %d times (default:3 times) - first SB position", kk, iSBdecision ); 
+									fprintf(stderr,">>SB decision Num  : <<%d>> %d times (default:3 times) - first SB/SP position", kk, iSBdecision ); 
 								}
 							}
 							else
@@ -9728,6 +9667,8 @@ int main(int argc, char *argv[])
 					isUpShift	 = 0;
 					isDownShift  = 1;
 					iModeID      = -1;
+
+					iPwrOnOff    = SHI_PWR_ON;
 
 					memset(str_ShiftOp, 0x00, sizeof(str_ShiftOp) );
 
