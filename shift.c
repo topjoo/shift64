@@ -797,6 +797,8 @@ void AllFilesClosed(void)
 #define TXT_SBMXNtNe 		"(SB)MXNtNe"
 #define TXT_SBMXNtgX 		"(SB)MXNtgX"
 #define TXT_SBMXNegX 		"(SB)MXNegX"
+#define TXT_SBMXNtgm 		"(SB)MXNtgm"
+#define TXT_SBMXNegm 		"(SB)MXNegm"
 
 #define TXT_SB0_MaxNt 		"(SB0)MXNt" 
 #define TXT_SB0_MaxNe 		"(SB0)MXNe" 
@@ -1413,9 +1415,9 @@ iShift, iShiType12, arrGear[iShiType12].sGear, TqFr, ShiftPh, sNe, sNt16, Long_A
 
 
 /* 2022-12-18, to buffer */
-#define MAX_DATA_FILE_SAVED 	1
+#define MAX_DATA_FILE_SAVED 	0 /* NOT file saved, Used buffer */
 
-#if 0 //MAX_DATA_FILE_SAVED
+#if (0==MAX_DATA_FILE_SAVED)
 typedef struct _minMax_buf_ {
 	int iIndex; 
 	double	msTime;
@@ -1817,7 +1819,10 @@ typedef enum _gear_shift_type_ {
 	GEAR_NEAR2STOP ,
 	GEAR_RETURN_SHI,
 	
-	GEAR_CURRENT   ,
+	GEAR_P,
+	GEAR_N,
+	GEAR_R,
+	GEAR_D,
 	GEAR_OTHER     ,
 
 	GEAR_MAX_NUM = 0x7f
@@ -1837,7 +1842,7 @@ typedef struct _gearShiKind_ {
 	unsigned long long lSum;
 } tGearShi_type;
 
-tGearShi_type gMode[10] = {
+tGearShi_type gMode[13] = {
 	{ GEAR_SHI_NONE,		"(****)",	  0, -1,   0, -1,   0, -1,  0, -1, 0ULL },
 	{ PWR_ON_UP_SHIFT, 		"(s**Z)",    15, 21,   0, -1,   0, -1,  0, -1, 0ULL }, /* Power On	(s**Z), 15~21  */
 	{ PWR_ON_DOWN_SHIFT,	"(s**Z)",	 36, 42,  57, 73,	0, -1,  0, -1, 0ULL }, /* Power On_Down shift (s**Z), 36~42,	57~73 */
@@ -1846,8 +1851,11 @@ tGearShi_type gMode[10] = {
 	{ GEAR_PWRON_MAN, 		"(s**MZ)",   29, 35,  50, 56,  80, 85,  0, -1, 0ULL }, /* Power On Manual (s**MZ) 29~35, 80~85, 50~56 */
 	{ GEAR_NEAR2STOP,		"(s**R)",    86, 98,   0, -1,   0, -1,  0, -1, 0ULL }, /* Near to Stop (s**R) 86~98 */
 	{ GEAR_RETURN_SHI,		"(s***)",    99,123,   0, -1,   0, -1,  0, -1, 0ULL }, /* Return Shift (s???) 99~123 */
-	{ GEAR_CURRENT,			"(s*)",		  0, 10,   0, -1,	0, -1,	0, -1, 0ULL }, /* Return Shift (s???) 99~123 */
-	{ GEAR_OTHER,			"(s@^#)",	124,160,   11, 14,   0, -1,  0, -1, 0ULL }, /* Return Shift (s???) 99~123 */
+	{ GEAR_P, 				"(sP)", 	  9,  9,   0, -1,	0, -1,	0, -1, 0ULL }, /* Parking (sP) */
+	{ GEAR_N,				"(sN)", 	  0,  0,   0, -1,	0, -1,	0, -1, 0ULL }, /* N (sN) */
+	{ GEAR_R,				"(sR)", 	 10, 10,   0, -1,	0, -1,	0, -1, 0ULL }, /* R (sR) */
+	{ GEAR_D,				"(s*)", 	  1,  8,   0, -1,	0, -1,	0, -1, 0ULL }, /* D (s?) 1~8 */
+	{ GEAR_OTHER,			"(s@^#)",	124,160,  11, 14,   0, -1,  0, -1, 0ULL }, /* Return Shift (s???) 99~123 */
 };
 
 unsigned long long Find_GearMode( unsigned long long *gShift, short iChoice, unsigned int iavgTime )
@@ -1861,7 +1869,10 @@ unsigned long long Find_GearMode( unsigned long long *gShift, short iChoice, uns
 	unsigned int lPwrOnManualNums = 0;
 	unsigned int lNear2StopNums = 0;
 	unsigned int lReturnShiNums = 0;
-	unsigned int lCurrGearNums = 0;
+	unsigned int lGearPNums = 0;
+	unsigned int lGearNNums = 0;
+	unsigned int lGearRNums = 0;
+	unsigned int lGearDNums = 0;
 	unsigned int lotherNums = 0;
 	
 	lTotalNums = 0U;
@@ -1912,11 +1923,29 @@ unsigned long long Find_GearMode( unsigned long long *gShift, short iChoice, uns
 	for(ii=gMode[GEAR_RETURN_SHI].iStart3; ii<=gMode[GEAR_RETURN_SHI].iEnd3; ii++) lReturnShiNums += gShift[ii];
 	gMode[GEAR_RETURN_SHI].lSum = lReturnShiNums;
 
-	lCurrGearNums = 0U;
-	for(ii=gMode[GEAR_CURRENT].iStart1; ii<=gMode[GEAR_CURRENT].iEnd1; ii++) lCurrGearNums += gShift[ii];
-	for(ii=gMode[GEAR_CURRENT].iStart2; ii<=gMode[GEAR_CURRENT].iEnd2; ii++) lCurrGearNums += gShift[ii];
-	for(ii=gMode[GEAR_CURRENT].iStart3; ii<=gMode[GEAR_CURRENT].iEnd3; ii++) lCurrGearNums += gShift[ii];
-	gMode[GEAR_CURRENT].lSum = lCurrGearNums;
+	lGearPNums = 0U;
+	for(ii=gMode[GEAR_P].iStart1; ii<=gMode[GEAR_P].iEnd1; ii++) lGearPNums += gShift[ii];
+	for(ii=gMode[GEAR_P].iStart2; ii<=gMode[GEAR_P].iEnd2; ii++) lGearPNums += gShift[ii];
+	for(ii=gMode[GEAR_P].iStart3; ii<=gMode[GEAR_P].iEnd3; ii++) lGearPNums += gShift[ii];
+	gMode[GEAR_P].lSum = lGearPNums;
+
+	lGearNNums = 0U;
+	for(ii=gMode[GEAR_N].iStart1; ii<=gMode[GEAR_N].iEnd1; ii++) lGearNNums += gShift[ii];
+	for(ii=gMode[GEAR_N].iStart2; ii<=gMode[GEAR_N].iEnd2; ii++) lGearNNums += gShift[ii];
+	for(ii=gMode[GEAR_N].iStart3; ii<=gMode[GEAR_N].iEnd3; ii++) lGearNNums += gShift[ii];
+	gMode[GEAR_N].lSum = lGearNNums;
+
+	lGearRNums = 0U;
+	for(ii=gMode[GEAR_R].iStart1; ii<=gMode[GEAR_R].iEnd1; ii++) lGearRNums += gShift[ii];
+	for(ii=gMode[GEAR_R].iStart2; ii<=gMode[GEAR_R].iEnd2; ii++) lGearRNums += gShift[ii];
+	for(ii=gMode[GEAR_R].iStart3; ii<=gMode[GEAR_R].iEnd3; ii++) lGearRNums += gShift[ii];
+	gMode[GEAR_R].lSum = lGearRNums;
+
+	lGearDNums = 0U;
+	for(ii=gMode[GEAR_D].iStart1; ii<=gMode[GEAR_D].iEnd1; ii++) lGearDNums += gShift[ii];
+	for(ii=gMode[GEAR_D].iStart2; ii<=gMode[GEAR_D].iEnd2; ii++) lGearDNums += gShift[ii];
+	for(ii=gMode[GEAR_D].iStart3; ii<=gMode[GEAR_D].iEnd3; ii++) lGearDNums += gShift[ii];
+	gMode[GEAR_D].lSum = lGearDNums;
 
 	lotherNums = 0U;
 	for(ii=gMode[GEAR_OTHER].iStart1; ii<=gMode[GEAR_OTHER].iEnd1; ii++) lotherNums += gShift[ii];
@@ -1933,8 +1962,11 @@ unsigned long long Find_GearMode( unsigned long long *gShift, short iChoice, uns
 	fprintf(stderr,"    Power On Manual--%-8s  : %9u lines, %6.1f min \n", gMode[GEAR_PWRON_MAN].szModeTxt, gMode[GEAR_PWRON_MAN].lSum, (double)(gMode[GEAR_PWRON_MAN].lSum*iavgTime)/1000/60 );
 	fprintf(stderr,"    Near2Stop Shift--%-8s  : %9u lines, %6.1f min \n", gMode[GEAR_NEAR2STOP].szModeTxt, gMode[GEAR_NEAR2STOP].lSum, (double)(gMode[GEAR_NEAR2STOP].lSum*iavgTime)/1000/60 );
 	fprintf(stderr,"    Return Shift--%-8s     : %9u lines, %6.1f min \n", gMode[GEAR_RETURN_SHI].szModeTxt, gMode[GEAR_RETURN_SHI].lSum, (double)(gMode[GEAR_RETURN_SHI].lSum*iavgTime)/1000/60 );
-	fprintf(stderr,"    Curr Gear Counts--%-8s : %9u lines, %6.1f min \n", gMode[GEAR_CURRENT].szModeTxt, gMode[GEAR_CURRENT].lSum, (double)(gMode[GEAR_CURRENT].lSum*iavgTime)/1000/60 );
-	fprintf(stderr,"    Others Counts--%-8s    : %9u lines, %6.1f min \n", gMode[GEAR_OTHER].szModeTxt, gMode[GEAR_OTHER].lSum, (double)(gMode[GEAR_OTHER].lSum*iavgTime)/1000.0/60 );
+	fprintf(stderr,"    P Gear status--%-8s    : %9u lines, %6.1f min \n", gMode[GEAR_P].szModeTxt, gMode[GEAR_P].lSum, (double)(gMode[GEAR_P].lSum*iavgTime)/1000/60 );
+	fprintf(stderr,"    N Gear status--%-8s    : %9u lines, %6.1f min \n", gMode[GEAR_N].szModeTxt, gMode[GEAR_N].lSum, (double)(gMode[GEAR_N].lSum*iavgTime)/1000/60 );
+	fprintf(stderr,"    R Gear status--%-8s    : %9u lines, %6.1f min \n", gMode[GEAR_R].szModeTxt, gMode[GEAR_R].lSum, (double)(gMode[GEAR_R].lSum*iavgTime)/1000/60 );
+	fprintf(stderr,"    D Gear status--%-8s    : %9u lines, %6.1f min \n", gMode[GEAR_D].szModeTxt, gMode[GEAR_D].lSum, (double)(gMode[GEAR_D].lSum*iavgTime)/1000/60 );
+	fprintf(stderr,"    Others Gear -- %-8s    : %9u lines, %6.1f min \n", gMode[GEAR_OTHER].szModeTxt, gMode[GEAR_OTHER].lSum, (double)(gMode[GEAR_OTHER].lSum*iavgTime)/1000.0/60 );
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
 	if(iChoice>GEAR_SHI_NONE && iChoice<=GEAR_OTHER)
@@ -2811,7 +2843,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 	fprintf(stderr,"  Shift Average Time(t2:SB~SP) : %9llu msec <- 1st average time \n", avg_t2 );
 	fprintf(stderr,"  Total Quality Shift Records  : %9llu lines \n", RecordCnt );
 	fprintf(stderr,"  Error Shift Records (NG) ----: %9u lines <- ignored shift data. \n", iNGcount );
-	fprintf(stderr,"  Quality Shift Records (OK) --: %9u lines, %6.1lf min \n", iOKcount, (double)(iOKcount*iavgTime)/1000.0/60 );
+	fprintf(stderr,"  Quality Shift Records (OK) --: %9u lines, %6.1lf min \n", iOKcount, (iOKcount*iavgTime)/1000.0/60 );
 
 
 	totChkModeID = 0;
@@ -4116,7 +4148,7 @@ int Find2nd_NtNeminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigne
 
 								fprintf(fp2NeMax, "\n");
 							}
-					#else
+					#else /* Ne Max to buffer */
 							NeMax[iSScount-1].iIndex = iSScount-1;
 							NeMax[iSScount-1].msTime = sq2[0].Time01;
 							NeMax[iSScount-1].mValue = sq2[0].MaxNe;
@@ -4755,7 +4787,7 @@ int Find2nd_gminMaxShiftData(short aiPATs05, int minMaxType, unsigned int SScnt,
 
 								//gMaxSaveTime[iSScount] = sq2[0].Time01;
 							}
-						#else /* Nt Max to buffer */
+						#else /* g_Max to buffer */
 							gMax[iSScount-1].iIndex = iSScount-1;
 							gMax[iSScount-1].msTime = sq2[0].Time01;
 							gMax[iSScount-1].mValue = sq2[0].MaxAcc;
@@ -4862,7 +4894,9 @@ int Find2nd_gminMaxShiftData(short aiPATs05, int minMaxType, unsigned int SScnt,
 							iSScount++;
 						}
 
-						/* if( 0==strncmp( sq2[0].sTimePos, TXT_SBTIME, 4) ) iSBcount++; */
+					#if 0
+						if( 0==strncmp( sq2[0].sTimePos, TXT_SBTIME, 4) ) iSBcount++; 
+					#else
 						if( /* 0==strcmp( sq2[0].sTimePos, TXT_SBTIME) || */
 							0==strcmp( sq2[0].sTimePos, TXT_gmin) ||
 							0==strcmp( sq2[0].sTimePos, TXT_SBmigm) ||
@@ -4873,8 +4907,11 @@ int Find2nd_gminMaxShiftData(short aiPATs05, int minMaxType, unsigned int SScnt,
 						{
 							iSBcount++; 
 						}
+					#endif
 
-						if( (kkloop==iSScount) && (0==strncmp( sq2[0].sTimePos, TXT_SPTIME, 4)) ) 
+
+						if( (kkloop==iSScount) && (0==strncmp( sq2[0].sTimePos, TXT_SPTIME, 4)) ) /* SP 이전에 g_mix */ 
+						//if( (kkloop==iSBcount) && (0==strncmp( sq2[0].sTimePos, TXT_SBTIME, 4)) )  /* SB 이전에 g_mix */
 						{
 							iSPcount++;
 
@@ -5099,7 +5136,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 			ierr = ferror(fpinput);
 			fclose(fpinput);
 			//fprintf(stderr,">>%s min/Max Table is applied!!! [%s + %s] -> [%s] \r\n", maxType, infile, shi_inp, shi_out);
-			fprintf(stderr,">>%s min/Max Table is applied!!!                            \r\n", maxType );
+			fprintf(stderr,">>%s min/Max Table is applied!!!                                        \r\n", maxType );
 			break;
 		}
 
@@ -5161,11 +5198,13 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 				if( 0==strncmp( sq2[0].sTimePos, TXT_SBTIME, 4) ) /* SB point */
 				{
 					is2File = 1;
+					iSBcount ++;
 					isSBpoint = TRUE;
 				}
 
-
 				if( 0==strcmp( sq2[0].sTimePos, TXT_SBMXgX) ||
+					0==strcmp( sq2[0].sTimePos, TXT_SBMXNtgX) ||
+					0==strcmp( sq2[0].sTimePos, TXT_SBMXNegX) || 
 					0==strcmp( sq2[0].sTimePos, TXT_MXNtgX) ||
 					0==strcmp( sq2[0].sTimePos, TXT_MXNegX) || 
 					0==strcmp( sq2[0].sTimePos, TXT_MXNtNegX) ||  
@@ -5229,6 +5268,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 								strcpy( sq2[0].sTimePos, maxType);
 
 							isSSpoint = 0;
+
 
 							//fprintf(stderr,"  NtMax: Same record[ %s/ %d ], location updated!!! \n", sq2[0].sTimePos, iSScount );
 						}
@@ -5318,6 +5358,9 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 						}
 					}
 
+					//fprintf(stderr," %02d : g_MAX %10u  %10u %10u \n", iSScount, (int)((sq2[0].LAcc17)*10000), (int)((gMax[iSScount].mValue)*10000),  (int)((sq2[0].MaxAcc)*10000));
+
+
 					if(0==isgMax)
 					{
 						minAcc = sq2[0].minAcc = GMAX_RVALUE; /* For g_mix */
@@ -5341,7 +5384,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 			#if MAX_DATA_FILE_SAVED /* 2022-12-18, gMax data to file saved */
 					if( /*isSBpoint &&*/ isgMaxPoint && ((sq2[0].LAcc17)*10000)==(mValue[iSScount]*10000) && (((sq2[0].minAcc)*10000)==(mValue[iSScount]*10000)) )
 			#else
-					if( /*isSBpoint &&*/ isgMaxPoint && ((sq2[0].LAcc17)*10000)==((gmin[iSScount].mValue)*10000) && (((sq2[0].minAcc)*10000)==((gmin[iSScount].mValue)*10000)) )
+					if( /*isSBpoint &&*/ isgMaxPoint && ((sq2[0].LAcc17)*1000)==((gmin[iSScount-1].mValue)*1000) && (((sq2[0].minAcc)*1000)==((gmin[iSScount-1].mValue)*1000)) )
 			#endif
 					{
 						if( 0==strcmp(sq2[0].sTimePos, TXT_SSTIME) || 
@@ -5376,6 +5419,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 							//fprintf(stderr,"  g_min: Same record[ %s/ %d ], location updated!!! \n", sq2[0].sTimePos, iSScount );
 						}
 					}
+
 					break;
 
 				case TYPE_Min_NT:
@@ -6465,7 +6509,7 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 	avg_t1 /= iSPcountot;
 	avg_t2 /= iSPcountot;
 	
-	fprintf(stderr,">>Average Time after Last Sorting... SS(%d), SB(%d), SP(%d) Records.. %s \n", iSScountot, iSBcountot, iSPcountot, arrPATs_ModeID[aiPATs05].ModeID );
+	fprintf(stderr,">>Average Time after Last Sorting... SS(%d), SB(%d), SP(%d) Records... %s \n", iSScountot, iSBcountot, iSPcountot, arrPATs_ModeID[aiPATs05].ModeID );
 	fprintf(stderr,"  Shift Average Time(t1:SS~SB) : %9llu msec <- 3rd average time  \n", avg_t1 );
 	fprintf(stderr,"  Shift Average Time(t2:SB~SP) : %9llu msec <- 3rd average time  \n", avg_t2 );
 	//fprintf(stderr,"----------------------------------------------------------------------------------\n" );
@@ -14137,6 +14181,8 @@ int main(int argc, char *argv[])
 
 		// --------------------------------------------------------
 		// g_min --------------------------------------------------
+		// input  : *.3ECO 
+		// output : *.zECO
 		strcpy(shi_inp, shi_ori);
 		strcpy(shi_out, shi_ori);
 		strcpy(infile,  shi_ori);
