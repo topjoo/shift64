@@ -5135,8 +5135,24 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 		{
 			ierr = ferror(fpinput);
 			fclose(fpinput);
-			//fprintf(stderr,">>%s min/Max Table is applied!!! [%s + %s] -> [%s] \r\n", maxType, infile, shi_inp, shi_out);
-			fprintf(stderr,">>%s min/Max Table is applied!!!                                        \r\n", maxType );
+
+			switch(mType)
+			{
+				case TYPE_MAX_NT:
+				case TYPE_MAX_NE:
+				case TYPE_MAX_G:
+					//fprintf(stderr,">>%s min/Max Table is applied!!! [%s + %s] -> [%s] \r\n", maxType, infile, shi_inp, shi_out);
+					fprintf(stderr,">>%s Max values are applied!!!                                        \r\n", maxType );
+					break;
+
+				case TYPE_Min_NT:
+				case TYPE_Min_NE:
+				case TYPE_Min_G:
+					//fprintf(stderr,">>%s min/Max Table is applied!!! [%s + %s] -> [%s] \r\n", maxType, infile, shi_inp, shi_out);
+					fprintf(stderr,">>%s min values are applied!!!                                         \r\n", maxType );
+				default:
+					break;
+			}
 			break;
 		}
 
