@@ -4183,7 +4183,7 @@ int Find2nd_NtNeminMaxShiftData(short aiPATs05, int chk, int minMaxType, unsigne
 		if(fp2NeMax) fclose(fp2NeMax);
 	}
 
-	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
+	//fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
 	if(inpfile) fclose(inpfile);
 	if(fp2NtMax) fclose(fp2NtMax);
@@ -4452,12 +4452,12 @@ int MakeShiftData4gMax_Table(short aiPATs05, int chk, int minMaxType)
 	while (!feof (fpginp));
 
 	//fprintf(stderr,">>Re-Mapped g_Max %s [%s] - %u msec before SB point > %s \n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, iJerkTimeLen, shi_out );
-	fprintf(stderr,">>Re-Mapped g_Max %s -- %u msec before SB point (continuous SB/SP %d times) \n", arrPATs_ModeID[aiPATs05].ModeID, iJerkTimeLen, iSBdecision );
+	fprintf(stderr,">>Re-Mapped g_Max %s -- %u msec before SB point. \n", arrPATs_ModeID[aiPATs05].ModeID, iJerkTimeLen); //, iSBdecision );
 
 	fclose(fpginp);
 	fclose(fpgout);
 	
-	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
+	//fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
 	return 1;
 }
@@ -4969,7 +4969,7 @@ int Find2nd_gminMaxShiftData(short aiPATs05, int minMaxType, unsigned int SScnt,
 	if(fp2gMax) { fclose(fp2gMax); fp2gMax=NULL; }
 	if(fp2gmin) { fclose(fp2gmin); fp2gmin=NULL; }
 
-	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
+	//fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
 
 	return 1;
@@ -6143,7 +6143,7 @@ unsigned int APSData_Filtering(char *shi_inp, short aiPATs05, int avgTime, short
 	*SPcnt = iSPcount;
 	
 	fprintf(stderr,">>APS Filtering Sorted result file: %s \n", shift_file );
-	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
+	//fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
 
 	return iignoredCnt;
