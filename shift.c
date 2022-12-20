@@ -1315,7 +1315,7 @@ iShift, iShiType12, arrGear[iShiType12].sGear, TqFr, ShiftPh, sNe, sNt16, Long_A
 #define 	WR_minAcc  		" %7.4lf"
 #define 	WR_TimeTxt 		" %-2s"
 #define 	WR_Jerk2  		" %8.2lf"
-#define 	WR_mSec  		" %4d"
+#define 	WR_mSec  		" %5d"
 #define 	WR_APSIdx  		" %2d"
 
 #define 	WR_MaxNe_DEC    " %6d"
@@ -4894,12 +4894,15 @@ int Find2nd_gminMaxShiftData(short aiPATs05, int minMaxType, unsigned int SScnt,
 							iSScount++;
 						}
 
+
 					#if 0
 						if( 0==strncmp( sq2[0].sTimePos, TXT_SBTIME, 4) ) iSBcount++; 
 					#else
 						if( /* 0==strcmp( sq2[0].sTimePos, TXT_SBTIME) || */
 							0==strcmp( sq2[0].sTimePos, TXT_gmin) ||
 							0==strcmp( sq2[0].sTimePos, TXT_SBmigm) ||
+							0==strcmp( sq2[0].sTimePos, TXT_SBMXNtgm) ||
+							0==strcmp( sq2[0].sTimePos, TXT_SBMXNegm) ||
 							0==strcmp( sq2[0].sTimePos, TXT_MXNtgm) ||
 							0==strcmp( sq2[0].sTimePos, TXT_MXNegm) ||
 							0==strcmp( sq2[0].sTimePos, TXT_MXNtNegm) ||
@@ -5268,8 +5271,12 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 						}
 						else
 						{
-							if( 0==strncmp(sq2[0].sTimePos, TXT_SBTIME, 4) )
+							if( 0==strcmp(sq2[0].sTimePos, TXT_SBTIME) )
 								strcpy( sq2[0].sTimePos, TXT_SBMXNt);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBMXgX) )
+								strcpy( sq2[0].sTimePos, TXT_SBMXNtgX);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBmigm) )
+								strcpy( sq2[0].sTimePos, TXT_SBMXNtgm);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_MaxNe) )
 								strcpy( sq2[0].sTimePos, TXT_MXNtNe);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_gMAX) )
@@ -5307,8 +5314,13 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 						}
 						else
 						{
-							if( 0==strncmp(sq2[0].sTimePos, TXT_SBTIME, 4) )
+
+							if( 0==strcmp(sq2[0].sTimePos, TXT_SBTIME) )
 								strcpy( sq2[0].sTimePos, TXT_SBMXNe);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBMXgX) )
+								strcpy( sq2[0].sTimePos, TXT_SBMXNegX);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBmigm) )
+								strcpy( sq2[0].sTimePos, TXT_SBMXNegm);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_MaxNt) )
 								strcpy( sq2[0].sTimePos, TXT_MXNtNe);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_gMAX) )
@@ -5317,6 +5329,8 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 								strcpy( sq2[0].sTimePos, TXT_MXNegm);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBMXNt) )
 								strcpy( sq2[0].sTimePos, TXT_SBMXNtNe);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_MXNtgX) )
+								strcpy( sq2[0].sTimePos, TXT_MXNtNegX);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBSWING0) )
 								strcpy( sq2[0].sTimePos, TXT_SB0_MaxNe);
 							else	
@@ -5413,8 +5427,13 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 						}
 						else
 						{
-							if( 0==strncmp(sq2[0].sTimePos, TXT_SBTIME, 4) )
+
+							if( 0==strcmp(sq2[0].sTimePos, TXT_SBTIME) )
 								strcpy( sq2[0].sTimePos, TXT_SBmigm);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBMXNt) )
+								strcpy( sq2[0].sTimePos, TXT_SBMXNtgm);
+							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBMXNe) )
+								strcpy( sq2[0].sTimePos, TXT_SBMXNegm);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_MaxNt) )
 								strcpy( sq2[0].sTimePos, TXT_MXNtgm);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_MaxNe) )  
@@ -5752,7 +5771,9 @@ unsigned int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, sho
 				gTimeDiff = (gSBtime - gSStime);
 				//fprintf(stderr, "%s - %lf \n", TXT_SBMXNe, gTimeDiff  );
 			}
-			else if( 0==strcmp( sq3[0].sTimePos, TXT_SBmigm) ) /* SB point & gmin */
+			else if( 0==strcmp( sq3[0].sTimePos, TXT_SBmigm ) || /* SB point & gmin */
+					 0==strcmp( sq3[0].sTimePos, TXT_SBMXNtgm ) || /* SB & g_min */
+					 0==strcmp( sq3[0].sTimePos, TXT_SBMXNegm ) ) /* SB & g_min */
 			{
 				ig_min = 1;
 				gminTime = sq3[0].Time01;
@@ -5817,12 +5838,15 @@ unsigned int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, sho
 					if( 1==gMaxStart[iSScount-1].ignored ) continue;
 				}
 			#endif
-			
+
+					
 				// ------------------------------------
 				// -- g Max time
 				// ------------------------------------
 				if( 0==strcmp( sq3[0].sTimePos, TXT_gMAX) || /* Max gX */
 					0==strcmp( sq3[0].sTimePos, TXT_SBMXgX) || /* SB & gX */
+					0==strcmp( sq3[0].sTimePos, TXT_SBMXNtgX) ||
+					0==strcmp( sq3[0].sTimePos, TXT_SBMXNegX) || 
 					0==strcmp( sq3[0].sTimePos, TXT_MXNtgX) || /* MX Nt & gX */
 					0==strcmp( sq3[0].sTimePos, TXT_MXNegX) || /* MX Nt & gX */
 					0==strcmp( sq3[0].sTimePos, TXT_MXNtNegX) || /* MX Nt&Ne & gX */
@@ -5838,13 +5862,14 @@ unsigned int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, sho
 				//	fprintf(stderr,"Jerk2 Calc Error>> g_Max time posistion error.  %s \n", sq3[0].sTimePos );
 				//}
 
-				
 
 				// ------------------------------------
 				// -- g min time
 				// ------------------------------------
 				if( 0==strcmp( sq3[0].sTimePos, TXT_gmin) || /* min g_min */
 					0==strcmp( sq3[0].sTimePos, TXT_SBmigm) || /* SB & g_min */
+					0==strcmp( sq3[0].sTimePos, TXT_SBMXNtgm) || /* SB & g_min */
+					0==strcmp( sq3[0].sTimePos, TXT_SBMXNegm) || /* SB & g_min */
 					0==strcmp( sq3[0].sTimePos, TXT_MXNegm) || /* MX Ne & g_min */
 					0==strcmp( sq3[0].sTimePos, TXT_MXNtgm) || /* MX Nt & g_min */
 					0==strcmp( sq3[0].sTimePos, TXT_MXNtNegm) || /* MX Ne & g_min */
@@ -6472,11 +6497,11 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 					#if SAVEMODE
 						if(outfile && is2File)
 						{
-							fprintf(outfile, SAVE_FltFMT,
+							fprintf(outfile, SAVE_APSFMT /* SAVE_FltFMT */,
 									sq4[0].Time01,	 sq4[0].iPATs05,	sq4[0].iPATs05S,  sq4[0].curGear08, sq4[0].tgtGear11,  sq4[0].VSP03, 
 									sq4[0].tqi07,	 sq4[0].APS09,		sq4[0].No10,	  sq4[0].ShiNew12,	sq4[0].ShiTy12,    sq4[0].arrGear, 
 									sq4[0].TqFr13,	 sq4[0].ShiPh14,	sq4[0].Ne15,	  sq4[0].Nt16,		sq4[0].LAcc17,	   sq4[0].DiffTime, 
-									sq4[0].sTimePos, sq4[0].gearRat,	sq4[0].fJerk1,	  sq4[0].fJerk2,	sq4[0].deltams );
+									sq4[0].sTimePos, sq4[0].gearRat,	sq4[0].fJerk1,	  sq4[0].fJerk2,	sq4[0].deltams,    sq4[0].apsIdx  );
 					
 							if(1==is2File) fprintf(outfile, "\n");
 							if(2==is2File) fprintf(outfile, "\n\n");
@@ -14553,7 +14578,8 @@ int main(int argc, char *argv[])
 
 
 			printf("MD5>> MD5 hashing for input files* \n");
-			for(ii=0; ii<16*2; ii++) printf("-");  printf(" %d --\r\n", 16*2 );
+			for(ii=0; ii<16*2; ii++) printf("-");  
+			printf(" %d --\r\n", 16*2 );
 
 			if(inpfile) { fclose(inpfile); inpfile=NULL; }
 			if(data_buf){ free(data_buf); data_buf=NULL; }
@@ -14633,7 +14659,8 @@ int main(int argc, char *argv[])
 			else
 			{
 				printf("MD5>> MD5 hashing for input files... \n");
-				for(ii=0; ii<16*2; ii++) printf("-");  printf(" %d --\r\n", 16*2 );
+				for(ii=0; ii<16*2; ii++) printf("-");  
+				printf(" %d --\r\n", 16*2 );
 
 				do {
 
@@ -14851,7 +14878,8 @@ int main(int argc, char *argv[])
 
 
 			printf("MD4>> MD4 hashing for input files* \n");
-			for(ii=0; ii<MD4_DIGEST_LENGTH*2; ii++) printf("-");  printf(" %d --\r\n", MD4_DIGEST_LENGTH*2 );
+			for(ii=0; ii<MD4_DIGEST_LENGTH*2; ii++) printf("-");  
+			printf(" %d --\r\n", MD4_DIGEST_LENGTH*2 );
 
 			if(inpfile) { fclose(inpfile); inpfile=NULL; }
 			if(data_buf){ free(data_buf); data_buf=NULL; }
@@ -14927,7 +14955,8 @@ int main(int argc, char *argv[])
 			{
 			
 				printf("MD4>> MD4 hashing for input files... \n");
-				for(ii=0; ii<MD4_DIGEST_LENGTH*2; ii++) printf("-");  printf(" %d --\r\n", MD4_DIGEST_LENGTH*2 );
+				for(ii=0; ii<MD4_DIGEST_LENGTH*2; ii++) printf("-");  
+				printf(" %d --\r\n", MD4_DIGEST_LENGTH*2 );
 
 				do {
 
@@ -15083,7 +15112,8 @@ int main(int argc, char *argv[])
 			unsigned __int64 	kll = 0UL;
 
 			printf("MD2>> MD2 hashing for input files* \n");
-			for(ii=0; ii<MD2_DIGEST_LENGTH*2; ii++) printf("-");  printf(" %d --\r\n", MD2_DIGEST_LENGTH*2 );
+			for(ii=0; ii<MD2_DIGEST_LENGTH*2; ii++) printf("-");  
+			printf(" %d --\r\n", MD2_DIGEST_LENGTH*2 );
 
 			if(inpfile) { fclose(inpfile); inpfile=NULL; }
 			if(data_buf){ free(data_buf); data_buf=NULL; }
@@ -15155,7 +15185,8 @@ int main(int argc, char *argv[])
 
 				printf("MD2>> MD2 hashing for input files... \n");
 				//printf("--------------------------------------------------------\r\n" );
-				for(ii=0; ii<MD2_DIGEST_LENGTH*2; ii++) printf("-");  printf(" %d --\r\n", MD2_DIGEST_LENGTH*2 );
+				for(ii=0; ii<MD2_DIGEST_LENGTH*2; ii++) printf("-");  
+				printf(" %d --\r\n", MD2_DIGEST_LENGTH*2 );
 
 				do {
 
@@ -15311,7 +15342,8 @@ int main(int argc, char *argv[])
 
 
 			printf("SHA1>> SHA1 hashing for input files* (%d) \n", argc);
-			for(ii=0; ii<20*2; ii++) printf("-");  printf(" %d --\r\n", 20*2 );
+			for(ii=0; ii<20*2; ii++) printf("-");  
+			printf(" %d --\r\n", 20*2 );
 
 			if(inpfile) { fclose(inpfile); inpfile=NULL; }
 			if(data_buf){ free(data_buf); data_buf=NULL; }
@@ -15386,7 +15418,8 @@ int main(int argc, char *argv[])
 
 				printf("SHA1>> SHA1 hashing for input files... \n");
 				//printf("----------------------------------------------------------\r\n" );
-				for(ii=0; ii<20*2; ii++) printf("-");  printf(" %d --\r\n", 20*2 );
+				for(ii=0; ii<20*2; ii++) printf("-");  
+				printf(" %d --\r\n", 20*2 );
 
 
 				do {
@@ -15555,7 +15588,8 @@ int main(int argc, char *argv[])
 			unsigned __int64 	kll = 0UL;
 
 			printf("SHA2>> SHA256 hashing for input files* \n");
-			for(ii=0; ii<SHA256_DIGEST_LENGTH*2; ii++) printf("-");  printf(" %d --\r\n", SHA256_DIGEST_LENGTH*2 );
+			for(ii=0; ii<SHA256_DIGEST_LENGTH*2; ii++) printf("-");  
+			printf(" %d --\r\n", SHA256_DIGEST_LENGTH*2 );
 
 			if(inpfile) { fclose(inpfile); inpfile=NULL; }
 			if(data_buf){ free(data_buf); data_buf=NULL; }
@@ -15622,7 +15656,8 @@ int main(int argc, char *argv[])
 			{
 
 				printf("SHA2>> SHA-256 hashing for input files... \n");
-				for(ii=0; ii<SHA256_DIGEST_LENGTH*2; ii++) printf("-");  printf(" %d --\r\n", SHA256_DIGEST_LENGTH*2 );
+				for(ii=0; ii<SHA256_DIGEST_LENGTH*2; ii++) printf("-");  
+				printf(" %d --\r\n", SHA256_DIGEST_LENGTH*2 );
 
 				do {
 
@@ -15780,7 +15815,8 @@ int main(int argc, char *argv[])
 
 
 			printf("SHA2>> SHA-384 hashing for input files* \n");
-			for(ii=0; ii<SHA384_DIGEST_LENGTH*2; ii++) printf("-");  printf(" %d --\r\n", SHA384_DIGEST_LENGTH*2 );
+			for(ii=0; ii<SHA384_DIGEST_LENGTH*2; ii++) printf("-");  
+			printf(" %d --\r\n", SHA384_DIGEST_LENGTH*2 );
 
 			if(inpfile) { fclose(inpfile); inpfile=NULL; }
 			if(data_buf){ free(data_buf); data_buf=NULL; }
@@ -15849,7 +15885,8 @@ int main(int argc, char *argv[])
 
 				printf("SHA2>> SHA-384 hashing for input files... \n");
 				//printf("-------------------------------------------------------------\r\n" );
-				for(ii=0; ii<SHA384_DIGEST_LENGTH*2; ii++) printf("-");  printf(" %d --\r\n", SHA384_DIGEST_LENGTH*2 );
+				for(ii=0; ii<SHA384_DIGEST_LENGTH*2; ii++) printf("-");  
+				printf(" %d --\r\n", SHA384_DIGEST_LENGTH*2 );
 
 				do {
 
@@ -16004,7 +16041,8 @@ int main(int argc, char *argv[])
 
 
 			printf("SHA2>> SHA-512 hashing for input files* \n");
-			for(ii=0; ii<SHA512_DIGEST_LENGTH*2; ii++) printf("-");  printf(" %d --\r\n", SHA512_DIGEST_LENGTH*2 );
+			for(ii=0; ii<SHA512_DIGEST_LENGTH*2; ii++) printf("-");  
+			printf(" %d --\r\n", SHA512_DIGEST_LENGTH*2 );
 
 			if(inpfile) { fclose(inpfile); inpfile=NULL; }
 			if(data_buf){ free(data_buf); data_buf=NULL; }
@@ -16072,7 +16110,8 @@ int main(int argc, char *argv[])
 
 				printf("SHA2>> SHA-512 hashing for input files... \n");
 				//printf("-------------------------------------------------------------\r\n" );
-				for(ii=0; ii<SHA512_DIGEST_LENGTH*2; ii++) printf("-");  printf(" %d --\r\n", SHA512_DIGEST_LENGTH*2 );
+				for(ii=0; ii<SHA512_DIGEST_LENGTH*2; ii++) printf("-");  
+				printf(" %d --\r\n", SHA512_DIGEST_LENGTH*2 );
 				
 				do {
 
@@ -16226,7 +16265,8 @@ int main(int argc, char *argv[])
 
 
 			printf("SHA2>> SHA-224 hashing for input files* \n");
-			for(ii=0; ii<SHA224_DIGEST_SIZE*2; ii++) printf("-");  printf(" %d --\r\n", SHA224_DIGEST_SIZE*2 );
+			for(ii=0; ii<SHA224_DIGEST_SIZE*2; ii++) printf("-");  
+			printf(" %d --\r\n", SHA224_DIGEST_SIZE*2 );
 
 			if(inpfile) { fclose(inpfile); inpfile=NULL; }
 			if(data_buf){ free(data_buf); data_buf=NULL; }
@@ -16294,7 +16334,8 @@ int main(int argc, char *argv[])
 			{
 				printf("SHA2>> SHA-224 hashing for input files... \n");
 				//printf("-------------------------------------------------------------\r\n" );
-				for(ii=0; ii<SHA224_DIGEST_SIZE*2; ii++) printf("-");  printf(" %d --\r\n", SHA224_DIGEST_SIZE*2 );
+				for(ii=0; ii<SHA224_DIGEST_SIZE*2; ii++) printf("-");  
+				printf(" %d --\r\n", SHA224_DIGEST_SIZE*2 );
 				
 				do {
 					iLenSub = strlen(iFiles.name);
@@ -16459,7 +16500,8 @@ int main(int argc, char *argv[])
 			unsigned __int64 	kll = 0UL;
 
 			printf("MD6>> MD6 hashing for input files* \n");
-			for(ii=0; ii<32*2; ii++) printf("-");  printf(" %d --\r\n", 32*2 );
+			for(ii=0; ii<32*2; ii++) printf("-");  
+			printf(" %d --\r\n", 32*2 );
 
 			if(inpfile) { fclose(inpfile); inpfile=NULL; }
 			if(data_buf){ free(data_buf); data_buf=NULL; }
@@ -16528,7 +16570,8 @@ int main(int argc, char *argv[])
 
 				printf("MD6>> MD6 hashing for input files... \n");
 				//printf("--------------------------------------------------------\r\n" );
-				for(ii=0; ii<32*2; ii++) printf("-");  printf(" %d --\r\n", 32*2 );
+				for(ii=0; ii<32*2; ii++) printf("-");  
+				printf(" %d --\r\n", 32*2 );
 
 				do {
 
@@ -16697,7 +16740,8 @@ int main(int argc, char *argv[])
 			unsigned __int64 	kll = 0UL;
 
 			printf("HA3-KECCAK>> SHA3-224 hashing for input files* \n");
-			for(ii=0; ii<SHA3_OUT_224*2; ii++) printf("-");  printf(" %d --\r\n", SHA3_OUT_224*2 );
+			for(ii=0; ii<SHA3_OUT_224*2; ii++) printf("-");  
+			printf(" %d --\r\n", SHA3_OUT_224*2 );
 
 			if(inpfile) { fclose(inpfile); inpfile=NULL; }
 			if(data_buf){ free(data_buf); data_buf=NULL; }
@@ -16773,7 +16817,8 @@ int main(int argc, char *argv[])
 
 				printf("SHA3-KECCAK>> SHA3-224 hashing for input files... \n");
 				//printf("-------------------------------------------------------------\r\n" );
-				for(ii=0; ii<SHA3_OUT_224*2; ii++) printf("-");  printf(" %d --\r\n", SHA3_OUT_224*2 );
+				for(ii=0; ii<SHA3_OUT_224*2; ii++) printf("-");  
+				printf(" %d --\r\n", SHA3_OUT_224*2 );
 
 				do {
 					iLenSub = strlen(iFiles.name);
@@ -16942,7 +16987,8 @@ int main(int argc, char *argv[])
 
 
 			printf("SHA3-KECCAK>> SHA3-256 hashing for input files* \n");
-			for(ii=0; ii<SHA3_OUT_256*2; ii++) printf("-");  printf(" %d --\r\n", SHA3_OUT_256*2 );
+			for(ii=0; ii<SHA3_OUT_256*2; ii++) printf("-");  
+			printf(" %d --\r\n", SHA3_OUT_256*2 );
 
 			if(inpfile) { fclose(inpfile); inpfile=NULL; }
 			if(data_buf){ free(data_buf); data_buf=NULL; }
@@ -17016,7 +17062,8 @@ int main(int argc, char *argv[])
 
 				printf("SHA3-KECCAK>> SHA3-256 hashing for input files... \n");
 				//printf("-------------------------------------------------------------\r\n" );
-				for(ii=0; ii<SHA3_OUT_256*2; ii++) printf("-");  printf(" %d --\r\n", SHA3_OUT_256*2 );
+				for(ii=0; ii<SHA3_OUT_256*2; ii++) printf("-");  
+				printf(" %d --\r\n", SHA3_OUT_256*2 );
 				
 				do {
 
@@ -17182,7 +17229,8 @@ int main(int argc, char *argv[])
 			unsigned __int64 	kll = 0UL;
 
 			printf("SHA3-KECCAK>> SHA3-384  hashing for input files* \n");
-			for(ii=0; ii<SHA3_OUT_384*2; ii++) printf("-");  printf(" %d --\r\n", SHA3_OUT_384*2 );
+			for(ii=0; ii<SHA3_OUT_384*2; ii++) printf("-");  
+			printf(" %d --\r\n", SHA3_OUT_384*2 );
 
 			if(inpfile) { fclose(inpfile); inpfile=NULL; }
 			if(data_buf){ free(data_buf); data_buf=NULL; }
@@ -17257,7 +17305,8 @@ int main(int argc, char *argv[])
 
 				printf("SHA3-KECCAK>> SHA3-384 hashing for input files... \n");
 				//printf("-------------------------------------------------------------\r\n" );
-				for(ii=0; ii<SHA3_OUT_384*2; ii++) printf("-");  printf(" %d --\r\n", SHA3_OUT_384*2 );
+				for(ii=0; ii<SHA3_OUT_384*2; ii++) printf("-");  
+				printf(" %d --\r\n", SHA3_OUT_384*2 );
 				
 				do {
 
@@ -17424,7 +17473,8 @@ int main(int argc, char *argv[])
 
 
 			printf("SHA3-KECCAK>> SHA3-512 hashing for input files* \n");
-			for(ii=0; ii<SHA3_OUT_512*2; ii++) printf("-");  printf(" %d --\r\n", SHA3_OUT_512*2 );
+			for(ii=0; ii<SHA3_OUT_512*2; ii++) printf("-");  
+			printf(" %d --\r\n", SHA3_OUT_512*2 );
 
 			if(inpfile) { fclose(inpfile); inpfile=NULL; }
 			if(data_buf){ free(data_buf); data_buf=NULL; }
@@ -17499,7 +17549,8 @@ int main(int argc, char *argv[])
 
 				printf("SHA3-KECCAK>> SHA3-512 hashing for input files... \n");
 				//printf("-------------------------------------------------------------\r\n" );
-				for(ii=0; ii<SHA3_OUT_512*2; ii++) printf("-");  printf(" %d --\r\n", SHA3_OUT_512*2 );
+				for(ii=0; ii<SHA3_OUT_512*2; ii++) printf("-");  
+				printf(" %d --\r\n", SHA3_OUT_512*2 );
 				
 				do {
 
@@ -17668,7 +17719,8 @@ int main(int argc, char *argv[])
 
 
 			printf("SHAKE128>> SHAKE128 hashing for input files* \n");
-			for(ii=0; ii<SHAKE_OUT_128*2; ii++) printf("-");  printf(" %d --\r\n", SHAKE_OUT_128*2 );
+			for(ii=0; ii<SHAKE_OUT_128*2; ii++) printf("-");  
+			printf(" %d --\r\n", SHAKE_OUT_128*2 );
 
 			if(inpfile) { fclose(inpfile); inpfile=NULL; }
 			if(data_buf){ free(data_buf); data_buf=NULL; }
@@ -17742,7 +17794,8 @@ int main(int argc, char *argv[])
 
 				printf("SHAKE128>> SHAKE128 hashing for input files... \n");
 				//printf("-------------------------------------------------------------\r\n" );
-				for(ii=0; ii<SHAKE_OUT_128*2; ii++) printf("-");  printf(" %d --\r\n", SHAKE_OUT_128*2 );
+				for(ii=0; ii<SHAKE_OUT_128*2; ii++) printf("-");  
+				printf(" %d --\r\n", SHAKE_OUT_128*2 );
 				
 				do {
 					iLenSub = strlen(iFiles.name);
@@ -17907,7 +17960,8 @@ int main(int argc, char *argv[])
 
 
 			printf("SHAKE256>> SHAKE256 hashing for input files* \n");
-			for(ii=0; ii<SHAKE_OUT_256*2; ii++) printf("-");  printf(" %d --\r\n", SHAKE_OUT_256*2 );
+			for(ii=0; ii<SHAKE_OUT_256*2; ii++) printf("-");  
+			printf(" %d --\r\n", SHAKE_OUT_256*2 );
 
 			if(inpfile) { fclose(inpfile); inpfile=NULL; }
 			if(data_buf){ free(data_buf); data_buf=NULL; }
@@ -17981,7 +18035,8 @@ int main(int argc, char *argv[])
 
 				printf("SHAKE256>> SHAKE256 hashing for input files... \n");
 				//printf("-------------------------------------------------------------\r\n" );
-				for(ii=0; ii<SHAKE_OUT_256*2; ii++) printf("-");  printf(" %d --\r\n", SHAKE_OUT_256*2 );
+				for(ii=0; ii<SHAKE_OUT_256*2; ii++) printf("-");  
+				printf(" %d --\r\n", SHAKE_OUT_256*2 );
 				
 				do {
 
@@ -18155,7 +18210,8 @@ int main(int argc, char *argv[])
 
 
 			printf("RMD128>> RMD128 hashing for input files* \n");
-			for(ii=0; ii<RMD128_LENGTH*2; ii++) printf("-");  printf(" %d --\r\n", RMD128_LENGTH*2 );
+			for(ii=0; ii<RMD128_LENGTH*2; ii++) printf("-");  
+			printf(" %d --\r\n", RMD128_LENGTH*2 );
 
 			if(inpfile) { fclose(inpfile); inpfile=NULL; }
 			if(data_buf){ free(data_buf); data_buf=NULL; }
@@ -18251,7 +18307,8 @@ int main(int argc, char *argv[])
 
 				printf("RMD128>> RMD128 hashing for input files... \n");
 				//printf("-------------------------------------------------------------\r\n" );
-				for(ii=0; ii<RMD128_LENGTH*2; ii++) printf("-");  printf(" %d --\r\n", RMD128_LENGTH*2 );
+				for(ii=0; ii<RMD128_LENGTH*2; ii++) printf("-");  
+				printf(" %d --\r\n", RMD128_LENGTH*2 );
 				
 				do {
 
@@ -18559,7 +18616,8 @@ int main(int argc, char *argv[])
 
 				printf("RipeMD160>> RipeMD160 hashing for input files... \n");
 				//printf("-------------------------------------------------------------\r\n" );
-				for(ii=0; ii<RMD160_LENGTH*2; ii++) printf("-");  printf(" %d --\r\n", RMD160_LENGTH*2 );
+				for(ii=0; ii<RMD160_LENGTH*2; ii++) printf("-");  
+				printf(" %d --\r\n", RMD160_LENGTH*2 );
 				
 				do {
 
@@ -18846,7 +18904,8 @@ int main(int argc, char *argv[])
 
 				printf("BLAKE224>> BLAKE224 hashing for input files... \n");
 				//printf("-------------------------------------------------------------\r\n" );
-				for(ii=0; ii<BLAKE224_LEN*2; ii++) printf("-");  printf(" %d --\r\n", BLAKE224_LEN*2 );
+				for(ii=0; ii<BLAKE224_LEN*2; ii++) printf("-");  
+				printf(" %d --\r\n", BLAKE224_LEN*2 );
 
 				do {
 
@@ -19111,7 +19170,8 @@ int main(int argc, char *argv[])
 
 				printf("BLAKE256>> BLAKE256 hashing for input files... \n");
 				//printf("-------------------------------------------------------------\r\n" );
-				for(ii=0; ii<BLAKE256_LEN*2; ii++) printf("-");  printf(" %d --\r\n", BLAKE256_LEN*2 );
+				for(ii=0; ii<BLAKE256_LEN*2; ii++) printf("-");  
+				printf(" %d --\r\n", BLAKE256_LEN*2 );
 				
 				do {
 
@@ -19375,7 +19435,8 @@ int main(int argc, char *argv[])
 	
 				printf("BLAKE384>> BLAKE384 hashing for input files... \n");
 				//printf("-------------------------------------------------------------\r\n" );
-				for(ii=0; ii<BLAKE384_LEN*2; ii++) printf("-");  printf(" %d --\r\n", BLAKE384_LEN*2 );
+				for(ii=0; ii<BLAKE384_LEN*2; ii++) printf("-");  
+				printf(" %d --\r\n", BLAKE384_LEN*2 );
 				
 				do {
 	
@@ -19636,7 +19697,8 @@ int main(int argc, char *argv[])
 	
 				printf("BLAKE512>> BLAKE512 hashing for input files... \n");
 				//printf("-------------------------------------------------------------\r\n" );
-				for(ii=0; ii<BLAKE512_LEN*2; ii++) printf("-");  printf(" %d --\r\n", BLAKE512_LEN*2 );
+				for(ii=0; ii<BLAKE512_LEN*2; ii++) printf("-");  
+				printf(" %d --\r\n", BLAKE512_LEN*2 );
 
 				do {
 	
