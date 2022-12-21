@@ -1283,7 +1283,7 @@ iShift, iShiType12, arrGear[iShiType12].sGear, TqFr, ShiftPh, sNe, sNt16, Long_A
 #define SAVEMODE 	1
 
 /* ------- 1st saved text file write format ----------------------- */
-#define 	WR_TIME01 		" %10.4lf"
+#define 	WR_TIME01 		" %11.5lf"
 #define 	WR_OTS02 		"[@%d"
 #define 	WR_VSP03 		" %6.1lf"
 #define 	WR_TQSTND04 	"[=%d"
@@ -3158,7 +3158,7 @@ int SSCounterCheck(short aiPATs05, short SBposDecision, unsigned int SScnt, unsi
 	memset(shi_out, 0x00, sizeof(shi_out));  
 
 
-#ifndef MAX_DATA_FILE_SAVED
+#if (0==MAX_DATA_FILE_SAVED)
 	memset(NtMax, 0x00, MAX_TABLE_SIZ*sizeof(tminMax_type));  
 	memset(NeMax, 0x00, MAX_TABLE_SIZ*sizeof(tminMax_type));  
 	memset(gMax, 0x00, MAX_TABLE_SIZ*sizeof(tminMax_type));  
@@ -3338,11 +3338,11 @@ int SSCounterCheck(short aiPATs05, short SBposDecision, unsigned int SScnt, unsi
 		}
 
 
-
 	#if SAVEMODE
 		if(fp2chk)
-		fprintf(fp2chk, TITLE_SHI1 "\n");
+			fprintf(fp2chk, TITLE_SHI1 "\n");
 	#endif
+
 
 		{
 			iSScount = 0U;
@@ -3488,8 +3488,9 @@ int SSCounterCheck(short aiPATs05, short SBposDecision, unsigned int SScnt, unsi
 
 #if SAVEMODE
 	if(fp2chk)
-	fprintf(fp2chk, TITLE_SHI1 "\n");
+		fprintf(fp2chk, TITLE_SHI1 "\n");
 #endif
+
 
 	{
 		unsigned long long avg_t1=0ULL, avg_t2 = 0ULL;
@@ -5016,10 +5017,14 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 	int ci=0;
 	unsigned int iloop = 0;
 	double minAcc = GMAX_RVALUE;
-	
+
+#if MAX_DATA_FILE_SAVED /* 2022-12-18, Nt/Ne Max, gMax/gmin data to file saved */	
 	int iNum[MAX_TABLE_SIZ] = {0,};
 	double  msTime[MAX_TABLE_SIZ] = {0.0,};
 	double  mValue[MAX_TABLE_SIZ] = {0.0,};
+#endif
+
+
 	//AllFilesClosed();
 
 	if(fpinput) { fclose(fpinput); fpinput=NULL; }
@@ -5072,7 +5077,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 
 #if SAVEMODE
 	if(fp2out)
-	fprintf(fp2out, TITLE_SHI1 "\n");
+		fprintf(fp2out, TITLE_SHI1 "\n");
 #endif
 
 	/* ---- Nt Max Table -------------- */
@@ -5117,7 +5122,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 		}
 	} 
 	while (!feof (fp2in));
-	fclose(fp2in);
+	if(fp2in) { fclose(fp2in); fp2in=NULL; }
 	// ----- open MAX file OK ------------------------------
 #endif
 
@@ -5475,8 +5480,8 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 
 			}
 
-		#if SAVEMODE
 
+		#if SAVEMODE
 			if(fp2out) // && is2File)
 			{
 				fprintf(fp2out, SAVE_ChkFMT,
@@ -5490,7 +5495,6 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 				//else fprintf(fp2out, "\n");
 				fprintf(fp2out, "\n");
 			}
-
 		#endif
 
 
@@ -5562,7 +5566,7 @@ unsigned int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, sho
 	short isSPpoint = 0;
 
 	short ig_Max = 0, ig_min = 0;
-	int 	DeltaTime = 0;
+	double 	DeltaTime = 0;
 	double	DeltaValu = 0.0f;
 	int isNaming = 0;
 
@@ -5707,7 +5711,7 @@ unsigned int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, sho
 				ig_Max = 0;
 				ig_min = 0;
 
-			#if SS2SP_OVER_TIME
+			#if SS2SP_OVER_TIME /* result -> ignored */
 				if( 1==gMaxStart[iSScount].ignored ) 
 				{
 					iSScount ++;
@@ -5733,7 +5737,7 @@ unsigned int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, sho
 				isSBpoint = TRUE;
 				gSBtime = sq3[0].Time01;
 
-			#if SS2SP_OVER_TIME
+			#if SS2SP_OVER_TIME /* result -> ignored */
 				if( 1==gMaxStart[iSBcount].ignored ) 
 				{
 					iSBcount ++;
@@ -5758,7 +5762,7 @@ unsigned int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, sho
 				isSBpoint = TRUE;
 				gSBtime = sq3[0].Time01;
 
-			#if SS2SP_OVER_TIME
+			#if SS2SP_OVER_TIME /* result -> ignored */
 				if( 1==gMaxStart[iSBcount].ignored ) 
 				{
 					iSBcount ++;
@@ -5783,7 +5787,7 @@ unsigned int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, sho
 				isSBpoint = TRUE;
 				gSBtime = sq3[0].Time01;
 
-			#if SS2SP_OVER_TIME
+			#if SS2SP_OVER_TIME /* result -> ignored */
 				if( 1==gMaxStart[iSBcount].ignored ) 
 				{
 					iSBcount ++;
@@ -5808,7 +5812,7 @@ unsigned int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, sho
 				gMaxTime = -1.0f;
 				gminTime = -1.0f;
 
-			#if SS2SP_OVER_TIME
+			#if SS2SP_OVER_TIME /* result -> ignored */
 				if( 1==gMaxStart[iSPcount].ignored ) 
 				{
 					iSPcount ++;
@@ -5832,7 +5836,7 @@ unsigned int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, sho
 				is2File = 1;
 				gTimeDiff = (sq3[0].Time01 - gSStime);
 
-			#if SS2SP_OVER_TIME
+			#if SS2SP_OVER_TIME /* result -> ignored */
 				if( iSScount )
 				{
 					if( 1==gMaxStart[iSScount-1].ignored ) continue;
@@ -5898,18 +5902,17 @@ unsigned int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, sho
 				ig_Max = 0;
 				ig_min = 0;
 
-				DeltaTime = (int)(gminTime*1000*10 - gMaxTime*1000*10);
+				DeltaTime = round(gminTime*1000.0*JERK_TIME_SCALE*JERK_TIME_SCALE - gMaxTime*1000.0*JERK_TIME_SCALE*JERK_TIME_SCALE);
 				DeltaValu = (gminVal*1000.0f - gMaxVal*1000.0f);
-
-				if( DeltaTime > 0 || DeltaTime < 0 )
+				
+				if( DeltaTime > 0.0f || DeltaTime < 0.0f )
 				{
-					fJerk2 = DeltaValu*10.0/DeltaTime;
+					fJerk2 = DeltaValu*JERK_TIME_SCALE*JERK_TIME_SCALE/DeltaTime;
 				}
 			}
 			/* ----------------------------------------------------- */
 			/* Calc Jerk											 */
 			/* ----------------------------------------------------- */
-
 
 
 		#if SAVEMODE
@@ -5919,7 +5922,7 @@ unsigned int ShiftData_Filtering(char *shi_inp, short aiPATs05, int avgTime, sho
 						sq3[0].Time01,  sq3[0].iPATs05,	   sq3[0].iPATs05S,	  sq3[0].curGear08, sq3[0].tgtGear11,  sq3[0].VSP03, 
 						sq3[0].tqi07,   sq3[0].APS09,      sq3[0].No10,       sq3[0].ShiNew12,	sq3[0].ShiTy12,    sq3[0].arrGear, 
 						sq3[0].TqFr13,  sq3[0].ShiPh14,	   sq3[0].Ne15,       sq3[0].Nt16,      sq3[0].LAcc17,     gTimeDiff, sq3[0].sTimePos,
-						sq3[0].gearRat, sq3[0].fJerk1,	   fJerk2,            DeltaTime/10 );
+						sq3[0].gearRat, sq3[0].fJerk1,	   fJerk2,            (int)(DeltaTime/JERK_TIME_SCALE/JERK_TIME_SCALE));
 
 				if(1==is2File) fprintf(fp2out, "\n");
 				if(2==is2File) fprintf(fp2out, "\n\n");
