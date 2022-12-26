@@ -1327,8 +1327,12 @@ iShift, iShiType12, arrGear[iShiType12].sGear, TqFr, ShiftPh, sNe, sNt16, Long_A
 #define 	WR_MaxAcc_DEC  	" %5d"
 #define 	WR_minAcc_DEC  	" %5d"
 
-#define 	WE_APS_D 		" %3d"
-#define 	WE_APS_F 		" %6.1lf"
+#define 	WR_APS_D 		" %3d"
+#define 	WR_APS_F 		" %6.1lf"
+
+#define 	WR_MAX_POS 		"%s"
+#define 	WR_MAX_DIFF 	" (%+4d)"
+
 
 //#define SAVEFMT  "%10.4lf  %3d %-10s %6.1lf %7.2lf  %2d %8.2lf %8.2lf %2d %03d %3d %-8s %7.2lf %2d %8.2lf %8.2lf %6.3lf %-6s %4.2lf %9.2lf %9.2lf %7.2lf %9.2lf %9.2lf"
 
@@ -1418,10 +1422,23 @@ iShift, iShiType12, arrGear[iShiType12].sGear, TqFr, ShiftPh, sNe, sNt16, Long_A
 #define gMAX_FORMAT		("%5d" WR_TIME01 WR_MaxAcc)
 #define gmin_FORMAT		("%5d" WR_TIME01 WR_minAcc)
 
-#define SAVE_PRT_01 	(WR_curGear08 WR_tgtGear11 WR_Shi12S WE_APS_D WE_APS_F)
+#define WR_NcurGear 	"%2d"
+#define WR_NtgtGear 	"%2d"
+
+#define SAVE_PRT_01 	(WR_NcurGear WR_NtgtGear WR_Shi12S WR_APS_D WR_APS_F)
 #define SAVE_PRT_02 	(WR_TimeDiff WR_TimeDiff WR_LAcc17 WR_LAcc17 WR_LAcc17)
 #define SAVE_PRT_03 	(WR_Jerk2 WR_mSec)
-#define SAVE_PRT_04 	(WR_Nt16 WR_Nt16 WR_Ne15 WR_Ne15)
+#define SAVE_PRT_04 	(WR_Nt16 WR_Nt16 WR_MAX_POS WR_Ne15 WR_Ne15 WR_MAX_POS)
+#define SAVE_PRT_05 	(WR_Nt16 WR_Nt16 WR_MAX_DIFF WR_Ne15 WR_Ne15 WR_MAX_DIFF)
+
+#define SAVE_PRT_10 	(" 3(F)_300msec : continuous 3 times and first poistion. Before 300msec postion from SB position. \n")
+#define SAVE_PRT_11 	(" APSt : APS Table values \n")
+#define SAVE_PRT_12 	(" APSv : APS values from vehicle at SS position \n")
+#define SAVE_PRT_13 	(" t1   : SS~SB time (sec) \n")
+#define SAVE_PRT_14 	(" t2   : SB~SP time (sec) \n")
+#define SAVE_PRT_15 	(" Jerk : calculated Jerk value \n")
+#define SAVE_PRT_16 	(" msec : Time duration(min and Max) used to calculate Jerk (msec) \n")
+
 
 
 
@@ -1738,7 +1755,7 @@ const tPATs_ModeType arrPATs_ModeID[MODE_ID_NUMS] = {
 
 #define TITLE_TXT   "    time   iPAT  ModeID    cG tG   vsp    tqi      Aps      No    ct iShi txt        TqFr ShiPh Ne       Nt     LAccel DiffTime TimPos(%d)%s   Ratio   Jerk_%dms  Jerk1 (msec)_%dms"
 
-#define REPORT_TXT  " cg tg Shift    APSt  APSv    SBTime   SPTime  SS(g)  SB(g)   SP(g)     Jerk   msec  Nt_SB  / MaxNt    Ne_SB  / MaxNe "
+#define REPORT_TXT  "cg tg Shift   APSt  APSv   t1(sec)  t2(sec)  G(SS)  G(SB)   G(SP)     Jerk   msec  Nt_SB  / MaxNt(msec)     Ne_SB  / MaxNe(msec) "
 
 
 #endif /* SHIFT_QUALITY_DATA_SORTING */
@@ -6580,7 +6597,8 @@ int ShiftData_LastSorting(char *shi_inp, char *output, short aiPATs05, int avgTi
 
 
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
-	fprintf(stderr,">>Shift Quality Data Sorting finished!!! %s [%s] -> [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, output  ); 		
+	fprintf(stderr,">>Shift Quality Data Sorting finished!!! %s \r\n", arrPATs_ModeID[aiPATs05].ModeID );
+	//fprintf(stderr,">>Shift Quality Data Sorting finished!!! %s [%s] -> [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, output  );
 
 	fprintf(stderr,">>Final Sorted result file: %s \n", output );
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
@@ -6615,10 +6633,16 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 	unsigned short idxJerk = 0;
 	unsigned short idxNt = 0;
 	unsigned short idxNe = 0;
+
+	int diffTimeNt = 0;
+	int diffTimeNe = 0;
+	int iSBTime = 0;
+	
 	short icurGear = 0;
 	short itgtGear = 0;
 	short ii = 0;
-
+	char sToday[50];
+	
 	AllFilesClosed();
 
 	/* ===================================================================================== */
@@ -6646,18 +6670,48 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 	/* ===================================================================================== */
 
 	memset(QualData, 0x00, QUAL_DATA_MAX_SIZE*sizeof(char) );
-	memset(sq4, 0x00, sizeof(sq4) );
+	memset(sq4, 0x00, MAX_RPT_BUF_SIZ*sizeof(sqdAps_type) );
 
 	RecordCnt  = 0ULL;
 	iNGcount   = 0ULL;
 	iOKcount   = 0ULL;
 
 
+{
+	time_t	currTime;
+	struct tm *locTime;
+
+
+	time( &currTime );
+	locTime = localtime( &currTime ); // time_t	형식으로 변환합니다.
+	/* -----------
+	locTime->tm_year+1900;
+	locTime->tm_mon+1;
+	locTime->tm_mday;
+	locTime->tm_hour;
+	locTime->tm_min;
+	locTime->tm_sec;
+	locTime->tm_wday;
+	----------------- */
+
+	memset(sToday, 0x00, sizeof(sToday) );
+
+	sprintf(sToday, "%4d/%02d/%02d(%s), %02d:%02d:%02d", 
+			locTime->tm_year+1900, locTime->tm_mon+1, locTime->tm_mday, WeekTXT[ locTime->tm_wday ], 
+			locTime->tm_hour+9, locTime->tm_min, locTime->tm_sec );
+				
+}
+
+
 #if SAVEMODE
 	if(outfile)
 	{
-		fprintf(outfile," Shift Quality Report %s \n", arrPATs_ModeID[aiPATs05].ModeID );			
-		fprintf(outfile,"    Shift       APS_Power(%%)   Shift Time(sec)       Acc(G)         Jerk(G/sec)%d(%s)_%dmsec        rpm  \n", iSBdecision, iSBchoicePnt?"L":"F", iJerkTimeLen);
+		fprintf(outfile," Shift Quality Report %s - %s by GIL&S \n", arrPATs_ModeID[aiPATs05].ModeID, sToday );			
+
+		for(ii=0; ii<131; ii++) fprintf(outfile, "-");
+		fprintf(outfile, "\n");
+
+		fprintf(outfile,"    Shift     APS_Power(%%)   ShiftTime(sec)       Accel(G)         Jerk(G/sec)%d(%s)_%dmsec        rpm  \n", iSBdecision, iSBchoicePnt?"L":"F", iJerkTimeLen);
 		fprintf(outfile, REPORT_TXT "\n");
 	}
 #endif
@@ -6679,7 +6733,7 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 
 			rewind(inpfile); 
 			fprintf(stderr,"----------------------------------------------------------------------------------\n" );
-			fprintf(stderr,">>Shift Quality Report!!! %s [%s] -> [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, output  );			
+			fprintf(stderr,">>Shift Quality Data final Report!!! %s [%s] -> [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, output  );			
 			break;
 		}
 
@@ -6722,7 +6776,6 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 			}
 
 
-
 			if( icurGear != sq4[index].curGear08 )
 			{
 				icurGear = sq4[index].curGear08;
@@ -6730,7 +6783,7 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 
 				if(outfile)
 				{
-					for(ii=0; ii<120; ii++) fprintf(outfile, "-");
+					for(ii=0; ii<131; ii++) fprintf(outfile, "-");
 					fprintf(outfile, "\n");
 				}
 			}
@@ -6765,6 +6818,7 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 				0==strcmp( sq4[index].sTimePos, TXT_MXNtNegm) ) 
 			{
 				idxNt = index;
+				diffTimeNt = round( (sq4[index].Time01)*1000*JERK_TIME_SCALE );
 			}
 
 			if( 0==strcmp( sq4[index].sTimePos, TXT_MaxNe) ||
@@ -6779,12 +6833,14 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 				0==strcmp( sq4[index].sTimePos, TXT_MXNtNegm) ) 
 			{
 				idxNe = index;
+				diffTimeNe = round( (sq4[index].Time01)*1000*JERK_TIME_SCALE );
 			}
 
 			if( 0==strncmp( sq4[index].sTimePos, TXT_SBTIME, 4) ) 
 			{
 				iSBcountot ++;
 				idxSB = index;
+				iSBTime = round( (sq4[index].Time01)*1000*JERK_TIME_SCALE );
 			}
 
 			if( 0==strncmp( sq4[index].sTimePos, TXT_SPTIME, 4) ) 
@@ -6806,9 +6862,16 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 					fprintf(outfile, SAVE_PRT_03,
 							sq4[idxJerk].fJerk2,  sq4[idxJerk].deltams );
 
+				#if 0
 					fprintf(outfile, SAVE_PRT_04,
-							sq4[idxSB].Nt16, sq4[idxNt].Nt16, sq4[idxSB].Ne15, sq4[idxNe].Ne15 );
-
+							sq4[idxSB].Nt16, sq4[idxNt].Nt16, (idxNt>idxSB)?"(+)":((idxNt<idxSB)?"(-)":"(0)") ,
+							sq4[idxSB].Ne15, sq4[idxNe].Ne15, (idxNe>idxSB)?"(+)":((idxNe<idxSB)?"(-)":"(0)") );
+				#else
+					fprintf(outfile, SAVE_PRT_05,
+							sq4[idxSB].Nt16, sq4[idxNt].Nt16, (int)(diffTimeNt-iSBTime)/JERK_TIME_SCALE ,
+							sq4[idxSB].Ne15, sq4[idxNe].Ne15, (int)(diffTimeNe-iSBTime)/JERK_TIME_SCALE );
+				#endif
+		
 					if(1==is2File) fprintf(outfile, "\n");
 					if(2==is2File) fprintf(outfile, "\n\n");
 
@@ -6822,9 +6885,13 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 				idxJerk = 0;
 				idxNt = 0;
 				idxNe = 0;
+
+				idxSS = 0;
+				idxSB = 0;
+				idxSP = 0;
+				memset(sq4, 0x00, MAX_RPT_BUF_SIZ*sizeof(sqdAps_type) );
+
 			}
-
-
 
 
 			index ++;
@@ -6833,6 +6900,16 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 		}
 	}
 	while (!feof (inpfile));
+
+
+	fprintf(outfile, "\n\n");
+	fprintf(outfile, SAVE_PRT_10);
+	fprintf(outfile, SAVE_PRT_11);
+	fprintf(outfile, SAVE_PRT_12);
+	fprintf(outfile, SAVE_PRT_13);
+	fprintf(outfile, SAVE_PRT_14);
+	fprintf(outfile, SAVE_PRT_15);
+	fprintf(outfile, SAVE_PRT_16);
 
 
 
@@ -7353,19 +7430,6 @@ int main(int argc, char *argv[])
 
 	
 	unsigned int crc32_ctab[CRC32_TAB_SIZE] = {0,};
-
-	const char WeekTXT[9][3+1] = {
-			"Sun", // wDayOfWeek 0
-			"Mon", // wDayOfWeek 1
-			"Tue", // wDayOfWeek 2
-			"Wed", // wDayOfWeek 3
-			"Thu", // wDayOfWeek 4
-			"Fri", // wDayOfWeek 5
-			"Sat", // wDayOfWeek 6
-			"***", // NEVER
-			0x00
-		};
-
 
 	int ret_scan = 0;
 	int opt;

@@ -43,7 +43,7 @@
 
 
 
-const char AttVersion[] = "1.1.2"; /* ver 1.1.2 : 2022.12.19 : Shift Quality Data Sorting */
+const char AttVersion[] = "1.1.4"; /* ver 1.1.2 : 2022.12.19 : Shift Quality Data Sorting */
 const char EmailText[]  = "tp.joo@daum.net";
 
 
@@ -353,6 +353,18 @@ _month_table_ month_table[MONTH_LEN] =
 	{ "Dec", 'L' },
 };
 
+
+const char WeekTXT[9][3+1] = {
+		"Sun", // wDayOfWeek 0
+		"Mon", // wDayOfWeek 1
+		"Tue", // wDayOfWeek 2
+		"Wed", // wDayOfWeek 3
+		"Thu", // wDayOfWeek 4
+		"Fri", // wDayOfWeek 5
+		"Sat", // wDayOfWeek 6
+		"***", // NEVER
+		0x00
+	};
 
 
 #define ENDIAN_LITTLE 		1
