@@ -563,6 +563,7 @@ void help(void)
            " Ex) ah.exe --input 5ms_16select.tsv --output 5ms_eco.txt --upshift eco.last 3 300 3 1.5 \n"
            "     ah.exe --input 5ms_16select.tsv --output 5ms_spt.txt --upshift spt 4 300 3   1.5 \n"
            "     ah.exe --input 5ms_16select.tsv --output 5ms_nor.txt --upshift NOR 4 300 3.5 2  \n"
+           "     ah.exe --input 5ms_16select.tsv --output 5ms_nor.txt --upshift spt.last.value 4 300 3.5 2  \n"
            "        -> Sorted result output : 5ms_eco.txt and 5ms_eco.gil \n"
            "\n" 
            "  -D or --downshift [ModeID][SB Pos] [SB#1] [Jerk#1] [APS#1] [APS#2] [VS start] [VS end] [VS step] \n" 
@@ -10941,7 +10942,7 @@ int main(int argc, char *argv[])
 					// ------------------------------------------------
 
 					itmpFileDeleted = 1;
-					if( strstr(str_ShiftOp[0], ".used") || strstr(str_ShiftOp[0], "_used") )
+					if( strstr(str_ShiftOp[0], ".used") )
 					{
 					int i, len;
 
@@ -10949,16 +10950,18 @@ int main(int argc, char *argv[])
 						len = strlen( str_ShiftOp[0] );
 						for(i=len; i>0; i--)
 						{
-							if( '.' == str_ShiftOp[0][i] || '_' == str_ShiftOp[0][i] ) 
+							if( 0==strncmp( (char*)&str_ShiftOp[0][i], (char*)".used", 5 ) ) 
 							{
-								str_ShiftOp[0][i]='\0';
+								strcpy( (char*)&str_ShiftOp[0][i], (char*)&str_ShiftOp[0][i+5] );
 								break;
 							}
+
 						}
 					}
 
+
 					iSBchoicePnt = 0; /* SB first position */
-					if( strstr(str_ShiftOp[0], ".last") || strstr(str_ShiftOp[0], "_last") )
+					if( strstr(str_ShiftOp[0], ".last") )
 					{
 					int i, len;
 
@@ -10966,16 +10969,17 @@ int main(int argc, char *argv[])
 						len = strlen( str_ShiftOp[0] );
 						for(i=len; i>0; i--)
 						{
-							if( '.' == str_ShiftOp[0][i] || '_' == str_ShiftOp[0][i] ) 
+							if( 0==strncmp( (char*)&str_ShiftOp[0][i], (char*)".last", 5 ) ) 
 							{
-								str_ShiftOp[0][i]='\0';
+								strcpy( (char*)&str_ShiftOp[0][i], (char*)&str_ShiftOp[0][i+5] );
 								break;
 							}
 						}
 					}
 
+
 					gValueDisplay = 0;
-					if( strstr(str_ShiftOp[0], ".value") || strstr(str_ShiftOp[0], "_value") )
+					if( strstr(str_ShiftOp[0], ".value") )
 					{
 					int i, len;
 
@@ -10983,14 +10987,14 @@ int main(int argc, char *argv[])
 						len = strlen( str_ShiftOp[0] );
 						for(i=len; i>0; i--)
 						{
-							if( '.' == str_ShiftOp[0][i] || '_' == str_ShiftOp[0][i] ) 
+							if( 0==strncmp( (char*)&str_ShiftOp[0][i], (char*)".value", 6 ) ) 
 							{
-								str_ShiftOp[0][i]='\0';
+								strcpy( (char*)&str_ShiftOp[0][i], (char*)&str_ShiftOp[0][i+6] );
 								break;
 							}
 						}
 					}
-					
+
 
 					iModeID = -1;
 					for(kk=0; kk<MODE_ID_NUMS-1; kk++)
@@ -11006,7 +11010,7 @@ int main(int argc, char *argv[])
 					if(iModeID == -1)
 					{
 						fprintf(stderr,"\n");
-						fprintf(stderr,">>PATs-ModeID	   : <<%d>> %d, Unknown ModeID, Check ModeID(ECO, NOR, SPT, ...) +++ \n\n", 0, iModeID ); 
+						fprintf(stderr,">>PATs-ModeID	   : <<%d>> %d, Unknown ModeID, Check ModeID(ECO, NOR, SPT, ...) [%s] \n\n", 0, iModeID, str_ShiftOp[0] ); 
 						AllFilesClosed();
 						exit(EXIT_FAILURE);
 						break;
