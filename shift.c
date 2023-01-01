@@ -749,6 +749,8 @@ void AllFilesClosed(void)
 
 #define FUNC_SPC 				14
 #define SPACE_ONE 				60
+#define SPACE_ONE_UNIT 			10
+
 
 
 #define MODE_NOR 		8  /* 8: (md_NOR) */
@@ -1801,6 +1803,7 @@ typedef struct _graphDB_ {
 	int  gearIdx;
 	char gearTxt[10];
 	int  value;
+	int  validNum;
 } graphData_type;
 
 
@@ -5419,7 +5422,7 @@ int ShiftData_MAXLocationCheck(char *infile, char *shi_inp, char *shi_out, char 
 						}
 						else
 						{		
-							if( 0==strncmp(sq2[0].sTimePos, TXT_SBTIME, 4) )
+							if( 0==strcmp(sq2[0].sTimePos, TXT_SBTIME) )
 								strcpy( sq2[0].sTimePos, TXT_SBMXgX);
 							else if( 0==strcmp(sq2[0].sTimePos, TXT_SBMXNt) )
 								strcpy( sq2[0].sTimePos, TXT_SBMXNtgX);
@@ -6251,19 +6254,25 @@ int t1t2GraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 {
 	int ii=0;
 	int xx=0, yy=0;
-
-	double gYMaxt1=0.0f, gYmint1 = 9999999.9f;
-	double gYMaxt2=0.0f, gYmint2 = 9999999.9f;
+	int xxMore = xxMax-6;
+	short isMoved = 0;
+	
+	double gYMaxt1=0.0f, gYmint1 = 9999999.9f, gYavg1=0.0f;
+	double gYMaxt2=0.0f, gYmint2 = 9999999.9f, gYavg2=0.0f;
 	
 	/* ---------------------------------------------------------- */
 	/* --- t1, t2 Qsorting	------------------------------------- */
 	/* ---------------------------------------------------------- */
 	fprintf(outfile,"\n [sec]");
 	for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile," ");
+	
+	if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
 	fprintf(outfile," [sec]\n");
 
 	fprintf(outfile,"     |");
 	for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile," ");
+
+	if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
 	fprintf(outfile,"     |");
 	fprintf(outfile,"\n");
 
@@ -6288,8 +6297,46 @@ int t1t2GraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 			if( gYMaxt1 <= tblV1[xx][yy].value ) gYMaxt1 = tblV1[xx][yy].value ;
 			if( gYMaxt2 <= tblV2[xx][yy].value ) gYMaxt2 = tblV2[xx][yy].value ;
 
+			//fprintf(stderr, "%d %d ValidNum = %d, yyMax = %d \n", xx, yy, tblV1[0][yy].validNum, yyMax);
 		}
 	}
+
+	/* --- Average --- */
+	gYavg1 = (gYMaxt1 + gYmint1)/2;
+	for(xx=xxMax-1; xx>=0; xx--)
+	{
+		for(yy=yyMax; yy>=0; yy--)
+		{
+			isMoved = 0;
+			if( (int)gYavg1 > tblV1[xx][yy].value && (tblV1[xx][yy].value>0) )
+			{
+				memcpy( (void*)&tblV1[xx][yy+1], (void*)&tblV1[xx][yy], sizeof(graphData_type) );
+				memset( (void*)&tblV1[xx][yy], 0x00, sizeof(graphData_type) );
+				isMoved = 1;
+			}
+
+		}
+	}
+
+
+
+	gYavg2 = (gYMaxt2 + gYmint2)/2;
+	for(xx=xxMax-1; xx>=0; xx--)
+	{
+		for(yy=yyMax; yy>=0; yy--)
+		{
+			isMoved = 0;
+			if( (int)gYavg2 > tblV2[xx][yy].value && (tblV2[xx][yy].value>0) )
+			{
+				memcpy( (void*)&tblV2[xx][yy+1], (void*)&tblV2[xx][yy], sizeof(graphData_type) );
+				memset( (void*)&tblV2[xx][yy], 0x00, sizeof(graphData_type) );
+				isMoved = 1;
+			}
+
+		}
+	}
+
+
 	gYMaxt1 /= 1000.0f;
 	gYMaxt2 /= 1000.0f;
 	
@@ -6298,22 +6345,27 @@ int t1t2GraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 
 
 	/* ----------- t1 & t2 Graph ------------------ */
-	for(yy=0; yy<yyMax; yy++)
+	for(yy=0; yy<=yyMax; yy++)
 	{
 		if(yy>0)
 		{
 			fprintf(outfile,"\n");
 			fprintf(outfile,"     |");
 			for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile," ");
+
+			if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
 			fprintf(outfile,"     |");
 			fprintf(outfile,"\n");
 		}
 
+		/* ---------------------------------------------- */
+		/* 1st Graph */
+		/* ---------------------------------------------- */
 		if(yy==0)
 		{
 			fprintf(outfile," %4.2lf|", (float)(gYMaxt1-yy)/10.0f  );
 		}
-		else if(yy==yyMax-1)
+		else if(yy==yyMax)
 		{
 			fprintf(outfile," %4.2lf|", (gYmint1)/10.0f  );
 		}
@@ -6338,12 +6390,14 @@ int t1t2GraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 			}
 		}
 
-
+		/* ---------------------------------------------- */
+		/* 2nd Graph */
+		/* ---------------------------------------------- */
 		if(yy==0)
 		{
 			fprintf(outfile," %4.2lf|", (float)(gYMaxt2-yy)/10.0f  );
 		}
-		else if(yy==yyMax-1)
+		else if(yy==yyMax)
 		{
 			fprintf(outfile," %4.2lf|", (gYmint2)/10.0f  );
 		}
@@ -6379,19 +6433,25 @@ int t1t2GraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 	fprintf(outfile,"\n");
 	fprintf(outfile,"     |");
 	for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile," ");
+
+	if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
 	fprintf(outfile,"     |");
 	fprintf(outfile,"\n");
 
 	fprintf(outfile,"     |");
 	for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile," ");
+
+	if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
 	fprintf(outfile,"     |");
 	fprintf(outfile,"\n");
 
 	fprintf(outfile,"     +");
 	for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile,"-");
+	if(xxMore) for(ii=0; ii<(SPACE_ONE_UNIT)*xxMore; ii++) fprintf(outfile,"-");
 
 	fprintf(outfile,"     +");
 	for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile,"-");
+	if(xxMore) for(ii=0; ii<(SPACE_ONE_UNIT)*xxMore; ii++) fprintf(outfile,"-");
 	
 	fprintf(outfile,"\n   ");
 	for(xx=0; xx<APS_TABLE_NUM && (int)ApsTble[xx]; xx++)
@@ -6417,19 +6477,23 @@ int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 {
 	int ii=0;
 	int xx=0, yy=0;
+	int xxMore = xxMax-6;
+	short isMoved = 0;
 
-	double gYMaxt1=0.0f, gYmint1 = 9999999.9f;
-	double gYMaxt2=0.0f, gYmint2 = 9999999.9f;
+	double gYMaxt1=0.0f, gYmint1 = 9999999.9f, gYavg1=0.0f;
+	double gYMaxt2=0.0f, gYmint2 = 9999999.9f, gYavg2=0.0f;
 	
 	/* ---------------------------------------------------------- */
-	/* --- t1, t2 Qsorting	------------------------------------- */
+	/* --- Jerk1, Ne MAX Qsorting	------------------------------------- */
 	/* ---------------------------------------------------------- */
 	fprintf(outfile,"\n[G/sec]");
 	for(ii=0; ii<SPACE_ONE-1; ii++) fprintf(outfile," ");
+	if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
 	fprintf(outfile," [rpm]\n");
 
 	fprintf(outfile,"     |");
 	for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile," ");
+	if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
 	fprintf(outfile,"     |");
 	fprintf(outfile,"\n");
 
@@ -6457,6 +6521,54 @@ int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 		}
 	}
 
+	/* -- Average --- */
+	gYavg1 = (gYMaxt1 + gYmint1)/2;
+	for(xx=xxMax-1; xx>=0; xx--)
+	{
+		for(yy=yyMax; yy>=0; yy--)
+		{
+			isMoved = 0;
+			if( (int)gYavg1 > tblV1[xx][yy].value && (tblV1[xx][yy].value>0) )
+			{
+				memcpy( (void*)&tblV1[xx][yy+1], (void*)&tblV1[xx][yy], sizeof(graphData_type) );
+				memset( (void*)&tblV1[xx][yy], 0x00, sizeof(graphData_type) );
+				isMoved = 1;
+			}
+		}
+	}
+	
+
+	gYavg2 = (gYMaxt2 + gYmint2)/2;
+	for(xx=xxMax-1; xx>=0; xx--)
+	{
+		for(yy=yyMax; yy>=0; yy--)
+		{
+			isMoved = 0;
+			if( (int)gYavg2 > tblV2[xx][yy].value && (tblV2[xx][yy].value>0) )
+			{
+				memcpy( (void*)&tblV2[xx][yy+1], (void*)&tblV2[xx][yy], sizeof(graphData_type) );
+				memset( (void*)&tblV2[xx][yy], 0x00, sizeof(graphData_type) );
+				isMoved = 1;
+			}
+
+		}
+	}
+
+#if 0
+	fprintf(stderr,"\n----------------- %lf  %lf  %lf \n", gYavg2, gYMaxt2 , gYmint2 );
+	for(xx=0; xx<=xxMax ; xx+=5)
+	{
+		for(yy=0; yy<=yyMax; yy++)
+		{
+			fprintf(stderr," %d , %d -> %6d  = [ %d , %d -> %6d ] = %d , %d -> %6d = [ %d , %d -> %6d ] = %d , %d -> %6d = [ %d , %d -> %6d ] \n", 
+				xx, yy, tblV2[xx][yy].value, xx+1, yy, tblV2[xx+1][yy].value, xx+2, yy, tblV2[xx+2][yy].value, 
+				xx+3, yy, tblV2[xx+3][yy].value, xx+4, yy, tblV2[xx+4][yy].value, xx+5, yy, tblV2[xx+5][yy].value );
+
+		}
+	}
+#endif
+
+
 	gYMaxt1 /= 100.0f;
 	gYMaxt2 /= 100.0f;
 
@@ -6464,8 +6576,8 @@ int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 	gYmint2 /= 100.0f;
 
 
-	/* ----------- t1 & t2 Graph ------------------ */
-	for(yy=0; yy<yyMax; yy++)
+	/* ----------- Jerk1 & Ne MAX Graph ------------------ */
+	for(yy=0; yy<=yyMax; yy++)
 	{
 		if(yy>0)
 		{
@@ -6473,7 +6585,7 @@ int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 			fprintf(outfile,"     |");
 
 			// ----------------------------------
-			// Left Table Value
+			// Jerk1, Left Table Value
 			// ----------------------------------
 			if(YesNo)
 			{
@@ -6496,11 +6608,12 @@ int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 			else
 			{
 				for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile," ");
+				if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
 				fprintf(outfile,"     |");
 			}
 
 			// ----------------------------------
-			// Right Table Value
+			// Ne MAX, Right Table Value
 			// ----------------------------------
 			if(YesNo)
 			{
@@ -6526,7 +6639,7 @@ int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 		{
 			fprintf(outfile," %4.1lf|", (float)(gYMaxt1-yy)  );
 		}
-		else if(yy==yyMax-1)
+		else if(yy==yyMax)
 		{
 			fprintf(outfile," %4.1lf|", (gYmint1)  );
 		}
@@ -6537,14 +6650,14 @@ int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 		{
 			if( 0 == tblV1[ xx ][ yy ].value ) 
 			{
-				if( (0==yy || yy==yyMax-1) && xx==xxMax-1 )
+				if( (0==yy || yy==yyMax) && xx==xxMax-1 )
 					fprintf(outfile," %5s%2s","x ","");
 				else
 					fprintf(outfile," %5s%4s","x ","");
 			}
 			else
 			{
-				if( (0==yy || yy==yyMax-1) && xx==xxMax-1 )
+				if( (0==yy || yy==yyMax) && xx==xxMax-1 )
 					fprintf(outfile," %5s%2s", tblV1[ xx ][ yy ].gearTxt, "" );
 				else
 					fprintf(outfile," %5s%4s", tblV1[ xx ][ yy ].gearTxt, "" );
@@ -6556,7 +6669,7 @@ int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 		{
 			fprintf(outfile," %4.1lf|", (float)(gYMaxt2-yy)  );
 		}
-		else if(yy==yyMax-1)
+		else if(yy==yyMax)
 		{
 			fprintf(outfile," %4.1lf|", (gYmint2)  );
 		}
@@ -6569,25 +6682,19 @@ int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 		{
 			if( 0 == tblV2[ xx ][ yy ].value ) 
 			{
-				if( (0==yy || yy==yyMax-1) && xx==xxMax-1 )
+				if( (0==yy || yy==yyMax) && xx==xxMax-1 )
 					fprintf(outfile," %5s%2s","x ","");
 				else
 					fprintf(outfile," %5s%4s","x ","");
 			}
 			else
 			{
-				if( (0==yy || yy==yyMax-1) && xx==xxMax-1 )
-					fprintf(outfile," %5s%2s", tblV1[ xx ][ yy ].gearTxt, "" );
+				if( (0==yy || yy==yyMax) && xx==xxMax-1 )
+					fprintf(outfile," %5s%2s", tblV2[ xx ][ yy ].gearTxt, "" );
 				else
 					fprintf(outfile," %5s%4s", tblV2[ xx ][ yy ].gearTxt, "" );
 			}
 		}
-#if 0
-		fprintf(outfile,"\n");
-		fprintf(outfile,"	  |");
-		for(ii=0; ii<70; ii++) fprintf(outfile," ");
-		fprintf(outfile,"	  | \n");
-#endif
 	}
 
 
@@ -6596,6 +6703,7 @@ int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 		fprintf(outfile,"\n");
 		fprintf(outfile,"     |");
 		for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile," ");
+		if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
 		fprintf(outfile,"     |");
 		fprintf(outfile,"\n");
 	}
@@ -6628,6 +6736,7 @@ int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 		else
 		{
 			for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile," ");
+			if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
 			fprintf(outfile,"     |");
 		}
 
@@ -6657,14 +6766,17 @@ int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 
 	fprintf(outfile,"     |");
 	for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile," ");
+	if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
 	fprintf(outfile,"     |");
 	fprintf(outfile,"\n");
 
 	fprintf(outfile,"     +");
 	for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile,"-");
+	if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile,"-");
 
 	fprintf(outfile,"     +");
 	for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile,"-");
+	if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile,"-");
 	
 	fprintf(outfile,"\n   ");
 	for(xx=0; xx<APS_TABLE_NUM && (int)ApsTble[xx]; xx++)
@@ -7118,6 +7230,7 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 	graphData_type tblNtMX[APS_TABLE_NUM][GRAPH_Y_BUF_SIZ]; /* Nt Max */
 
 	int xx=0, xxMax, yy=0, yyMax;
+	int xxMore=0;
 	double gYMaxt1=0.0f, gYmint1 = 9999999.9f;
 	double gYMaxt2=0.0f, gYmint2 = 9999999.9f;
 
@@ -7482,9 +7595,26 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 	/* -- 1 ------------------------------ */
 	/* -- 변속 준비 시간 (S.S~S.B Time) -- */
 	/* -- 1 ------------------------------ */
+	for(xx=0; xx<APS_TABLE_NUM && (int)ApsTble[xx]; xx++)
+	{
+			; /* Just, find xxMax ~~ */
+	}
+	yyMax  = icurGear;
+	xxMax  = xx;
+	xxMore = xxMax-6;
+
+	
 	fprintf(outfile,"\r\n\r\n\n");
 
-	fprintf(outfile,"t1(SS~SB)-");
+	fprintf(outfile,"   === Up shift Average t1 time (SS~SB) === ");
+	for(ii=0; ii<FUNC_SPC+14; ii++) fprintf(outfile," ");
+	if(xxMore) for(ii=0; ii<(SPACE_ONE_UNIT-2)*xxMore; ii++) fprintf(outfile," ");
+
+	fprintf(outfile,"   === Up shift Average t2 time (SB~SP) === ");
+	fprintf(outfile,"\r\n");
+
+
+	fprintf(outfile,"t1(SS~SB) ");
 	for(xx=0; xx<APS_TABLE_NUM && (int)ApsTble[xx]; xx++)
 	{
 		fprintf(outfile," %4d(%%)", (int)ApsTble[xx] );
@@ -7492,19 +7622,24 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 
 	for(ii=0; ii<FUNC_SPC; ii++) fprintf(outfile," ");
 
-	fprintf(outfile,"t2(SB~SP)-");
+	fprintf(outfile,"t2(SB~SP) ");
 	for(xx=0; xx<APS_TABLE_NUM && (int)ApsTble[xx]; xx++)
 	{
 		fprintf(outfile," %4d(%%)", (int)ApsTble[xx] );
 	}
 	fprintf(outfile,"\n");
+
+	
 	for(ii=0; ii<60; ii++) fprintf(outfile,"-");
+	if(xxMore) for(ii=0; ii<(SPACE_ONE_UNIT-2)*xxMore; ii++) fprintf(outfile,"-");
+
 	for(ii=0; ii<FUNC_SPC-2; ii++) fprintf(outfile," ");
+
 	for(ii=0; ii<60; ii++) fprintf(outfile,"-");
+	if(xxMore) for(ii=0; ii<(SPACE_ONE_UNIT-2)*xxMore; ii++) fprintf(outfile,"-");
+
 	fprintf(outfile,"\n");
 	
-	yyMax = icurGear;
-	xxMax = xx;
 
 	for(yy=1; yy<=yyMax; yy++)
 	{
@@ -7515,7 +7650,10 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 			if( 0 == tblT1[ xx ][ yy ].value ) 
 				fprintf(outfile," %7s","x");
 			else
+			{
 				fprintf(outfile," %7.3lf", (tblT1[ xx ][ yy ].value /1000.0f/10.0f) );
+				tblT1[ 0 ][ yy ].validNum ++;
+			}
 		}
 
 		for(ii=0; ii<FUNC_SPC; ii++) fprintf(outfile," ");
@@ -7526,7 +7664,10 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 			if( 0 == tblT2[ xx ][ yy ].value ) 
 				fprintf(outfile," %7s","x");
 			else
+			{
 				fprintf(outfile," %7.3lf", (tblT2[ xx ][ yy ].value /1000.0f/10.0f) );
+				tblT2[ 0 ][ yy ].validNum ++;
+			}
 		}
 		fprintf(outfile,"\n");
 	}
@@ -7706,7 +7847,16 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 	/* -- and              --------------- */
 	/* -- Max Ne (S.B 부근) -------------- */
 	/* -- 3 ------------------------------ */
-	fprintf(outfile,"--Jerk1---");
+
+	fprintf(outfile,"   === Up shift Average Jerk1 === ");
+	for(ii=0; ii<FUNC_SPC+24; ii++) fprintf(outfile," ");
+	if(xxMore) for(ii=0; ii<(SPACE_ONE_UNIT-2)*xxMore; ii++) fprintf(outfile," ");
+
+	fprintf(outfile,"   === Up shift Average Ne Max === ");
+	fprintf(outfile,"\r\n");
+	
+
+	fprintf(outfile,"<<Jerk1>> ");
 	for(xx=0; xx<APS_TABLE_NUM && (int)ApsTble[xx]; xx++)
 	{
 		fprintf(outfile," %4d(%%)", (int)ApsTble[ xx ] );
@@ -7714,20 +7864,30 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 
 	for(ii=0; ii<FUNC_SPC; ii++) fprintf(outfile," ");
 
-	fprintf(outfile,"--Ne Max--");
+	fprintf(outfile,"<<Ne Max>>");
 	for(xx=0; xx<APS_TABLE_NUM && (int)ApsTble[xx]; xx++)
 	{
 		fprintf(outfile," %4d(%%)", (int)ApsTble[ xx ] );
 	}
-	fprintf(outfile,"\n");
-	for(ii=0; ii<60; ii++) fprintf(outfile,"-");
-	for(ii=0; ii<FUNC_SPC-2; ii++) fprintf(outfile," ");
-	for(ii=0; ii<60; ii++) fprintf(outfile,"-");
-	fprintf(outfile,"\n");
-
 
 	yyMax = icurGear;
 	xxMax = xx;
+	xxMore = xxMax-6;
+
+
+	fprintf(outfile,"\n");
+	for(ii=0; ii<60; ii++) fprintf(outfile,"-");
+	if(xxMore) for(ii=0; ii<(SPACE_ONE_UNIT-2)*xxMore; ii++) fprintf(outfile,"-");
+
+	for(ii=0; ii<FUNC_SPC-2; ii++) fprintf(outfile," ");
+
+	for(ii=0; ii<60; ii++) fprintf(outfile,"-");
+	if(xxMore) for(ii=0; ii<(SPACE_ONE_UNIT-2)*xxMore; ii++) fprintf(outfile,"-");
+	fprintf(outfile,"\n");
+
+
+
+
 	for(yy=1; yy<=yyMax; yy++)
 	{
 		fprintf(outfile,"  <%d-%d> : ", yy,yy+1 ); /* <curGear-tgtGear>*/
@@ -7736,7 +7896,10 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 			if( 0 == tblJerk1[ xx ][ yy ].value ) 
 				fprintf(outfile," %7s","x");
 			else
+			{
 				fprintf(outfile," %7.2lf", (tblJerk1[ xx ][ yy ].value)/100.0f );
+				tblJerk1[ 0 ][ yy ].validNum ++;
+			}
 		}
 
 		for(ii=0; ii<FUNC_SPC; ii++) fprintf(outfile," ");
@@ -7747,7 +7910,10 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 			if( 0 == tblNeMX[ xx ][ yy ].value ) 
 				fprintf(outfile," %7s","x");
 			else
+			{
 				fprintf(outfile," %7.2lf", (tblNeMX[ xx ][ yy ].value)/100.0f );
+				tblNeMX[ 0 ][ yy ].validNum ++;
+			}
 		}
 	
 		fprintf(outfile,"\n");
@@ -10960,12 +11126,12 @@ int main(int argc, char *argv[])
 					}
 
 
-					iSBchoicePnt = 0; /* SB first position */
+					iSBchoicePnt = 0; /* 0 means SB first position */
 					if( strstr(str_ShiftOp[0], ".last") )
 					{
 					int i, len;
 
-						iSBchoicePnt = 1; /* SB Last position */
+						iSBchoicePnt = 1; /* 1 means SB Last position */
 						len = strlen( str_ShiftOp[0] );
 						for(i=len; i>0; i--)
 						{
@@ -10979,7 +11145,7 @@ int main(int argc, char *argv[])
 
 
 					gValueDisplay = 0;
-					if( strstr(str_ShiftOp[0], ".value") )
+					if( strstr(str_ShiftOp[0], ".gvalue") )
 					{
 					int i, len;
 
@@ -10987,14 +11153,13 @@ int main(int argc, char *argv[])
 						len = strlen( str_ShiftOp[0] );
 						for(i=len; i>0; i--)
 						{
-							if( 0==strncmp( (char*)&str_ShiftOp[0][i], (char*)".value", 6 ) ) 
+							if( 0==strncmp( (char*)&str_ShiftOp[0][i], (char*)".gvalue", 7 ) ) 
 							{
-								strcpy( (char*)&str_ShiftOp[0][i], (char*)&str_ShiftOp[0][i+6] );
+								strcpy( (char*)&str_ShiftOp[0][i], (char*)&str_ShiftOp[0][i+7] );
 								break;
 							}
 						}
 					}
-
 
 					iModeID = -1;
 					for(kk=0; kk<MODE_ID_NUMS-1; kk++)
@@ -11120,7 +11285,6 @@ int main(int argc, char *argv[])
 							break;
 
 						case 8:
-
 
 						default:
 							fprintf(stderr,"\n");
