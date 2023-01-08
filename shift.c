@@ -40,7 +40,11 @@
                      INCLUDE FILES 
 ---------------------------------------------------------------------------*/
 
+//#define __USE_MINGW_ANSI_STDIO 		1
+//#define _UNICODE
+
 #include <stdio.h>
+#include <stddef.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h> /* for getopt() */
@@ -55,6 +59,9 @@
 #include <memory.h> 
 #include <stdarg.h>
 #include <direct.h> // mkdir, rename
+#include <locale.h>
+#include <wchar.h>
+
 //#include <windows.h> /* 2022-11-22 */
 
 
@@ -68,8 +75,6 @@
 #include "hex2bin.c"
 #include "elfinfo.c"
 #include "common.c"
-
-
 
 
 
@@ -1799,13 +1804,127 @@ typedef struct _SPdecision_ {
 } tSPdec_type;
 
 
+
+#define WIDE_CHAR_SYMBOL 	0
+
 typedef struct _graphDB_ {
 	int  gearIdx;
 	char gearTxt[10];
 	int  value;
-	int  validNum;
+	int  YvalNum;
+	#if WIDE_CHAR_SYMBOL
+	wchar_t symbol[2];
+	#else
+	char symbol[2];
+	#endif
 } graphData_type;
 
+
+#if WIDE_CHAR_SYMBOL
+static wchar_t gSymbol[20][2];
+
+const char	mbSym[][2] = {
+		"",  // 0
+		"■" , // 2
+		"◈" , // 9
+		"♡" , // 10
+		"♤" , // 11
+		"●" , // 3
+		"◆" , // 4
+		"▲" , // 5
+		"♠" , // 6
+		"♥" , // 7
+		"♣" , // 8
+		"○" , // 12
+		"◇" , // 13
+		"★", // 1
+		"△" , // 14
+		"α" , // 15
+		"β" , // 16
+		"γ" , // 17
+		"δ" , // 18
+		""
+	};
+#else
+const char	gSymbol[20][2] = {
+		"0",  // 0
+		"a", // 1
+		"b", // 2
+		"c", // 3
+		"d", // 4
+		"e", // 5
+		"f", // 6
+		"g", // 7
+		"h", // 8
+		"i", // 9
+		"j", // 10
+		"k", // 11
+		"m", // 12
+		"n", // 13
+		"o", // 14
+		"p", // 15
+		"q", // 16
+		"r", // 17
+		"s", // 18
+		""
+	};
+#endif
+
+
+				 
+void mb2wc(void)
+{
+#if WIDE_CHAR_SYMBOL
+	int length, temp;
+	int ii;
+	char *loc = NULL;
+
+	/* --------------------------------------------------------------------------
+	mbtowc() ? 멀티바이트 문자를 와이드 문자로 변환
+	wcslen() ? 와이드 문자 스트링 길이 계산
+	wcrtomb() ? 멀티바이트 문자로 와이드 문자 변환(재시작 가능)
+	wcstombs() ? 멀티바이트 스트링으로 와이드 문자 스트링 변환
+	wcsrtombs() ? 와이드 문자 스트링을 멀티바이트 스트링으로 변환(재시작 가능)
+	---------------------------------------------------------------------------- */
+
+	/* initialize internal state variable */
+	//temp = mbtowc(gSymbol, NULL, 0); 		   
+	memset(gSymbol, 0x00, 20*sizeof(wchar_t) );
+
+
+	//loc = setlocale(LC_ALL, "ko_KR.utf8" );
+	//loc = setlocale(LC_ALL, "ko_KR.UTF-8");
+	loc = setlocale(LC_ALL, "");
+	//loc = setlocale(LC_ALL, "korean" ); 
+	//loc = setlocale(LC_ALL,".949");
+	//loc = setlocale(LC_ALL,"Korean_Korea.65001");
+	//loc = setlocale(LC_ALL,"Korean_Korea.949");
+	//loc = setlocale(LC_ALL,"en_US.UTF-8");//	CP_UTF8
+	//loc = setlocale(LC_ALL, "/QSYS.LIB/EN_US.LOCALE" );
+	//loc = setlocale(LC_ALL, "");
+	if( NULL == loc )
+	{
+		fprintf(stderr,"set locale failed.. [%s] \r\n\n", loc );
+	}
+	else
+	{
+		//fprintf(stderr,"LC_ALL = [%s] \n", loc);
+		//printf("LC_CTYPE = [%s]\n", setlocale(LC_CTYPE, NULL));
+	}
+
+	/* Set string to point to a multibyte character. */
+	for(ii=0; ii<20; ii++)
+	{
+		length = mblen(mbSym[ii], MB_CUR_MAX);
+		temp = mbtowc(gSymbol[ii], mbSym[ii], length);
+		//temp = mbstowcs(gSymbol[ii], mbSym[ii], length); 
+		gSymbol[ii][1] = L'\0';
+		//fwprintf(stderr, L"wide character string: %d/%d -> [%4ls] \n",length, temp, gSymbol[ii] );
+	}
+
+	//fprintf(outfile,"■★●◆▲♠♥♣ ◎※℃∇ αβγδ ◈○◇□△♡♤\n");
+#endif
+}
 
 
 short apsTableIndex(void)
@@ -2007,18 +2126,18 @@ unsigned long long Find_GearMode( unsigned long long *gShift, short iChoice, uns
 
 
 	fprintf(stderr,"  Total Quality Shift Records -: %9u lines, %6.1f min \n", lTotalNums, (double)(lTotalNums*iavgTime)/1000.0/60 );
-	fprintf(stderr,"    Pwr On Upshift--%-8s   : %9u lines, %6.1f min \n", gMode[PWR_ON_UP_SHIFT].szModeTxt, gMode[PWR_ON_UP_SHIFT].lSum, (double)(gMode[PWR_ON_UP_SHIFT].lSum*iavgTime)/1000.0/60 );
-	fprintf(stderr,"    Pwr On Downshift--%-8s : %9u lines, %6.1f min \n", gMode[PWR_ON_DOWN_SHIFT].szModeTxt, gMode[PWR_ON_DOWN_SHIFT].lSum, (double)(gMode[PWR_ON_DOWN_SHIFT].lSum*iavgTime)/1000.0/60 );
-	fprintf(stderr,"    Pwr Off Upshift--%-8s  : %9u lines, %6.1f min \n", gMode[POWER_OFF_UP_SHIFT].szModeTxt, gMode[POWER_OFF_UP_SHIFT].lSum, (double)(gMode[POWER_OFF_UP_SHIFT].lSum*iavgTime)/1000/60 );
-	fprintf(stderr,"    Pwr Off Downshift--%-8s: %9u lines, %6.1f min \n", gMode[POWER_OFF_DOWN_SHIFT].szModeTxt, gMode[POWER_OFF_DOWN_SHIFT].lSum, (double)(gMode[POWER_OFF_DOWN_SHIFT].lSum*iavgTime)/1000/60 );
-	fprintf(stderr,"    Power On Manual--%-8s  : %9u lines, %6.1f min \n", gMode[GEAR_PWRON_MAN].szModeTxt, gMode[GEAR_PWRON_MAN].lSum, (double)(gMode[GEAR_PWRON_MAN].lSum*iavgTime)/1000/60 );
-	fprintf(stderr,"    Near2Stop Shift--%-8s  : %9u lines, %6.1f min \n", gMode[GEAR_NEAR2STOP].szModeTxt, gMode[GEAR_NEAR2STOP].lSum, (double)(gMode[GEAR_NEAR2STOP].lSum*iavgTime)/1000/60 );
-	fprintf(stderr,"    Return Shift--%-8s     : %9u lines, %6.1f min \n", gMode[GEAR_RETURN_SHI].szModeTxt, gMode[GEAR_RETURN_SHI].lSum, (double)(gMode[GEAR_RETURN_SHI].lSum*iavgTime)/1000/60 );
-	fprintf(stderr,"    P Gear status--%-8s    : %9u lines, %6.1f min \n", gMode[GEAR_P].szModeTxt, gMode[GEAR_P].lSum, (double)(gMode[GEAR_P].lSum*iavgTime)/1000/60 );
-	fprintf(stderr,"    N Gear status--%-8s    : %9u lines, %6.1f min \n", gMode[GEAR_N].szModeTxt, gMode[GEAR_N].lSum, (double)(gMode[GEAR_N].lSum*iavgTime)/1000/60 );
-	fprintf(stderr,"    R Gear status--%-8s    : %9u lines, %6.1f min \n", gMode[GEAR_R].szModeTxt, gMode[GEAR_R].lSum, (double)(gMode[GEAR_R].lSum*iavgTime)/1000/60 );
-	fprintf(stderr,"    D Gear status--%-8s    : %9u lines, %6.1f min \n", gMode[GEAR_D].szModeTxt, gMode[GEAR_D].lSum, (double)(gMode[GEAR_D].lSum*iavgTime)/1000/60 );
-	fprintf(stderr,"    Others Gear -- %-8s    : %9u lines, %6.1f min \n", gMode[GEAR_OTHER].szModeTxt, gMode[GEAR_OTHER].lSum, (double)(gMode[GEAR_OTHER].lSum*iavgTime)/1000.0/60 );
+	fprintf(stderr,"    Pwr On Upshift--%-8s   : %9llu lines, %6.1f min \n", gMode[PWR_ON_UP_SHIFT].szModeTxt, gMode[PWR_ON_UP_SHIFT].lSum, (double)(gMode[PWR_ON_UP_SHIFT].lSum*iavgTime)/1000.0/60 );
+	fprintf(stderr,"    Pwr On Downshift--%-8s : %9llu lines, %6.1f min \n", gMode[PWR_ON_DOWN_SHIFT].szModeTxt, gMode[PWR_ON_DOWN_SHIFT].lSum, (double)(gMode[PWR_ON_DOWN_SHIFT].lSum*iavgTime)/1000.0/60 );
+	fprintf(stderr,"    Pwr Off Upshift--%-8s  : %9llu lines, %6.1f min \n", gMode[POWER_OFF_UP_SHIFT].szModeTxt, gMode[POWER_OFF_UP_SHIFT].lSum, (double)(gMode[POWER_OFF_UP_SHIFT].lSum*iavgTime)/1000/60 );
+	fprintf(stderr,"    Pwr Off Downshift--%-8s: %9llu lines, %6.1f min \n", gMode[POWER_OFF_DOWN_SHIFT].szModeTxt, gMode[POWER_OFF_DOWN_SHIFT].lSum, (double)(gMode[POWER_OFF_DOWN_SHIFT].lSum*iavgTime)/1000/60 );
+	fprintf(stderr,"    Power On Manual--%-8s  : %9llu lines, %6.1f min \n", gMode[GEAR_PWRON_MAN].szModeTxt, gMode[GEAR_PWRON_MAN].lSum, (double)(gMode[GEAR_PWRON_MAN].lSum*iavgTime)/1000/60 );
+	fprintf(stderr,"    Near2Stop Shift--%-8s  : %9llu lines, %6.1f min \n", gMode[GEAR_NEAR2STOP].szModeTxt, gMode[GEAR_NEAR2STOP].lSum, (double)(gMode[GEAR_NEAR2STOP].lSum*iavgTime)/1000/60 );
+	fprintf(stderr,"    Return Shift--%-8s     : %9llu lines, %6.1f min \n", gMode[GEAR_RETURN_SHI].szModeTxt, gMode[GEAR_RETURN_SHI].lSum, (double)(gMode[GEAR_RETURN_SHI].lSum*iavgTime)/1000/60 );
+	fprintf(stderr,"    P Gear status--%-8s    : %9llu lines, %6.1f min \n", gMode[GEAR_P].szModeTxt, gMode[GEAR_P].lSum, (double)(gMode[GEAR_P].lSum*iavgTime)/1000/60 );
+	fprintf(stderr,"    N Gear status--%-8s    : %9llu lines, %6.1f min \n", gMode[GEAR_N].szModeTxt, gMode[GEAR_N].lSum, (double)(gMode[GEAR_N].lSum*iavgTime)/1000/60 );
+	fprintf(stderr,"    R Gear status--%-8s    : %9llu lines, %6.1f min \n", gMode[GEAR_R].szModeTxt, gMode[GEAR_R].lSum, (double)(gMode[GEAR_R].lSum*iavgTime)/1000/60 );
+	fprintf(stderr,"    D Gear status--%-8s    : %9llu lines, %6.1f min \n", gMode[GEAR_D].szModeTxt, gMode[GEAR_D].lSum, (double)(gMode[GEAR_D].lSum*iavgTime)/1000/60 );
+	fprintf(stderr,"    Others Gear -- %-8s    : %9llu lines, %6.1f min \n", gMode[GEAR_OTHER].szModeTxt, gMode[GEAR_OTHER].lSum, (double)(gMode[GEAR_OTHER].lSum*iavgTime)/1000.0/60 );
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 
 	if(iChoice>GEAR_SHI_NONE && iChoice<=GEAR_OTHER)
@@ -2903,12 +3022,12 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 	{
 		if( chkPATs_ModeID[ii] > 0UL )
 		{
-			fprintf(stderr,"    %3u:%-22s : %9lu lines, %6.1lf min  %s \n", ii, arrPATs_ModeID[ii].ModeID, chkPATs_ModeID[ii], (double)(chkPATs_ModeID[ii]*iavgTime)/1000.0/60, (aiPATs05==ii?"* Sorting":" ") );
+			fprintf(stderr,"    %3u:%-22s : %9llu lines, %6.1lf min  %s \n", ii, arrPATs_ModeID[ii].ModeID, chkPATs_ModeID[ii], (double)(chkPATs_ModeID[ii]*iavgTime)/1000.0/60, (aiPATs05==ii?"* Sorting":" ") );
 			totChkModeID += chkPATs_ModeID[ii];
 		}
 	}
 	fprintf(stderr,"  Quality Sum Records ---------: %9u lines \n", totChkModeID );
-	fprintf(stderr,"  Shift Sorted Rec %-11s : %9u/ %lu lines \n", arrPATs_ModeID[aiPATs05].ModeID, iSortCount, chkPATs_ModeID[aiPATs05] );
+	fprintf(stderr,"  Shift Sorted Rec %-11s : %9u/ %llu lines \n", arrPATs_ModeID[aiPATs05].ModeID, iSortCount, chkPATs_ModeID[aiPATs05] );
 	fprintf(stderr,"     SS Point Counts--%-8s : %9u points \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), iSScount );
 	fprintf(stderr,"     SB Point Counts--%-8s : %9u points \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), iSBcount );
 	fprintf(stderr,"     SP Point Counts--%-8s : %9u points \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), iSPcount );
@@ -6250,29 +6369,130 @@ int QsortCompare(const void *a, const void *b)  //내림차순 정렬
 }
 
 
-int t1t2GraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type tblV2[][GRAPH_Y_BUF_SIZ], int xxMax, int yyMax, short YesNo)
+int t1t2GraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type tblV2[][GRAPH_Y_BUF_SIZ], int xxMax, int yyMax, short gType)
 {
 	int ii=0;
-	int xx=0, yy=0;
+	int xx=0, yy=0, zlp=0, zlpMax;
 	int xxMore = xxMax-6;
-	short isMoved = 0;
-	
+	short pCnt = 0;
 	double gYMaxt1=0.0f, gYmint1 = 9999999.9f, gYavg1=0.0f;
 	double gYMaxt2=0.0f, gYmint2 = 9999999.9f, gYavg2=0.0f;
-	
+	double gYstep1=0.0f, gYstep2 =0.0f;
+
+
 	/* ---------------------------------------------------------- */
 	/* --- t1, t2 Qsorting	------------------------------------- */
 	/* ---------------------------------------------------------- */
+
+
+	/* --------------------------------- */
+	/* gType==0 Case : symbol print ---- */
+	/* --------------------------------- */
+	if(0==gType)
+	{
+		// ---------------------------
+		// 1st line ------------------
+		// ---------------------------
+		yy = 1;
+		if(tblV1[0][yy].value) 
+			fprintf(outfile," %6s:%s", tblV1[0][yy].symbol, tblV1[0][yy].gearTxt);
+
+		pCnt = 0;
+		for(yy=2; yy<=yyMax; yy++)
+		{
+			for(xx=0; xx<xxMax; xx++)
+			{
+				if(tblV1[xx][yy].value) 
+				{
+					fprintf(outfile,",%3s:%s", tblV1[xx][yy].symbol, tblV1[xx][yy].gearTxt);
+					break;
+				}
+			}
+			
+			if(pCnt++>=2) break;
+		}
+
+		for(ii=0; ii<(SPACE_ONE_UNIT+1)*(6-1-pCnt); ii++) fprintf(outfile," ");
+		if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
+
+		yy = 1;
+		if(tblV2[0][yy].value) 
+			fprintf(outfile," %5s%6s:%s", "", tblV2[0][yy].symbol, tblV2[0][yy].gearTxt);
+
+		pCnt = 0;
+		for(yy=2; yy<=yyMax; yy++)
+		{
+
+			for(xx=0; xx<xxMax; xx++)
+			{
+				if(tblV2[xx][yy].value) 
+				{
+					fprintf(outfile,",%3s:%s", tblV2[xx][yy].symbol, tblV2[xx][yy].gearTxt);
+					break;
+				}
+			}
+			if(pCnt++>=2) break;
+		}
+		fprintf(outfile,"\n");
+
+		// ---------------------------
+		// 2nd line ------------------
+		// ---------------------------
+
+		if(tblV1[0][yy+1].value) 
+			fprintf(outfile," %6s:%s", tblV1[0][yy+1].symbol, tblV1[0][yy+1].gearTxt);
+
+		pCnt = 0;
+		for(ii=yy+2; ii<=yyMax; ii++)
+		{
+			for(xx=0; xx<xxMax; xx++)
+			{
+				if(tblV1[xx][ii].value) 
+				{
+					fprintf(outfile,",%3s:%s", tblV1[xx][ii].symbol, tblV1[xx][ii].gearTxt);
+					break;
+				}
+			}
+			if(pCnt++>=2) break;
+		}
+
+		for(ii=0; ii<(SPACE_ONE_UNIT+1)*(6-1-pCnt); ii++) fprintf(outfile," ");
+		if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
+
+		if(yyMax>6) 
+			for(ii=0; ii<2; ii++) fprintf(outfile," ");
+
+		if(tblV2[0][yy+1].value) 
+			fprintf(outfile,"  %6s:%s", tblV2[0][yy+1].symbol, tblV2[0][yy+1].gearTxt);
+		
+		pCnt = 0;
+		for(ii=yy+2; ii<=yyMax; ii++)
+		{
+			for(xx=0; xx<xxMax; xx++)
+			{
+				if(tblV2[xx][ii].value) 
+				{
+					fprintf(outfile,",%3s:%s", tblV2[xx][ii].symbol, tblV2[xx][ii].gearTxt);
+					break;
+				}
+			}
+			if(pCnt++>=2) break;
+		}
+	}
+
 	fprintf(outfile,"\n [sec]");
+	
 	for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile," ");
 	
 	if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
 	fprintf(outfile," [sec]\n");
 
+	/* 1st column */
 	fprintf(outfile,"     |");
 	for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile," ");
 
 	if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
+	/* 2nd column */
 	fprintf(outfile,"     |");
 	fprintf(outfile,"\n");
 
@@ -6291,46 +6511,70 @@ int t1t2GraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 		for(yy=0; yy<yyMax; yy++)
 		{
 			if( 0==tblV1[xx][yy].value || 0==tblV2[xx][yy].value ) continue;
+
+			tblV1[xx][0].YvalNum++;
+			tblV2[xx][0].YvalNum++;
+
 			if( gYmint1 > tblV1[xx][yy].value ) gYmint1 = tblV1[xx][yy].value ;
 			if( gYmint2 > tblV2[xx][yy].value ) gYmint2 = tblV2[xx][yy].value ;
 
 			if( gYMaxt1 <= tblV1[xx][yy].value ) gYMaxt1 = tblV1[xx][yy].value ;
 			if( gYMaxt2 <= tblV2[xx][yy].value ) gYMaxt2 = tblV2[xx][yy].value ;
-
-			//fprintf(stderr, "%d %d ValidNum = %d, yyMax = %d \n", xx, yy, tblV1[0][yy].validNum, yyMax);
 		}
+		//fprintf(stderr, "xx:%d : ValidNum1 = %d, ValidNum2 = %d, yyMax = %d \n", xx, tblV1[xx][0].YvalNum, tblV2[xx][0].YvalNum, yyMax);
 	}
 
 	/* --- Average --- */
 	gYavg1 = (gYMaxt1 + gYmint1)/2;
 	for(xx=xxMax-1; xx>=0; xx--)
 	{
-		for(yy=yyMax; yy>=0; yy--)
+		if( tblV1[xx][0].YvalNum>0 ) 
+			gYstep1 = (gYMaxt1 - gYmint1)/tblV1[xx][0].YvalNum;
+
+		for(yy=yyMax; yy>0; yy--)
 		{
-			isMoved = 0;
-			if( (int)gYavg1 > tblV1[xx][yy].value && (tblV1[xx][yy].value>0) )
+			if( tblV1[xx][0].YvalNum <= (yyMax/2) )
+			{
+				for(zlp=0; zlp<(yyMax/2); zlp++)
+				{
+					if( (int)gYavg1 > (tblV1[xx][yy+zlp].value+gYstep1) && (tblV1[xx][yy+zlp].value>0) )
+					{
+						memcpy( (void*)&tblV1[xx][yy+zlp+1], (void*)&tblV1[xx][yy+zlp], sizeof(graphData_type) );
+						memset( (void*)&tblV1[xx][yy+zlp], 0x00, sizeof(graphData_type) );
+					}
+				}
+			}
+			else if( (int)gYavg1 > tblV1[xx][yy].value && (tblV1[xx][yy].value>0) )
 			{
 				memcpy( (void*)&tblV1[xx][yy+1], (void*)&tblV1[xx][yy], sizeof(graphData_type) );
 				memset( (void*)&tblV1[xx][yy], 0x00, sizeof(graphData_type) );
-				isMoved = 1;
 			}
-
 		}
 	}
-
-
 
 	gYavg2 = (gYMaxt2 + gYmint2)/2;
 	for(xx=xxMax-1; xx>=0; xx--)
 	{
+		if( tblV2[xx][0].YvalNum>0 ) 
+			gYstep2 = (gYMaxt2 - gYmint2)/tblV2[xx][0].YvalNum;
+
 		for(yy=yyMax; yy>=0; yy--)
 		{
-			isMoved = 0;
-			if( (int)gYavg2 > tblV2[xx][yy].value && (tblV2[xx][yy].value>0) )
+			if( tblV2[xx][0].YvalNum <= (yyMax/2) )
+			{
+				for(zlp=0; zlp<(yyMax/2); zlp++)
+				{
+					if( (int)gYavg2 > (tblV2[xx][yy+zlp].value+gYstep2) && (tblV2[xx][yy+zlp].value>0) )
+					{
+						memcpy( (void*)&tblV2[xx][yy+zlp+1], (void*)&tblV2[xx][yy+zlp], sizeof(graphData_type) );
+						memset( (void*)&tblV2[xx][yy+zlp], 0x00, sizeof(graphData_type) );
+					}
+				}
+			}
+			else if( (int)gYavg2 > tblV2[xx][yy].value && (tblV2[xx][yy].value>0) )
 			{
 				memcpy( (void*)&tblV2[xx][yy+1], (void*)&tblV2[xx][yy], sizeof(graphData_type) );
 				memset( (void*)&tblV2[xx][yy], 0x00, sizeof(graphData_type) );
-				isMoved = 1;
 			}
 
 		}
@@ -6376,17 +6620,24 @@ int t1t2GraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 		{
 			if( 0 == tblV1[ xx ][ yy ].value ) 
 			{
-				if(YesNo)
-					fprintf(outfile," %9s","x ");
-				else
-					fprintf(outfile," %5s%4s","x ","" );
+				fprintf(outfile," %5s%4s","","" ); // ".."
 			}
 			else
 			{
-				if(YesNo)
-					fprintf(outfile," %5s%-4.1lf", tblV1[ xx ][ yy ].gearTxt, (tblV1[ xx ][ yy ].value /1000.0f/10.0f) );
-				else
+				switch(gType)
+				{
+				case 1:
 					fprintf(outfile," %5s%4s", tblV1[ xx ][ yy ].gearTxt, "" );					
+					break;
+				case 2:
+					fprintf(outfile," %5s%-4.1lf", tblV1[ xx ][ yy ].gearTxt, (tblV1[ xx ][ yy ].value /1000.0f/10.0f) );
+					break;
+
+				case 0:
+				default:
+					fprintf(outfile," %5s%4s", tblV1[ xx ][ yy ].symbol, "" );					
+					break;
+				}
 			}
 		}
 
@@ -6408,17 +6659,25 @@ int t1t2GraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 		{
 			if( 0 == tblV2[ xx ][ yy ].value ) 
 			{
-				if(YesNo)
-					fprintf(outfile," %9s","x ");
-				else
-					fprintf(outfile," %5s%4s","x ","" );
+				fprintf(outfile," %5s%4s","","" ); // ".."
 			}
 			else
 			{
-				if(YesNo)
-					fprintf(outfile," %5s%-4.1lf", tblV2[ xx ][ yy ].gearTxt, (tblV2[ xx ][ yy ].value /1000.0f/10.0f) );
-				else
-					fprintf(outfile," %5s%4s", tblV2[ xx ][ yy ].gearTxt, "" );					
+				switch(gType)
+				{
+				case 1: /* shift, for example <1-2> */
+					fprintf(outfile," %5s%4s", tblV2[ xx ][ yy ].gearTxt, "" ); // 1
+					break;
+				case 2: /* shift and value, for example <1-2>1.2 */
+					fprintf(outfile," %5s%-4.1lf", tblV2[ xx ][ yy ].gearTxt, (tblV2[ xx ][ yy ].value /1000.0f/10.0f) ); // 2
+					break;
+				
+				case 0: /* symbol */
+				default:
+					fprintf(outfile," %5s%4s", tblV2[ xx ][ yy ].symbol, "" );					
+					break;
+				}
+
 			}
 		}
 #if 0
@@ -6473,19 +6732,114 @@ int t1t2GraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 
 
 
-int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type tblV2[][GRAPH_Y_BUF_SIZ], int xxMax, int yyMax, short YesNo)
+int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type tblV2[][GRAPH_Y_BUF_SIZ], int xxMax, int yyMax, short gType)
 {
 	int ii=0;
-	int xx=0, yy=0;
+	int xx=0, yy=0, zlp=0, zlpMax;
 	int xxMore = xxMax-6;
-	short isMoved = 0;
+	short pCnt=0;
 
 	double gYMaxt1=0.0f, gYmint1 = 9999999.9f, gYavg1=0.0f;
 	double gYMaxt2=0.0f, gYmint2 = 9999999.9f, gYavg2=0.0f;
-	
+	double gYstep1=0.0f, gYstep2=0.0f;
+
 	/* ---------------------------------------------------------- */
-	/* --- Jerk1, Ne MAX Qsorting	------------------------------------- */
+	/* --- Jerk1, Ne MAX Qsorting	----------------------------- */
 	/* ---------------------------------------------------------- */
+
+	/* --------------------------------- */
+	/* gType==0 Case : symbol print ---- */
+	/* --------------------------------- */
+	if(0==gType)
+	{
+		// ---------------------------
+		// 1st line ------------------
+		// ---------------------------
+		yy = 1;
+		if(tblV1[0][yy].value) 
+			fprintf(outfile," %6s:%s", tblV1[0][yy].symbol, tblV1[0][yy].gearTxt);
+
+		pCnt = 0;
+		for(yy=2; yy<=yyMax; yy++)
+		{
+			for(xx=0; xx<xxMax; xx++)
+			{
+				if(tblV1[xx][yy].value)
+				{
+					fprintf(outfile,",%3s:%s", tblV1[xx][yy].symbol, tblV1[xx][yy].gearTxt);
+					break;
+				}
+			}
+			if(pCnt++>=2) break;
+		}
+
+		for(ii=0; ii<(SPACE_ONE_UNIT+1)*(6-1-pCnt); ii++) fprintf(outfile," ");
+		if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
+
+		yy = 1;
+		if(tblV2[0][yy].value) 
+			fprintf(outfile," %5s%6s:%s", "",tblV2[0][yy].symbol, tblV2[0][yy].gearTxt);
+
+		pCnt = 0;
+		for(yy=2; yy<=yyMax; yy++)
+		{
+			for(xx=0; xx<xxMax; xx++)
+			{
+				if(tblV2[xx][yy].value) 
+				{
+					fprintf(outfile,",%3s:%s", tblV2[xx][yy].symbol, tblV2[xx][yy].gearTxt);
+					break;
+				}
+			}
+			if(pCnt++>=2) break;
+		}
+		fprintf(outfile,"\n");
+
+		// ---------------------------
+		// 2nd line ------------------
+		// ---------------------------
+		if(tblV1[0][yy+1].value) 
+			fprintf(outfile," %6s:%s", tblV1[0][yy+1].symbol, tblV1[0][yy+1].gearTxt);
+
+		pCnt = 0;
+		for(ii=yy+2; ii<=yyMax; ii++)
+		{
+			for(xx=0; xx<xxMax; xx++)
+			{
+				if(tblV1[xx][ii].value) 
+				{
+					fprintf(outfile,",%3s:%s", tblV1[xx][ii].symbol, tblV1[xx][ii].gearTxt);
+					break;
+				}
+			}
+			if(pCnt++>=2) break;
+		}
+
+		for(ii=0; ii<(SPACE_ONE_UNIT+1)*(6-1-pCnt); ii++) fprintf(outfile," ");
+		if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
+
+		if(yyMax>6) 
+			for(ii=0; ii<2; ii++) fprintf(outfile," ");
+
+
+		if(tblV2[0][yy+1].value) 
+			fprintf(outfile,"  %6s:%s", tblV2[0][yy+1].symbol, tblV2[0][yy+1].gearTxt);
+
+		pCnt = 0;
+		for(ii=yy+2; ii<=yyMax; ii++)
+		{
+			for(xx=0; xx<xxMax; xx++)
+			{
+				if(tblV2[xx][ii].value) 
+				{
+					fprintf(outfile,",%3s:%s", tblV2[xx][ii].symbol, tblV2[xx][ii].gearTxt);
+					break;
+				}
+			}
+			if(pCnt++>=2) break;
+		}
+	}
+
 	fprintf(outfile,"\n[G/sec]");
 	for(ii=0; ii<SPACE_ONE-1; ii++) fprintf(outfile," ");
 	if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
@@ -6512,6 +6866,10 @@ int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 		for(yy=0; yy<yyMax; yy++)
 		{
 			if( 0==tblV1[xx][yy].value || 0==tblV2[xx][yy].value ) continue;
+
+			tblV1[xx][0].YvalNum++;
+			tblV2[xx][0].YvalNum++;
+
 			if( gYmint1 > tblV1[xx][yy].value ) gYmint1 = tblV1[xx][yy].value ;
 			if( gYmint2 > tblV2[xx][yy].value ) gYmint2 = tblV2[xx][yy].value ;
 
@@ -6525,14 +6883,31 @@ int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 	gYavg1 = (gYMaxt1 + gYmint1)/2;
 	for(xx=xxMax-1; xx>=0; xx--)
 	{
+		if( tblV1[xx][0].YvalNum>0 ) 
+			gYstep1 = (gYMaxt1 - gYmint1)/tblV1[xx][0].YvalNum;
+			
 		for(yy=yyMax; yy>=0; yy--)
 		{
-			isMoved = 0;
-			if( (int)gYavg1 > tblV1[xx][yy].value && (tblV1[xx][yy].value>0) )
+			if( tblV1[xx][0].YvalNum <= (yyMax/2) )
+			{
+				for(zlp=0; zlp<=(yyMax/2); zlp++)
+				{
+					if( (int)gYavg1 > (tblV1[xx][yy+zlp].value+(int)gYstep1) && (tblV1[xx][yy+zlp].value>0) )
+					{
+						memcpy( (void*)&tblV1[xx][yy+zlp+1], (void*)&tblV1[xx][yy+zlp], sizeof(graphData_type) );
+						memset( (void*)&tblV1[xx][yy+zlp], 0x00, sizeof(graphData_type) );
+					}
+					else if( (int)gYavg1 > (tblV1[xx][yy+zlp].value+(int)(gYstep1/2) ) && (tblV1[xx][yy+zlp].value>0) )
+					{
+						memcpy( (void*)&tblV1[xx][yy+zlp+1], (void*)&tblV1[xx][yy+zlp], sizeof(graphData_type) );
+						memset( (void*)&tblV1[xx][yy+zlp], 0x00, sizeof(graphData_type) );
+					}
+				}
+			}
+			else if( (int)gYavg1 > tblV1[xx][yy].value && (tblV1[xx][yy].value>0) )
 			{
 				memcpy( (void*)&tblV1[xx][yy+1], (void*)&tblV1[xx][yy], sizeof(graphData_type) );
 				memset( (void*)&tblV1[xx][yy], 0x00, sizeof(graphData_type) );
-				isMoved = 1;
 			}
 		}
 	}
@@ -6541,14 +6916,31 @@ int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 	gYavg2 = (gYMaxt2 + gYmint2)/2;
 	for(xx=xxMax-1; xx>=0; xx--)
 	{
+		if( tblV2[xx][0].YvalNum>0 ) 
+			gYstep2 = (gYMaxt2 - gYmint2)/tblV2[xx][0].YvalNum;
+
 		for(yy=yyMax; yy>=0; yy--)
 		{
-			isMoved = 0;
-			if( (int)gYavg2 > tblV2[xx][yy].value && (tblV2[xx][yy].value>0) )
+			if( tblV2[xx][0].YvalNum <= (yyMax/2) )
+			{
+				for(zlp=0; zlp<(yyMax/2); zlp++)
+				{
+					if( (int)gYavg2 > (tblV2[xx][yy+zlp].value+(int)(gYstep2/2)) && (tblV2[xx][yy+zlp].value>0) )
+					{
+						memcpy( (void*)&tblV2[xx][yy+zlp+1], (void*)&tblV2[xx][yy+zlp], sizeof(graphData_type) );
+						memset( (void*)&tblV2[xx][yy+zlp], 0x00, sizeof(graphData_type) );
+					}
+					else if( (int)gYavg2 > (tblV2[xx][yy+zlp].value) && (tblV2[xx][yy+zlp].value>0) )
+					{
+						memcpy( (void*)&tblV2[xx][yy+zlp+1], (void*)&tblV2[xx][yy+zlp], sizeof(graphData_type) );
+						memset( (void*)&tblV2[xx][yy+zlp], 0x00, sizeof(graphData_type) );
+					}
+				}
+			}
+			else if( (int)gYavg2 > tblV2[xx][yy].value && (tblV2[xx][yy].value>0) )
 			{
 				memcpy( (void*)&tblV2[xx][yy+1], (void*)&tblV2[xx][yy], sizeof(graphData_type) );
 				memset( (void*)&tblV2[xx][yy], 0x00, sizeof(graphData_type) );
-				isMoved = 1;
 			}
 
 		}
@@ -6587,7 +6979,7 @@ int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 			// ----------------------------------
 			// Jerk1, Left Table Value
 			// ----------------------------------
-			if(YesNo)
+			if(2==gType) /* shift and value, for example <1-2>1.2 */
 			{
 				for(xx=0; xx<xxMax; xx++)
 				{
@@ -6615,7 +7007,7 @@ int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 			// ----------------------------------
 			// Ne MAX, Right Table Value
 			// ----------------------------------
-			if(YesNo)
+			if(2==gType) /* shift and value, for example <1-2>1.2 */
 			{
 				for(xx=0; xx<xxMax; xx++)
 				{
@@ -6651,16 +7043,28 @@ int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 			if( 0 == tblV1[ xx ][ yy ].value ) 
 			{
 				if( (0==yy || yy==yyMax) && xx==xxMax-1 )
-					fprintf(outfile," %5s%2s","x ","");
+				{
+					fprintf(outfile," %5s%2s","","");  /* */
+					//fprintf(outfile," %5s%2s","..","");  /* */
+				}
 				else
-					fprintf(outfile," %5s%4s","x ","");
+				{
+					fprintf(outfile," %5s%4s","","");
+					//fprintf(outfile," %5s%4s","..","");
+				}
 			}
 			else
 			{
 				if( (0==yy || yy==yyMax) && xx==xxMax-1 )
-					fprintf(outfile," %5s%2s", tblV1[ xx ][ yy ].gearTxt, "" );
+				{
+					if(gType) fprintf(outfile," %5s%2s", tblV1[ xx ][ yy ].gearTxt, "" ); /* shift, for example <1-2> */
+					if(0==gType) fprintf(outfile," %4s%3s", tblV1[ xx ][ yy ].symbol, "" ); /* 0 means symbol only */
+				}
 				else
-					fprintf(outfile," %5s%4s", tblV1[ xx ][ yy ].gearTxt, "" );
+				{
+					if(gType) fprintf(outfile," %5s%4s", tblV1[ xx ][ yy ].gearTxt, "" ); /* shift, for example <1-2> */
+					if(0==gType) fprintf(outfile," %4s%5s", tblV1[ xx ][ yy ].symbol, "" ); /* 0 means symbol only */
+				}
 			}
 		}
 
@@ -6683,22 +7087,35 @@ int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 			if( 0 == tblV2[ xx ][ yy ].value ) 
 			{
 				if( (0==yy || yy==yyMax) && xx==xxMax-1 )
-					fprintf(outfile," %5s%2s","x ","");
+				{
+					fprintf(outfile," %5s%2s"," ","");
+					//fprintf(outfile," %5s%2s","..","");
+				}
 				else
-					fprintf(outfile," %5s%4s","x ","");
+				{
+					fprintf(outfile," %5s%4s"," ","");
+					//fprintf(outfile," %5s%4s","..","");
+				}
 			}
 			else
 			{
 				if( (0==yy || yy==yyMax) && xx==xxMax-1 )
-					fprintf(outfile," %5s%2s", tblV2[ xx ][ yy ].gearTxt, "" );
+				{
+					if(gType) fprintf(outfile," %5s%2s", tblV2[ xx ][ yy ].gearTxt, "" );
+					if(0==gType) fprintf(outfile," %4s%3s", tblV2[ xx ][ yy ].symbol, "" );
+				}
 				else
-					fprintf(outfile," %5s%4s", tblV2[ xx ][ yy ].gearTxt, "" );
+				{
+					if(gType) fprintf(outfile," %5s%4s", tblV2[ xx ][ yy ].gearTxt, "" );
+					if(0==gType) fprintf(outfile," %4s%5s", tblV2[ xx ][ yy ].symbol, "" );
+				}
+				
 			}
 		}
 	}
 
 
-	if( 0==YesNo )
+	if( 0==gType )
 	{
 		fprintf(outfile,"\n");
 		fprintf(outfile,"     |");
@@ -6715,14 +7132,14 @@ int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 		// ----------------------------------
 		// Left Table Value
 		// ----------------------------------
-		if(YesNo)
+		if(2==gType)
 		{
 			for(xx=0; xx<xxMax; xx++)
 			{
 				if( 0 == tblV1[ xx ][ yy-1 ].value ) 
 				{
 					if( (0==yy || yy==yyMax-1) && xx==xxMax-1 )
-						fprintf(outfile," %5s%4s","* ","");
+						fprintf(outfile," %5s%4s","  ","");
 					else
 						fprintf(outfile," %5s%4s","  ","");
 				}
@@ -6743,14 +7160,14 @@ int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 		// ----------------------------------
 		// Right Table Value
 		// ----------------------------------
-		if(YesNo)
+		if(2==gType)
 		{
 			for(xx=0; xx<xxMax; xx++)
 			{
 				if( 0 == tblV2[ xx ][ yy-1 ].value ) 
 				{
 					if( (0==yy || yy==yyMax-1) && xx==xxMax-1 )
-						fprintf(outfile," %5s%4s","* ","");
+						fprintf(outfile," %5s%4s","  ","");
 					else
 						fprintf(outfile," %5s%4s","  ","");
 				}
@@ -6792,6 +7209,35 @@ int JerkGraphAferQsort(graphData_type tblV1[][GRAPH_Y_BUF_SIZ], graphData_type t
 	}
 
 	fprintf(outfile,"\n");
+
+
+
+#if 0
+{
+	wchar_t  sTime[10][4];
+	wcscpy(sym[0],L"\u2764");
+	wcscpy(sym[1],L"\u2764");
+	wcscpy(sym[2],L"\u2764");
+
+	sprintf(sym[0], L"■"); 
+	fprintf(stderr,"■★●◆▲♠♥♣ ◎※℃∇ αβγδ ◈○◇□△♡♤\n");
+	fprintf(outfile,"■★●◆▲♠♥♣ ◎※℃∇ αβγδ ◈○◇□△♡♤\n");
+
+	fprintf(outfile,"%ls \n",sym[0] );
+	fprintf(stderr,"%ls \n",sym[0] );
+	fprintf(stderr,"[%S [-]\n",sym[0] );
+
+
+	int nLen = MultiByteToWideChar(CP_ACP, 0, sTime, lstrlen(sTime), NULL, NULL);
+	// 얻어낸 길이만큼 메모리를 할당한다.
+	bstr = SysAllocStringLen(NULL, nLen);
+	// 이제 변환을 수행한다.
+	MultiByteToWideChar(CP_ACP, 0, sTime, lstrlen(sTime), bstr, nLen);
+	// 필요없어지면 제거한다.
+	SysFreeString(bstr);
+
+}
+#endif
 
 	return 1;
 }
@@ -7235,7 +7681,11 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 	double gYMaxt2=0.0f, gYmint2 = 9999999.9f;
 
 
+
 	AllFilesClosed();
+	mb2wc();
+	
+
 
 	/* ===================================================================================== */
 	// read file OK
@@ -7247,7 +7697,11 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 		exit(0);
 	}
 	// Write file OK
+	#if WIDE_CHAR_SYMBOL
+	if( NULL == (outfile = fopen( output, "wb,ccs=UTF-8")) )	
+	#else
 	if( NULL == (outfile = fopen( output, "wb")) )	
+	#endif
 	{
 		// FAIL
 		fprintf(stderr,"\r\n++ERROR++[%s]:Can not create file (%s) \n\n", __FUNCTION__, output );
@@ -7256,6 +7710,8 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 	}	
 	/* ===================================================================================== */
 
+	//_setmode(_fileno(outfile), _O_U8TEXT); /* UTF-8 인코딩으로 설정*/
+	//_setmode(_fileno(outfile), _O_BINARY); /*  */
 
 
 	/* ===================================================================================== */
@@ -7344,7 +7800,7 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 		i = strlen(QualData);
 		if(i >= QUAL_DATA_MAX_SIZE)
 		{
-			fprintf(stderr,"ERROR:%6llu: Not enough Buffer length-1--(%u) \r\n", RecordCnt, i );
+			fprintf(stderr,"ERROR:%6llu: Not enough Buffer length-11--(%u) \r\n", RecordCnt, i );
 		}
 
 		if (--i > 0)
@@ -7483,38 +7939,60 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 
 
 
+
 				/* ----------------------------------------------------------------------- */
 				/* ----------------------------------------------------------------------- */
 				/* -- 변속 준비 시간 (S.S~S.B Time) -- */
 				if( 0==tblT1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].value )
 				{
 					tblT1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearIdx = sq4[idxSS].curGear08;
-					sprintf(tblT1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearTxt,"<%d-%d>", sq4[idxSS].curGear08, sq4[idxSS].curGear08+1);
+					sprintf(tblT1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearTxt,"(%d%d)", sq4[idxSS].curGear08, sq4[idxSS].curGear08+1);
 					tblT1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].value   = (int)( (sq4[idxSB].DiffTime)*1000*10 );
+				#if WIDE_CHAR_SYMBOL
+					wcscpy( tblT1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].symbol, gSymbol[sq4[idxSS].curGear08] );
+					//fwprintf(stderr,L"[%4ls],  [%5ls] \n",  tblT1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].symbol, gSymbol[sq4[idxSS].curGear08] );
+				#else
+					strcpy( tblT1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].symbol, gSymbol[sq4[idxSS].curGear08] );
+				#endif
 				}
 				else 
 				{
 					/* -- average -- */
 					tblT1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearIdx = sq4[idxSS].curGear08;
-					sprintf(tblT1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearTxt,"<%d-%d>", sq4[idxSS].curGear08, sq4[idxSS].curGear08+1);
+					sprintf(tblT1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearTxt,"(%d%d)", sq4[idxSS].curGear08, sq4[idxSS].curGear08+1);
 					tblT1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].value += (int)( (sq4[idxSB].DiffTime)*1000*10 );
 					tblT1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].value /= 2.0;
+				#if WIDE_CHAR_SYMBOL
+					wcscpy( tblT1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].symbol, gSymbol[sq4[idxSS].curGear08] );
+				#else
+					strcpy( tblT1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].symbol, gSymbol[sq4[idxSS].curGear08] );
+				#endif
 				}
 				
 				/* -- 실 변속 시간 (S.B~S.P Time) -- */
 				if( 0==tblT2[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].value )
 				{
 					tblT2[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearIdx = sq4[idxSS].curGear08;
-					sprintf(tblT2[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearTxt,"<%d-%d>", sq4[idxSS].curGear08, sq4[idxSS].curGear08+1);
+					sprintf(tblT2[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearTxt,"(%d%d)", sq4[idxSS].curGear08, sq4[idxSS].curGear08+1);
 					tblT2[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].value   = (int)( (sq4[idxSP].DiffTime)*1000*10 );
+				#if WIDE_CHAR_SYMBOL
+					wcscpy( tblT2[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].symbol, gSymbol[sq4[idxSS].curGear08] );
+				#else
+					strcpy( tblT2[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].symbol, gSymbol[sq4[idxSS].curGear08] );
+				#endif
 				}
 				else
 				{
 					/* -- average -- */
 					tblT2[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearIdx = sq4[idxSS].curGear08;
-					sprintf(tblT2[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearTxt,"<%d-%d>", sq4[idxSS].curGear08, sq4[idxSS].curGear08+1);
+					sprintf(tblT2[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearTxt,"(%d%d)", sq4[idxSS].curGear08, sq4[idxSS].curGear08+1);
 					tblT2[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].value += (int)( (sq4[idxSP].DiffTime)*1000*10 );
 					tblT2[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].value /= 2.0;
+				#if WIDE_CHAR_SYMBOL
+					wcscpy( tblT2[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].symbol, gSymbol[sq4[idxSS].curGear08] );					
+				#else
+					strcpy( tblT2[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].symbol, gSymbol[sq4[idxSS].curGear08] ); 				
+				#endif
 				}
 
 				
@@ -7522,16 +8000,26 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 				if( 0==tblJerk1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].value )
 				{
 					tblJerk1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearIdx = sq4[idxSS].curGear08;
-					sprintf(tblJerk1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearTxt,"<%d-%d>", sq4[idxSS].curGear08, sq4[idxSS].curGear08+1);
+					sprintf(tblJerk1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearTxt,"(%d%d)", sq4[idxSS].curGear08, sq4[idxSS].curGear08+1);
 					tblJerk1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].value = (int)( (sq4[idxJerk].fJerk2)*100 );
+				#if WIDE_CHAR_SYMBOL
+					wcscpy( tblJerk1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].symbol, gSymbol[sq4[idxSS].curGear08] );
+				#else
+					strcpy( tblJerk1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].symbol, gSymbol[sq4[idxSS].curGear08] );
+				#endif
 				}
 				else
 				{
 					/* -- average -- */
 					tblJerk1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearIdx = sq4[idxSS].curGear08;
-					sprintf(tblJerk1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearTxt,"<%d-%d>", sq4[idxSS].curGear08, sq4[idxSS].curGear08+1);
+					sprintf(tblJerk1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearTxt,"(%d%d)", sq4[idxSS].curGear08, sq4[idxSS].curGear08+1);
 					tblJerk1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].value += (int)( (sq4[idxJerk].fJerk2)*100 );
 					tblJerk1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].value /= 2.0;
+				#if WIDE_CHAR_SYMBOL
+					wcscpy( tblJerk1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].symbol, gSymbol[sq4[idxSS].curGear08] );
+				#else
+					strcpy( tblJerk1[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].symbol, gSymbol[sq4[idxSS].curGear08] );
+				#endif
 				}
 
 				
@@ -7539,32 +8027,52 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 				if( 0==tblNeMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].value )
 				{
 					tblNeMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearIdx = sq4[idxSS].curGear08;
-					sprintf(tblNeMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearTxt,"<%d-%d>", sq4[idxSS].curGear08, sq4[idxSS].curGear08+1);
+					sprintf(tblNeMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearTxt,"(%d%d)", sq4[idxSS].curGear08, sq4[idxSS].curGear08+1);
 					tblNeMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].value = (int)( (sq4[idxNe].Ne15)*100 );
+				#if WIDE_CHAR_SYMBOL
+					wcscpy( tblNeMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].symbol, gSymbol[sq4[idxSS].curGear08] );
+				#else
+					strcpy( tblNeMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].symbol, gSymbol[sq4[idxSS].curGear08] );
+				#endif
 				}
 				else
 				{
 					/* -- average -- */
 					tblNeMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearIdx = sq4[idxSS].curGear08;
-					sprintf(tblNeMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearTxt,"<%d-%d>", sq4[idxSS].curGear08, sq4[idxSS].curGear08+1);
+					sprintf(tblNeMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearTxt,"(%d%d)", sq4[idxSS].curGear08, sq4[idxSS].curGear08+1);
 					tblNeMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].value += (int)( (sq4[idxNe].Ne15)*100 );
 					tblNeMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].value /= 2.0;
+				#if WIDE_CHAR_SYMBOL
+					wcscpy( tblNeMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].symbol, gSymbol[sq4[idxSS].curGear08] );
+				#else
+					strcpy( tblNeMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].symbol, gSymbol[sq4[idxSS].curGear08] );
+				#endif
 				}
 
 				/* -- Max Nt (S.B 부근) -- */
 				if( 0==tblNtMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].value )
 				{
 					tblNtMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearIdx = sq4[idxSS].curGear08;
-					sprintf(tblNtMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearTxt,"<%d-%d>", sq4[idxSS].curGear08, sq4[idxSS].curGear08+1);
+					sprintf(tblNtMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearTxt,"(%d%d)", sq4[idxSS].curGear08, sq4[idxSS].curGear08+1);
 					tblNtMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].value = (int)( (sq4[idxNt].Nt16)*100 );
+				#if WIDE_CHAR_SYMBOL
+					wcscpy( tblNtMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].symbol, gSymbol[sq4[idxSS].curGear08] );
+				#else
+					strcpy( tblNtMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].symbol, gSymbol[sq4[idxSS].curGear08] );
+				#endif
 				}
 				else
 				{
 					/* -- average -- */
 					tblNtMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearIdx = sq4[idxSS].curGear08;
-					sprintf(tblNtMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearTxt,"<%d-%d>", sq4[idxSS].curGear08, sq4[idxSS].curGear08+1);
+					sprintf(tblNtMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].gearTxt,"(%d%d)", sq4[idxSS].curGear08, sq4[idxSS].curGear08+1);
 					tblNtMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].value += (int)( (sq4[idxNt].Nt16)*100 );
 					tblNtMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].value /= 2.0;
+				#if WIDE_CHAR_SYMBOL
+					wcscpy( tblNtMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].symbol, gSymbol[sq4[idxSS].curGear08] );
+				#else
+					strcpy( tblNtMX[ sq4[idxSS].apsIdx ][ sq4[idxSS].curGear08 ].symbol, gSymbol[sq4[idxSS].curGear08] );
+				#endif
 				}
 
 
@@ -7597,7 +8105,7 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 	/* -- 1 ------------------------------ */
 	for(xx=0; xx<APS_TABLE_NUM && (int)ApsTble[xx]; xx++)
 	{
-			; /* Just, find xxMax ~~ */
+		; /* Just, find xxMax ~~ */
 	}
 	yyMax  = icurGear;
 	xxMax  = xx;
@@ -7606,15 +8114,16 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 	
 	fprintf(outfile,"\r\n\r\n\n");
 
-	fprintf(outfile,"   === Up shift Average t1 time (SS~SB) === ");
+	fprintf(outfile," %8s === Up shift Average t1 time (SS~SB) === ", "");
 	for(ii=0; ii<FUNC_SPC+14; ii++) fprintf(outfile," ");
 	if(xxMore) for(ii=0; ii<(SPACE_ONE_UNIT-2)*xxMore; ii++) fprintf(outfile," ");
 
-	fprintf(outfile,"   === Up shift Average t2 time (SB~SP) === ");
+	fprintf(outfile," %2s === Up shift Average t2 time (SB~SP) === ", "");
 	fprintf(outfile,"\r\n");
 
 
-	fprintf(outfile,"t1(SS~SB) ");
+	//fprintf(outfile,"t1(SS~SB) ");
+	fprintf(outfile,"<t1(SS~SB)>");
 	for(xx=0; xx<APS_TABLE_NUM && (int)ApsTble[xx]; xx++)
 	{
 		fprintf(outfile," %4d(%%)", (int)ApsTble[xx] );
@@ -7622,7 +8131,8 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 
 	for(ii=0; ii<FUNC_SPC; ii++) fprintf(outfile," ");
 
-	fprintf(outfile,"t2(SB~SP) ");
+	//fprintf(outfile,"t2(SB~SP) ");
+	fprintf(outfile,"<t2(SB~SP)>");
 	for(xx=0; xx<APS_TABLE_NUM && (int)ApsTble[xx]; xx++)
 	{
 		fprintf(outfile," %4d(%%)", (int)ApsTble[xx] );
@@ -7643,7 +8153,8 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 
 	for(yy=1; yy<=yyMax; yy++)
 	{
-		fprintf(outfile,"  <%d-%d> : ", yy,yy+1 ); /* <curGear-tgtGear>*/
+		//fprintf(outfile,"  <%d-%d> : ", yy,yy+1 ); /* <curGear-tgtGear>*/
+		fprintf(outfile,"   (%d%d) : ", yy,yy+1 ); /* <curGear-tgtGear>*/
 
 		for(xx=0; xx<xxMax; xx++)
 		{
@@ -7652,12 +8163,13 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 			else
 			{
 				fprintf(outfile," %7.3lf", (tblT1[ xx ][ yy ].value /1000.0f/10.0f) );
-				tblT1[ 0 ][ yy ].validNum ++;
+				//tblT1[ 0 ][ yy ].YvalNum ++;
 			}
 		}
 
 		for(ii=0; ii<FUNC_SPC; ii++) fprintf(outfile," ");
-		fprintf(outfile,"  <%d-%d> : ", yy,yy+1 ); /* <curGear-tgtGear>*/
+		//fprintf(outfile,"  <%d-%d> : ", yy,yy+1 ); /* <curGear-tgtGear>*/
+		fprintf(outfile,"   (%d%d) : ", yy,yy+1 ); /* <curGear-tgtGear>*/
 
 		for(xx=0; xx<xxMax; xx++)
 		{
@@ -7666,7 +8178,7 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 			else
 			{
 				fprintf(outfile," %7.3lf", (tblT2[ xx ][ yy ].value /1000.0f/10.0f) );
-				tblT2[ 0 ][ yy ].validNum ++;
+				//tblT2[ 0 ][ yy ].YvalNum ++;
 			}
 		}
 		fprintf(outfile,"\n");
@@ -7678,6 +8190,7 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 	/* ---------------------------------------------------------- */
 	/* --- t1, t2 Qsorting  ------------------------------------- */
 	/* ---------------------------------------------------------- */
+
 	t1t2GraphAferQsort(tblT1, tblT2, xxMax, yyMax, gValueDisplay);
 
 
@@ -7848,15 +8361,15 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 	/* -- Max Ne (S.B 부근) -------------- */
 	/* -- 3 ------------------------------ */
 
-	fprintf(outfile,"   === Up shift Average Jerk1 === ");
+	fprintf(outfile," %8s === Up shift Average Jerk1 === ","");
 	for(ii=0; ii<FUNC_SPC+24; ii++) fprintf(outfile," ");
 	if(xxMore) for(ii=0; ii<(SPACE_ONE_UNIT-2)*xxMore; ii++) fprintf(outfile," ");
 
-	fprintf(outfile,"   === Up shift Average Ne Max === ");
+	fprintf(outfile," %2s === Up shift Average Ne Max === ", "");
 	fprintf(outfile,"\r\n");
 	
-
-	fprintf(outfile,"<<Jerk1>> ");
+	//fprintf(outfile,"<<Jerk1>> ");
+	fprintf(outfile," <Jerk1>  ");
 	for(xx=0; xx<APS_TABLE_NUM && (int)ApsTble[xx]; xx++)
 	{
 		fprintf(outfile," %4d(%%)", (int)ApsTble[ xx ] );
@@ -7864,7 +8377,8 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 
 	for(ii=0; ii<FUNC_SPC; ii++) fprintf(outfile," ");
 
-	fprintf(outfile,"<<Ne Max>>");
+	//fprintf(outfile,"<<Ne Max>>");
+	fprintf(outfile," <Ne Max> ");
 	for(xx=0; xx<APS_TABLE_NUM && (int)ApsTble[xx]; xx++)
 	{
 		fprintf(outfile," %4d(%%)", (int)ApsTble[ xx ] );
@@ -7890,7 +8404,8 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 
 	for(yy=1; yy<=yyMax; yy++)
 	{
-		fprintf(outfile,"  <%d-%d> : ", yy,yy+1 ); /* <curGear-tgtGear>*/
+		//fprintf(outfile,"  <%d-%d> : ", yy,yy+1 ); /* <curGear-tgtGear>*/
+		fprintf(outfile,"   (%d%d) : ", yy,yy+1 ); /* <curGear-tgtGear>*/
 		for(xx=0; xx<xxMax; xx++)
 		{
 			if( 0 == tblJerk1[ xx ][ yy ].value ) 
@@ -7898,13 +8413,14 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 			else
 			{
 				fprintf(outfile," %7.2lf", (tblJerk1[ xx ][ yy ].value)/100.0f );
-				tblJerk1[ 0 ][ yy ].validNum ++;
+				//tblJerk1[ 0 ][ yy ].YvalNum ++;
 			}
 		}
 
 		for(ii=0; ii<FUNC_SPC; ii++) fprintf(outfile," ");
 
-		fprintf(outfile,"  <%d-%d> : ", yy,yy+1 ); /* <curGear-tgtGear>*/
+		//fprintf(outfile,"  <%d-%d> : ", yy,yy+1 ); /* <curGear-tgtGear>*/
+		fprintf(outfile,"   (%d%d) : ", yy,yy+1 ); /* <curGear-tgtGear>*/
 		for(xx=0; xx<xxMax; xx++)
 		{
 			if( 0 == tblNeMX[ xx ][ yy ].value ) 
@@ -7912,7 +8428,7 @@ int ShiftData_Report(char *shi_inp, char *output, short aiPATs05, int avgTime, s
 			else
 			{
 				fprintf(outfile," %7.2lf", (tblNeMX[ xx ][ yy ].value)/100.0f );
-				tblNeMX[ 0 ][ yy ].validNum ++;
+				//tblNeMX[ 0 ][ yy ].YvalNum ++;
 			}
 		}
 	
@@ -8205,7 +8721,7 @@ int CheckLicense(void)
 	int result;
 	int re = 0, fres, ii=0, licOk=0;
 	unsigned int iOKc=0, iNGc=0, lloop=0, iFinal=0;
-	int iret = -10;
+	signed int iret = 0;
 	char userPath[_MAX_PATH] = "C:\\Users";
 	char findPath[_MAX_PATH]; 
 	///////////////////////////////////////////////////////////
@@ -8225,8 +8741,8 @@ int CheckLicense(void)
 			exit(0);
 		}
 
-		//fclose(fr);
-		//exit(0);
+		fclose(fr);
+		exit(0);
 	}
 	else
 	{
@@ -8259,7 +8775,7 @@ int CheckLicense(void)
 		re = system("getmac > C:/Temp/tmp111.tmp");
 		if( 0!=re )
 		{
-			fprintf(stderr,"\r\nLicense check needed.. \n\n");
+			fprintf(stderr,"\r\nLicense check needed.. [%d] \n\n", re);
 			exit(0);
 		}
 	}
@@ -8392,7 +8908,7 @@ int CheckLicense(void)
 			//fscanf(fi, "%s", sha3License );
 			ll = strlen( (char *)sha3License[lloop] );
 			{
-				//printf("[ll=%d[%s]]\n", ll, sha3License	);
+				//printf("[ll=%d[%s]]\n", lloop, sha3License[lloop]	);
 				kll += ll;
 				sha3_update(sha3License[lloop], ll);
 			}
@@ -8420,6 +8936,7 @@ int CheckLicense(void)
 				{
 					licOk ++;
 					iret = 0x8000; 
+					//fprintf(stderr," %d [%s] \n",ii, sha3digestTxt );
 				}
 			}
 			memset(sha3digestTxt, 0x00, sizeof(sha3digestTxt) ); // initialized
@@ -8910,6 +9427,7 @@ int main(int argc, char *argv[])
 
 	/// -----------------------------------------------
 
+
 	help_brief();
 
 
@@ -8923,7 +9441,8 @@ int main(int argc, char *argv[])
 		
 
 	// ================================================================
-	if( iret = CheckLicense() )
+	iret = CheckLicense();
+	if( iret )
 	{
 		// License OK~~
 		//fprintf(stderr,"\n");		
@@ -8935,8 +9454,8 @@ int main(int argc, char *argv[])
 		beep(700,100);
 		AllFilesClosed();
 		fprintf(stderr,"\r\n [LICENSED] License is required... \n\n");
-		exit(EXIT_SUCCESS); /* 0: EXIT_SUCCESS, 1: EXIT_FAILURE */
-		return EXIT_SUCCESS;
+		exit(EXIT_FAILURE); /* 0: EXIT_SUCCESS, 1: EXIT_FAILURE */
+		return EXIT_FAILURE;
 	}
 	// ================================================================
 	#endif
@@ -11145,17 +11664,23 @@ int main(int argc, char *argv[])
 
 
 					gValueDisplay = 0;
-					if( strstr(str_ShiftOp[0], ".gvalue") )
+					if( strstr(str_ShiftOp[0], ".g1") || strstr(str_ShiftOp[0], ".g2") )
 					{
 					int i, len;
 
-						gValueDisplay = 1; /* Graph and value display ~~~ */
 						len = strlen( str_ShiftOp[0] );
 						for(i=len; i>0; i--)
 						{
-							if( 0==strncmp( (char*)&str_ShiftOp[0][i], (char*)".gvalue", 7 ) ) 
+							if( 0==strncmp( (char*)&str_ShiftOp[0][i], (char*)".g1", 3 ) ) 
 							{
-								strcpy( (char*)&str_ShiftOp[0][i], (char*)&str_ShiftOp[0][i+7] );
+								gValueDisplay = 1; /* Graph and value display ~~~ */
+								strcpy( (char*)&str_ShiftOp[0][i], (char*)&str_ShiftOp[0][i+3] );
+								break;
+							}
+							else if( 0==strncmp( (char*)&str_ShiftOp[0][i], (char*)".g2", 3 ) ) 
+							{
+								gValueDisplay = 2; /* Graph and value display ~~~ */
+								strcpy( (char*)&str_ShiftOp[0][i], (char*)&str_ShiftOp[0][i+3] );
 								break;
 							}
 						}
@@ -11253,7 +11778,7 @@ int main(int argc, char *argv[])
 							if(fAPSpwrLvl >= 3.0f) iPwrOnOff = SHI_PWR_ON;
 							else iPwrOnOff = SHI_PWR_OFF;
 							fprintf(stderr,"\n");
-							fprintf(stderr,">>APS Percent lvl  : <<%d>> %.1lf%% -- default(3\%~5\%) \n", kk, fAPSpwrLvl ); 
+							fprintf(stderr,">>APS Percent lvl  : <<%d>> %.1lf%% -- default(3%%~5%%) \n", kk, fAPSpwrLvl ); 
 							fprintf(stderr,">>POWER ON/OFF     :       %s", (iPwrOnOff==SHI_PWR_ON?"PWR On":(iPwrOnOff==SHI_PWR_OFF?"PWR Off":(iPwrOnOff==SHI_STATIC?"Static":(iPwrOnOff==SHI_N_STOP_DN?"Stop Dn":"Unknown")))) ); 
 							break;
 							
@@ -11261,7 +11786,7 @@ int main(int argc, char *argv[])
 							// 2>> APS tolerance
 							fAPStol = atof( str_ShiftOp[kk] ); 
 							fprintf(stderr,"\n");
-							fprintf(stderr,">>APS Tolerance    : <<%d>> %.1lf%% -- default(-/+%.1f\%)", kk, fAPStol, APS_TOLENANCE ); 
+							fprintf(stderr,">>APS Tolerance    : <<%d>> %.1lf%% -- default(-/+%.1f%%)", kk, fAPStol, APS_TOLENANCE ); 
 							break;
 						case 5:							
 							aps1 = atoi( str_ShiftOp[kk] ); 
@@ -11629,7 +12154,7 @@ int main(int argc, char *argv[])
 					}
 				}
 			}
-			
+
 			if( 1==imkFolder )
 			{
 				// mkdir OK
@@ -11669,7 +12194,6 @@ int main(int argc, char *argv[])
 	}
 	else
 	{
-		
 		/// --- CHECKING input = output ----
 		if( 1==isIgnoreBothFile || 1==isIgnoreOuFile )
 		{
