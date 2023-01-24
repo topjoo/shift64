@@ -43,7 +43,7 @@
 
 
 
-const char AttVersion[] = "1.2.4"; /* ver 1.2.4 : 2023.1.7 : Shift Quality Data Sorting */
+const char AttVersion[] = "1.3.0"; /* ver 1.2.4 : 2023.1.7 : Shift Quality Data Sorting */
 const char EmailText[]  = "tp.joo@daum.net";
 
 
@@ -60,6 +60,7 @@ enum {
 	MOT_HEX_S9 = 0x0200
 };
 
+#define AVERAGE(LOW, HIGH) 		(((LOW)&(HIGH)) + ((LOW)^(HIGH))>>1)
 
 #define HDR_CRC16 				0x0015
 #define HDR_KSC_CRC16 			0x0016

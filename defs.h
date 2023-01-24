@@ -58,12 +58,17 @@
 #define SHIFT_QUALITY_DATA_SORTING 	1 /* 2022-11-13 - Shift Quality Data Sorting Program */
 #define QUAL_DATA_MAX_SIZE 	 		(1024)
 
-#define QUAL_DATA_ITEM_NUM 			17
-#define QUAL_2ND_DATA_ITEM_NUM 		26
-#define QUAL_3RD_DATA_ITEM_NUM 		25
 
-#define QUAL_FLT_DATA_ITEM_NUM 		23
-#define QUAL_APS_DATA_ITEM_NUM 		24
+#define QUAL_DATA_ITEM_NUM 			17 /* 5ms_16select.tsv - Original data nums */
+
+
+#define QUAL_2ND_DATA_ITEM_NUM 		25 /* 2023-01-14 */
+#define QUAL_2ND_NEWDT_ITEM_NUM 	27 /* 2023-01-23, +Gsum */
+
+#define QUAL_3RD_DATA_ITEM_NUM 		28 /* 2023-01-23, +Gsum */
+
+#define QUAL_FLT_DATA_ITEM_NUM 		27 /* 2023-01-23, +Gavg */
+#define QUAL_APS_DATA_ITEM_NUM 		28 /* 2023-01-23, +Gavg */
 
 #endif /* __DEFS_H__ */
 
