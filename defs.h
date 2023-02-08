@@ -59,7 +59,22 @@
 #define QUAL_DATA_MAX_SIZE 	 		(1024)
 
 
-#define QUAL_DATA_ITEM_NUM 			17 /* 5ms_16select.tsv - Original data nums */
+
+#define INPUT_FORMATCS 				1
+
+#if INPUT_FORMATCS
+#define QUAL_TSV_DATA_ITEM_NUM 		17 /* 5ms_16select.tsv - Original data nums */
+#else
+#define QUAL_TSV_DATA_ITEM_NUM 		15 /* 5ms_16select.tsv - Original data nums */
+#endif
+
+#define QUAL_TSV_CASE1_17_ITEM_NUM 		17 /* 5ms_16select.tsv - Original data nums */
+#define QUAL_TSV_CASE2_15_ITEM_NUM 		15 /* 5ms_16select.tsv - Original data nums */
+
+#define QUAL_TSV_CASE3_15_NEW_ITEMS 	15 /* New_FF8_PONUPSX2.tsv - Original data nums */
+#define QUAL_TSV_CASE4_15_NEW_ITEMS 	15 /* GN7_3.5GDI_PONDOWN_KD.tsv - Original data nums */
+
+
 
 
 #define QUAL_2ND_DATA_ITEM_NUM 		25 /* 2023-01-14 */
@@ -69,6 +84,12 @@
 
 #define QUAL_FLT_DATA_ITEM_NUM 		27 /* 2023-01-23, +Gavg */
 #define QUAL_APS_DATA_ITEM_NUM 		28 /* 2023-01-23, +Gavg */
+
+
+
+/* ---- Just Debug Message ---- */
+#define DEBUG_MSG_1ST_POINT_TIME 		0
+#define DEBUG_MSG_OVER_TIME 			0
 
 #endif /* __DEFS_H__ */
 
