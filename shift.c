@@ -1415,6 +1415,7 @@ enum {
 
 
 char shift_file[MAX_CHARS*LENGTH_OF_FILENAME+1];
+char shift_in[MAX_CHARS*LENGTH_OF_FILENAME+1];
 
 /* timeShift, iPATs05, arrPATs_ModeID[iPATs05].ModeID, tqi, curGear08, Aps09, sNo10, tgtGear11, 
 iShift, iShiType12, arrGear[iShiType12].sGear, TqFr, ShiftPh, sNe, sNt16, Long_Accel, gearRatio, rpmG */
@@ -3571,7 +3572,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 			{
 				/* OK: -255 <= Temp <= 255 */
 				iErrorTemp ++;
-				fprintf(stderr,"++ERROR++ Temp errors > %lf, %u \n", sq[0].EngTemp06, iErrorTemp );		
+				fprintf(stderr,"++ERROR++ Temp errors > %d, %u \n", sq[0].EngTemp06, iErrorTemp );		
 			}
 
 
@@ -10249,7 +10250,8 @@ int ShiftData_Report(short aiPATs05, int avgTime, short iSBchoicePnt, short gVal
 	short itgtGear = 0;
 	short ii = 0;
 	char sToday[50];
-	
+	char currPath[PATH_MAX];
+		
 	graphData_type tblT1[APS_TABLE_NUM][GRAPH_Y_BUF_SIZ]; /* t1 time table : SS~SB time in msec*10 unit */
 	graphData_type tblT2[APS_TABLE_NUM][GRAPH_Y_BUF_SIZ]; /* t2 time table : SB~SP time in msec*10 unit */
 	graphData_type tblJerk1[APS_TABLE_NUM][GRAPH_Y_BUF_SIZ]; /* Jerk1 */
@@ -10340,7 +10342,8 @@ int ShiftData_Report(short aiPATs05, int avgTime, short iSBchoicePnt, short gVal
 	memset(tblJerk1, 0x00, APS_TABLE_NUM*GRAPH_Y_BUF_SIZ*sizeof(graphData_type) );
 	memset(tblNeMX, 0x00, APS_TABLE_NUM*GRAPH_Y_BUF_SIZ*sizeof(graphData_type) );
 	memset(tblNtMX, 0x00, APS_TABLE_NUM*GRAPH_Y_BUF_SIZ*sizeof(graphData_type) );
-
+	memset(currPath, 0x00, PATH_MAX*sizeof(char) );
+	
 
 	RecordCnt  = 0ULL;
 	iNGcount   = 0ULL;
@@ -10376,10 +10379,18 @@ int ShiftData_Report(short aiPATs05, int avgTime, short iSBchoicePnt, short gVal
 	/* ----------------------------------------------------------------------------- */
 	/* ----------------------------------------------------------------------------- */
 
+
+
 #if SAVEMODE
 	if(outfile)
 	{
+		if ( getcwd(currPath, PATH_MAX) == NULL ) 
+		{
+			fprintf(stderr, "[++ERROR++] Can not check current directory!! \n\n") ;
+		} 
+
 		fprintf(outfile," Shift Quality Report %s - %s by GIL&S \n", arrPATs_ModeID[aiPATs05].ModeID, sToday );			
+		fprintf(outfile," FileName: %s\\%s \n", currPath, shift_in );			
 
 		for(ii=0; ii<SEPER_DASH; ii++) fprintf(outfile, "-");
 		fprintf(outfile, "\n");
@@ -11934,7 +11945,9 @@ int main(int argc, char *argv[])
 
 #if SHIFT_QUALITY_DATA_SORTING /* 2022-11-13 */
 	memset( shift_file, 0x00, (MAX_CHARS*LENGTH_OF_FILENAME)+1 ); // 2022.11.19
+	memset( shift_in, 0x00, (MAX_CHARS*LENGTH_OF_FILENAME)+1 ); // 2023.02.12
 #endif
+
 
 	memset(str_boardName,   0x00, (MAX_CHARS+1) );
 	memset(str_moduleName,  0x00, (MAX_CHARS+1) );
@@ -12088,7 +12101,7 @@ int main(int argc, char *argv[])
 	#if 1 /* 2022012-07 */	
 	if ( getcwd(currPath, PATH_MAX) == NULL ) 
 	{
-		fprintf(stderr, "\r\n++[ERROR}++ can not check surrent directory!! \n\n") ;
+		fprintf(stderr, "\r\n++[ERROR}++ can not check current directory!! \n\n") ;
 		exit(EXIT_FAILURE); 
 	} 
 	//fprintf(stderr, "Current Directory: %s\n", currPath) ;
@@ -14046,6 +14059,11 @@ int main(int argc, char *argv[])
 				{
 					memcpy(infile_name, optarg, MAX_CHARS*LENGTH_OF_FILENAME);
 					olen = strlen(infile_name);
+						
+			#if SHIFT_QUALITY_DATA_SORTING /* 2023-02-12 */
+					memcpy(shift_in, optarg, MAX_CHARS*LENGTH_OF_FILENAME );
+			#endif
+
 				}
 				else
 				{
