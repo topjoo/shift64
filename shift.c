@@ -771,8 +771,8 @@ void AllFilesClosed(void)
 #define NtMax_Before_mSec 		50 /* unit: msec, Nt-Max Begin point (msec) before SB point */
 #define Ntmin_After_mSec 		50 /* unit: msec, Nt-min Begin point (msec) after SP point */
 
-#define Nt_min_TIME_mSec 		50 /* unit: msec, min 200 msec */
-#define Nt_MAX_TIME_mSec 		200 /* unit: msec, max 2sec */
+#define Nt_min_TIME_mSec 		50 /* unit: msec, min 50msec */
+#define Nt_MAX_TIME_mSec 		200 /* unit: msec, max 200msec  */
 
 
 #define JERK_TIME_SCALE 		10 /* just scale */
@@ -1350,7 +1350,7 @@ enum {
 	USE_IN_NEW_CASE_4_15,
 
 
-	USE_IN_MAX = 10	
+	USE_IN_MAX = 9	
 }; // eUseCase_type;
 
 /* first format */
@@ -1637,6 +1637,9 @@ typedef struct _tGear_ {
 		int 	iGear;
 		char 	sGear[10];
 } tGear_type;
+
+
+#define ERROR_NUM_LIMIT 		10
 
 #define PWR_ON_12Z 		15
 #define PWR_ON_23Z 		16
@@ -1925,13 +1928,13 @@ const tPATs_ModeType arrPATs_ModeID[MODE_ID_NUMS] = {
 #define FILTER_EXT_RPT 		"rpt"
 
 
-#define TITLE_SHI0	"    time   iPAT  ModeID     vsp    tqi    cg   Aps      No    tg ct iShi txt        TqFr ShiPh Ne       Nt       LAccel  LPFAccel TimPos       TimNtPos  Ratio     Shi1One  Shi2Two   Jerk0  g_Max   g_min"
+#define TITLE_SHI0	"    time   iPAT  ModeID     vsp    tqi    cg   Aps      No    tg ct iShi txt        TqFr ShiPh Ne       Nt       LAccel  LPFAcc TimPos       TimNtPos  Ratio     Shi1One  Shi2Two   Jerk0  g_Max   g_min"
 
-#define TITLE_SHI1	"    time   iPAT  ModeID     vsp    tqi    cg   Aps      No    tg ct iShi txt        TqFr ShiPh Ne       Nt       LAccel  LPFAccel TimPos       PosNum     Gsum   TimNtPos Ratio    Shi1One  Shi2Two   Jerk0  g_Max   g_min"
+#define TITLE_SHI1	"    time   iPAT  ModeID     vsp    tqi    cg   Aps      No    tg ct iShi txt        TqFr ShiPh Ne       Nt       LAccel  LPFAcc TimPos       PosNum     Gsum   TimNtPos Ratio    Shi1One  Shi2Two   Jerk0  g_Max   g_min"
 
-#define TITLE_SHIGG	"    time   iPAT  ModeID     vsp    tqi    cg   Aps      No    tg ct iShi txt        TqFr ShiPh Ne       Nt       LAccel  LPFAccel TimPos       PosNum     Gsum   TimNtPos Gpos   Ratio     Shi1One  Shi2Two   Jerk0  g_Max   g_min"
+#define TITLE_SHIGG	"    time   iPAT  ModeID     vsp    tqi    cg   Aps      No    tg ct iShi txt        TqFr ShiPh Ne       Nt       LAccel  LPFAcc TimPos       PosNum     Gsum   TimNtPos Gpos   Ratio     Shi1One  Shi2Two   Jerk0  g_Max   g_min"
 
-#define TITLE_TXT   "    time   iPAT  ModeID    cG tG   vsp    tqi      Aps      No    ct iShi txt        TqFr ShiPh Ne       Nt     LAccel  LPFAccel DiffTime TimPos(%d)%s   posNum    Gavg  NtPos   Gpos   Ratio    Jerk_%dms  Jerk1 (msec)_%dms"
+#define TITLE_TXT   "    time   iPAT  ModeID    cG tG   vsp    tqi      Aps      No    ct iShi txt        TqFr ShiPh Ne       Nt     LAccel  LPFAcc DiffTime TimPos(%d)%s   posNum    Gavg  NtPos   Gpos   Ratio    Jerk_%dms  Jerk1 (msec)_%dms"
 
 #define REPORT_TXT  "cg tg Shift   APSt APSv  t1     t2     t3     G(SS)   G(SB)   G(SP)   G(dt)     Jerk1 msec  Ntmin    NtMax    Nt(dt)   Nt(SB)   Ne(SB)   NeMax "
 
@@ -2246,6 +2249,8 @@ typedef struct _SQData_pair_ {
 } tSQData_PairCheck_type;
 
 
+int tempFileDeleteIt(short YesNo, short iModeID, unsigned int iSBchk);
+
 /* -------------------------------------------- */
 /* qsort() down sorting ----------------------- */
 /* -------------------------------------------- */
@@ -2439,14 +2444,14 @@ unsigned long long Find_GearMode( unsigned long long *gShift, short iChoice, uns
 		return 0;
 }
 
-double LPFilter(double filterValue, double LAcc1st, double LAcc)
+double LPFilter(double factor, double fltLAcc, double currLAcc)
 {
 	double dLPF;
 
 	/* --------------------------------------- */
 	/* Low Pass Filter ----------------------- */
 	/* --------------------------------------- */
-	dLPF = filterValue*LAcc + (1.0 - filterValue)*LAcc1st;
+	dLPF = (factor*currLAcc) + (1.0 - factor)*fltLAcc;
 	return dLPF;
 }
 
@@ -2464,7 +2469,12 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 	unsigned int NGformatGEARCnt = 0;
 	unsigned int NGformatCG = 0;
 	unsigned int NGformatTG = 0;
-
+	unsigned int iErrorVSP = 0;
+	unsigned int iErrorAPS = 0;
+	unsigned int iErrorLAcc = 0;
+	unsigned int iErrorRPM = 0;
+	unsigned int iErrorTemp = 0;
+	
 	unsigned int iPreShTime = 0;
 	double avgTime = 0.0f;
 	unsigned long long avgCount = 0ULL;
@@ -2805,7 +2815,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 			/* === 1 STEP : record (17 items check) =============== */
 
 
-		#if 1 /* Check FILE FORMAT */
+		#if 1 /* Check tsv FILE FORMAT */
 			if( (sq[0].iPATs05 < MODE_ID_NUMS-1) && (sq[0].iPATs05 >= 0) )
 			{
 				chkPATs_ModeID[ sq[0].iPATs05 ] ++; /* All ModeID Counts */
@@ -2815,9 +2825,8 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 				//fprintf(stderr,"++ERROR++ ModeID errors > iPATs05: %d, OKline:%u \n", sq[0].iPATs05, iOKcount );
 				NGformatMODECnt ++;
 
-				if( (NGformatMODECnt > 10) && (useInputCase>USE_IN_CASE0_NONE) && (useInputCase < USE_IN_MAX) )
+				if( (NGformatMODECnt > ERROR_NUM_LIMIT) && (useInputCase>USE_IN_CASE0_NONE) && (useInputCase < USE_IN_MAX) )
 				{
-
 					RecordCnt = 0LL;
 					iOKcount = 0;
 					iNGcount = 0;
@@ -2828,6 +2837,11 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 					NGformatGEARCnt = 0;
 					NGformatCG = 0;
 					NGformatTG = 0;
+					iErrorVSP = 0;
+					iErrorAPS = 0;
+					iErrorLAcc = 0;
+					iErrorRPM = 0;
+					iErrorTemp = 0;
 
 					useInputCase ++;  /* Next Input Format... */
 
@@ -2850,9 +2864,8 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 				NGformatGEARCnt ++;
 				//fprintf(stderr,"++ERROR++ ShiftType errors > ShiTy12 : %u, OKline:%u \n", sq[0].ShiTy12, iOKcount );
 
-				if( (NGformatGEARCnt > 10) && (useInputCase>USE_IN_CASE0_NONE) && (useInputCase < USE_IN_MAX) )
+				if( (NGformatGEARCnt > ERROR_NUM_LIMIT) && (useInputCase>USE_IN_CASE0_NONE) && (useInputCase < USE_IN_MAX) )
 				{
-
 					RecordCnt = 0LL;
 					iOKcount = 0;
 					iNGcount = 0;
@@ -2863,6 +2876,11 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 					NGformatGEARCnt = 0;
 					NGformatCG = 0;
 					NGformatTG = 0;
+					iErrorVSP = 0;
+					iErrorAPS = 0;
+					iErrorLAcc = 0;
+					iErrorRPM = 0;
+					iErrorTemp = 0;
 
 					useInputCase ++;  /* Next Input Format... */
 
@@ -2882,12 +2900,12 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 			/* ------------------------------------------------------------ */
 			if( sq[0].curGear08 > 14 || sq[0].curGear08 < 0 )
 			{
+				/* currGear OK : 0~14 */
 				NGformatCG++;
 				//fprintf(stderr,"++ERROR++ curGear errors > %d , %u \n", sq[0].curGear08, NGformatCG );
 
-				if( (NGformatCG > 10) && (useInputCase>USE_IN_CASE0_NONE) && (useInputCase < USE_IN_MAX) )
+				if( (NGformatCG > ERROR_NUM_LIMIT) && (useInputCase>USE_IN_CASE0_NONE) && (useInputCase < USE_IN_MAX) )
 				{
-
 					RecordCnt = 0LL;
 					iOKcount = 0;
 					iNGcount = 0;
@@ -2898,6 +2916,11 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 					NGformatGEARCnt = 0;
 					NGformatCG = 0;
 					NGformatTG = 0;
+					iErrorVSP = 0;
+					iErrorAPS = 0;
+					iErrorLAcc = 0;
+					iErrorRPM = 0;
+					iErrorTemp = 0;
 
 					useInputCase ++;  /* Next Input Format... */
 
@@ -2911,12 +2934,12 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 
 			if( sq[0].tgtGear11 > 14 || sq[0].tgtGear11 < 0 )
 			{
+				/* tgtGear OK : 0~14 */
 				NGformatTG++;
 				//fprintf(stderr,"++ERROR++ tgtGear errors > %d , %u \n", sq[0].tgtGear11 );
 
-				if( (NGformatTG > 10) && (useInputCase>USE_IN_CASE0_NONE) && (useInputCase < USE_IN_MAX) )
+				if( (NGformatTG > ERROR_NUM_LIMIT) && (useInputCase>USE_IN_CASE0_NONE) && (useInputCase < USE_IN_MAX) )
 				{
-
 					RecordCnt = 0LL;
 					iOKcount = 0;
 					iNGcount = 0;
@@ -2927,6 +2950,11 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 					NGformatGEARCnt = 0;
 					NGformatCG = 0;
 					NGformatTG = 0;
+					iErrorVSP = 0;
+					iErrorAPS = 0;
+					iErrorLAcc = 0;
+					iErrorRPM = 0;
+					iErrorTemp = 0;
 
 					useInputCase ++;  /* Next Input Format... */
 
@@ -2938,6 +2966,170 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 
 			}
 		#endif
+
+			if( (sq[0].VSP03 < 0.0f) || (sq[0].VSP03 > 256.0f) )
+			{
+				/* OK: 0 <= VS <= 256 */
+				iErrorVSP ++;
+				if( (iErrorVSP > ERROR_NUM_LIMIT) && (useInputCase>USE_IN_CASE0_NONE) && (useInputCase < USE_IN_MAX) )
+				{
+					RecordCnt = 0LL;
+					iOKcount = 0;
+					iNGcount = 0;
+					memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
+					memset(gearShift, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
+
+					NGformatMODECnt = 0; 
+					NGformatGEARCnt = 0;
+					NGformatCG = 0;
+					NGformatTG = 0;
+					iErrorVSP = 0;
+					iErrorAPS = 0;
+					iErrorLAcc = 0;
+					iErrorRPM = 0;
+					iErrorTemp = 0;
+
+					useInputCase ++;  /* Next Input Format... */
+
+					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.5.  (%d) \n", useInputCase );
+
+					rewind(inpfile);
+					continue;
+				}
+			}
+
+
+			if( (sq[0].APS09 < 0.0f) || (sq[0].APS09 > 128.0f) )
+			{
+				/* OK: 0 <= APS <= 128 */
+				iErrorAPS ++;
+				if( (iErrorAPS > ERROR_NUM_LIMIT) && (useInputCase>USE_IN_CASE0_NONE) && (useInputCase < USE_IN_MAX) )
+				{
+					RecordCnt = 0LL;
+					iOKcount = 0;
+					iNGcount = 0;
+					memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
+					memset(gearShift, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
+			
+					NGformatMODECnt = 0; 
+					NGformatGEARCnt = 0;
+					NGformatCG = 0;
+					NGformatTG = 0;
+					iErrorVSP = 0;
+					iErrorAPS = 0;
+					iErrorLAcc = 0;
+					iErrorRPM = 0;
+					iErrorTemp = 0;
+
+					useInputCase ++;  /* Next Input Format... */
+			
+					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.6.  (%d) \n", useInputCase );
+			
+					rewind(inpfile);
+					continue;
+				}
+			}
+
+
+			if( (sq[0].LAcc17 < -16.0f) || (sq[0].LAcc17 > 16.0f) )
+			{
+				/* OK: -16 <= LAcc17 <= 16 */
+				iErrorLAcc ++;
+				if( (iErrorLAcc > ERROR_NUM_LIMIT) && (useInputCase>USE_IN_CASE0_NONE) && (useInputCase < USE_IN_MAX) )
+				{
+					RecordCnt = 0LL;
+					iOKcount = 0;
+					iNGcount = 0;
+					memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
+					memset(gearShift, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
+			
+					NGformatMODECnt = 0; 
+					NGformatGEARCnt = 0;
+					NGformatCG = 0;
+					NGformatTG = 0;
+					iErrorVSP = 0;
+					iErrorAPS = 0;
+					iErrorLAcc = 0;
+					iErrorRPM = 0;
+					iErrorTemp = 0;
+
+					useInputCase ++;  /* Next Input Format... */
+			
+					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.7.  (%d) \n", useInputCase );
+			
+					rewind(inpfile);
+					continue;
+				}
+			}
+
+			if( (sq[0].No10 < 0.0f) || (sq[0].No10 > 16384.0f) ||
+				(sq[0].Nt16 < 0.0f) || (sq[0].Nt16 > 16384.0f) ||
+				(sq[0].Ne15 < 0.0f) || (sq[0].Ne15 > 16384.0f) )
+			{
+				/* OK: 0 <= No10 <= 16384 */
+				/* OK: 0 <= Nt16 <= 16384 */
+				/* OK: 0 <= Ne15 <= 16384 */
+
+				iErrorRPM ++;
+				if( (iErrorRPM > ERROR_NUM_LIMIT) && (useInputCase>USE_IN_CASE0_NONE) && (useInputCase < USE_IN_MAX) )
+				{
+					RecordCnt = 0LL;
+					iOKcount = 0;
+					iNGcount = 0;
+					memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
+					memset(gearShift, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
+			
+					NGformatMODECnt = 0; 
+					NGformatGEARCnt = 0;
+					NGformatCG = 0;
+					NGformatTG = 0;
+					iErrorVSP = 0;
+					iErrorAPS = 0;
+					iErrorLAcc = 0;
+					iErrorRPM = 0;
+					iErrorTemp = 0;
+
+					useInputCase ++;  /* Next Input Format... */
+			
+					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.8.  (%d) \n", useInputCase );
+			
+					rewind(inpfile);
+					continue;
+				}
+			}
+
+
+			if( (sq[0].EngTemp06 < -255) || (sq[0].EngTemp06 > 255) )
+			{
+				/* OK: -255 <= EngTemp06 <= 255 */
+			
+				iErrorTemp ++;
+				if( (iErrorTemp > ERROR_NUM_LIMIT) && (useInputCase>USE_IN_CASE0_NONE) && (useInputCase < USE_IN_MAX) )
+				{
+					RecordCnt = 0LL;
+					iOKcount = 0;
+					iNGcount = 0;
+					memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
+					memset(gearShift, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
+			
+					NGformatMODECnt = 0; 
+					NGformatGEARCnt = 0;
+					NGformatCG = 0;
+					NGformatTG = 0;
+					iErrorVSP = 0;
+					iErrorAPS = 0;
+					iErrorLAcc = 0;
+					iErrorRPM = 0;
+					iErrorTemp = 0;
+			
+					useInputCase ++;  /* Next Input Format... */
+			
+					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.9.  (%d) \n", useInputCase );
+			
+					rewind(inpfile);
+					continue;
+				}
+			}
 
 
 
@@ -3022,6 +3214,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 
 				RecordCnt = 0LL;
 				iOKcount = 0;
+				iNGcount = 0;
 				memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
 				memset(gearShift, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
 
@@ -3029,6 +3222,12 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 				NGformatGEARCnt = 0;
 				NGformatCG = 0;
 				NGformatTG = 0;
+
+				iErrorVSP = 0;
+				iErrorAPS = 0;
+				iErrorLAcc = 0;
+				iErrorRPM = 0;
+				iErrorTemp = 0;
 
 				useInputCase ++;  /* Next Input Format... */
 
@@ -3128,6 +3327,12 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 	NGformatGEARCnt = 0;
 	NGformatCG = 0;
 	NGformatTG = 0;
+	
+	iErrorVSP = 0;
+	iErrorAPS = 0;
+	iErrorLAcc = 0;
+	iErrorRPM = 0;
+	iErrorTemp = 0;
 
 	iSBdecCnt  = 0;
 	iSBstart   = 0;
@@ -3229,9 +3434,9 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 			if( USE_IN_CASE1_17==useInputCase )
 			{
 				result = sscanf(QualData, SQD_INFORMAT,
-							&sq[0].Time01, &sq[0].OTS02,     &sq[0].VSP03, &sq[0].TqStnd04, &sq[0].iPATs05,   &sq[0].EngTemp06, 
-							&sq[0].tqi07,  &sq[0].curGear08, &sq[0].APS09, &sq[0].No10,     &sq[0].tgtGear11, &sq[0].ShiTy12, 
-							&sq[0].TqFr13, &sq[0].ShiPh14,   &sq[0].Ne15,  &sq[0].Nt16,     &sq[0].LAcc17 );
+							&sq[0].Time01, &sq[0].OTS02,       &sq[0].VSP03,     &sq[0].TqStnd04,   &sq[0].iPATs05,   &sq[0].EngTemp06, 
+							&sq[0].tqi07,  &sq[0].curGear08,   &sq[0].APS09,     &sq[0].No10,       &sq[0].tgtGear11, &sq[0].ShiTy12, 
+							&sq[0].TqFr13, &sq[0].ShiPh14,     &sq[0].Ne15,      &sq[0].Nt16,       &sq[0].LAcc17 );
 
 				iINPUT_NUMS = QUAL_TSV_CASE1_17_ITEM_NUM;
 			}
@@ -3308,6 +3513,69 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 				NGformatGEARCnt ++;				
 			}
 
+		
+			/* ------------------------------------------------------------ */
+			/* N(0), D(1~8), P(9), R(10) ---------------------------------	*/
+			/* 11, 12 : s1_Y, s2_Y		 ---------------------------------	*/
+			/* 13, 14 : s1_J, s2_J		 ---------------------------------	*/
+			/* ------------------------------------------------------------ */
+			if( sq[0].curGear08 > 14 || sq[0].curGear08 < 0 )
+			{
+				NGformatCG++;
+				fprintf(stderr,"++ERROR++ curGear errors > %d, %u \n", sq[0].curGear08, NGformatCG );
+			}
+		
+			if( sq[0].tgtGear11 > 14 || sq[0].tgtGear11 < 0 )
+			{
+				NGformatTG++;
+				fprintf(stderr,"++ERROR++ tgtGear errors > %d, %u \n", sq[0].tgtGear11, NGformatTG );		
+			}
+		
+			if( (sq[0].VSP03 < 0.0f) || (sq[0].VSP03 > 256.0f) )
+			{
+				/* OK: 0 <= VS <= 256 */
+				iErrorVSP ++;
+				fprintf(stderr,"++ERROR++ VSP errors > %lf, %u \n", sq[0].VSP03, iErrorVSP );		
+			}
+		
+		
+			if( (sq[0].APS09 < 0.0f) || (sq[0].APS09 > 128.0f) )
+			{
+				/* OK: 0 <= APS <= 128 */
+				iErrorAPS ++;
+				fprintf(stderr,"++ERROR++ ASP errors > %lf, %u \n", sq[0].APS09, iErrorAPS );		
+			}
+		
+		
+			if( (sq[0].LAcc17 < -16.0f) || (sq[0].LAcc17 > 16.0f) )
+			{
+				/* OK: -16 <= LAcc17 <= 16 */
+				iErrorLAcc ++;
+				fprintf(stderr,"++ERROR++ LAcc errors > %lf, %u \n", sq[0].LAcc17, iErrorLAcc );		
+			}
+		
+			if( (sq[0].No10 < 0.0f) || (sq[0].No10 > 16384.0f) ||
+				(sq[0].Nt16 < 0.0f) || (sq[0].Nt16 > 16384.0f) ||
+				(sq[0].Ne15 < 0.0f) || (sq[0].Ne15 > 16384.0f) )
+			{
+				/* OK: 0 <= No10 <= 16384 */
+				/* OK: 0 <= Nt16 <= 16384 */
+				/* OK: 0 <= Ne15 <= 16384 */
+		
+				iErrorRPM ++;
+				fprintf(stderr,"++ERROR++ rpm errors > No:%lf, Nt:%lf, Ne:%lf, %u \n", sq[0].No10, sq[0].Nt16, sq[0].Ne15, iErrorRPM );						
+			}
+		
+
+			if( (sq[0].EngTemp06 < -255) || (sq[0].EngTemp06 > 255) )
+			{
+				/* OK: -255 <= Temp <= 255 */
+				iErrorTemp ++;
+				fprintf(stderr,"++ERROR++ Temp errors > %lf, %u \n", sq[0].EngTemp06, iErrorTemp );		
+			}
+
+
+
 
 			/* === 2 STEP : SKIP record check ===================== */
 			if(iItemCurOK)
@@ -3318,25 +3586,6 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 			}
 			iItemPreOK = iItemCurOK;
 			/* === 2 STEP : SKIP record check ===================== */
-
-			if(iFirstItem)
-			{
-				iFirstItem = 0;
-
-		#if 0 //SAVEMODE
-				if(shiFile)
-				{
-					fprintf(shiFile, SAVEFMT,
-							sq[0].Time01,    sq[0].iPATs05,                 arrPATs_ModeID[sq[0].iPATs05].ModeID, sq[0].VSP03,      sq[0].tqi07, 
-							sq[0].curGear08, sq[0].APS09,                   sq[0].No10,                           sq[0].tgtGear11,  iShift,
-							sq[0].ShiTy12,   arrGear[sq[0].ShiTy12].sGear,  sq[0].TqFr13,                         sq[0].ShiPh14,    sq[0].Ne15,
-							sq[0].Nt16,    sq[0].LAcc17, 
-							sTimePos, sTimeNtPos, gearRatio, gearShift1One, gearShift2Two, fJerk0, MaxAcc, minAcc );
-
-					fprintf(shiFile, "\n");
-				}
-		#endif
-			}
 
 
 			/* ----------------------------------------------------- */
@@ -4110,6 +4359,10 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 	NGformatGEARCnt = 0;
 	NGformatCG = 0;
 	NGformatTG = 0;
+	iErrorVSP = 0;
+	iErrorAPS = 0;
+	iErrorLAcc = 0;
+	iErrorRPM = 0;
 
 	iSBdecCnt  = 0;
 	iSBstart   = 0;
@@ -4306,6 +4559,9 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 				iFirstItem = 0;
 
 		#ifdef LOW_PASS_FILTER_GACC /* 2023-02-09, Low Pass Filter for LAcc */
+				/* ------------------------------------------------------------------- */
+				/* -- Low Pass Filter initial Value for LAcclel ---------------------- */
+				/* ------------------------------------------------------------------- */
 				LPFilteredLAcc = sq[0].LAcc17;
 		#endif
 
@@ -4390,7 +4646,8 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 			/* ------------------------------------------------------------------- */
 			is2File = 0;
 
-			
+
+
 			/* ------------------------------------------------------------------- */
 			/* ------------------------------------------------------------------- */
 			if( (sq[0].iPATs05 == aiPATs05) && (sq[0].curGear08 == sq[0].tgtGear11) && (curSmPreGear+1==sq[0].curGear08) )
@@ -4475,8 +4732,8 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 
 		#ifdef LOW_PASS_FILTER_GACC /* 2023-02-09, Low Pass Filter for LAcc */
 				/* -------------------------------------------------------------- */
-				/* Low Pass Filter for JERK ------------------------------------- */
-				/* curr(10.2%) + previous(89.8%) ------------------------------------ */
+				/* Low Pass Filter factor (0.102 = 10.2%) for JERK -------------- */
+				/* curr(10.2%) + previous(89.8%) -------------------------------- */
 				/* -------------------------------------------------------------- */
 				LPFilteredLAcc = (JERK_LPFfactor * sq[0].LAcc17) + (1.0f - JERK_LPFfactor)*LPFilteredLAcc;
 		#endif
@@ -4503,7 +4760,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 				/* ----------------------------------------------------- */
 		#else
 				/* ----------------------------------------------------- */
-				/* Calc Jerk0 (per 5msec)								 */
+				/* Calc Jerk0 (per 5msec) Low Pass Filtered  ----------- */
 				/* ----------------------------------------------------- */
 				fJerk0 = 0.0f;
 				if(preTime)
@@ -4632,7 +4889,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 				}
 				else
 				{
-					/* initialized */
+					/* initialized string */
 					strcpy(sTimePos, TXT_UPCASE);
 					strcpy(sTimeNtPos, TXT_UPCASE);
 
@@ -4642,8 +4899,8 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 						/* -------------------------------------------------------------------------------
 						※	1-2 : Shift Begin (SB) 점 판단식 : Nt - No x 1단 기어비 ≤-30RPM 되는 싯점 
 								  Synch Point (SP) 점 판단식 : Nt - No x 2단 기어비 ≤ 30RPM 되는 싯점	 
-								  Nt Max 점 판단식			 : Nt - No x 1단 기어비 ≤0RPM 되는 싯점 
-								  Nt Max 점 판단식			 : Nt - No x 2단 기어비 ≤0RPM 되는 싯점 
+								  Nt Max 점 판단식			 : Nt - No x 1단 기어비 ≤-5RPM 되는 싯점 
+								  Nt min 점 판단식			 : Nt - No x 2단 기어비 ≤5RPM 되는 싯점 
 						---------------------------------------------------------------------------------- */
 
 				#if 0 // SB_POINT_SWING1
@@ -4754,7 +5011,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 								if(iNtMaxdecCnt < NtMax_DECISION_NUM)
 								{
 									NtMaxdecision[iNtMaxdecCnt].FixCount = 1; // 1 times
-									NtMaxdecision[iNtMaxdecCnt].NtMaxTime = (unsigned int)( (sq[0].Time01)*1000*JERK_TIME_SCALE ); // 1 times
+									NtMaxdecision[iNtMaxdecCnt].NtMaxTime = (unsigned int)( (sq[0].Time01)*1000*JERK_TIME_SCALE );
 									iNtMaxstart = 1;
 									iOnce_NtMax = 1; // re-enterance
 									//fprintf(stderr,"  iNtMaxdecCnt NtMaxdecision: %d:(%d) \n", iNtMaxdecCnt, NtMaxdecision[iNtMaxdecCnt].FixCount );
@@ -4778,7 +5035,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 							for(ide=0; ide<iNtMaxdecCnt; ide++)
 								iNtMaxTimeSum += NtMaxdecision[ide].FixCount;
 
-							if( iNtMaxTimeSum >= iSBdecision /* NtMax_DECISION_NUM */) 
+							if( iNtMaxTimeSum >= iSBdecision /* NtMax_DECISION_NUM */ ) 
 							{
 								iNtMaxpntFix=1;
 								//fprintf(stderr,"  iNtMaxTimeSum ---- OK (%d) \n", iNtMaxTimeSum );
@@ -4803,7 +5060,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 								if(iNtmindecCnt < Ntmin_DECISION_NUM)
 								{
 									Ntmindecision[iNtmindecCnt].FixCount = 1; // 1 times
-									Ntmindecision[iNtmindecCnt].NtminTime = (unsigned int)( (sq[0].Time01)*1000*JERK_TIME_SCALE ); // 1 times
+									Ntmindecision[iNtmindecCnt].NtminTime = (unsigned int)( (sq[0].Time01)*1000*JERK_TIME_SCALE );
 									iNtminstart = 1;
 									iOnce_Ntmin = 1; // re-enterance
 									//fprintf(stderr,"  iNtmindecCnt Ntmindecision: %d:(%d) \n", iNtmindecCnt, Ntmindecision[iNtmindecCnt].FixCount );
@@ -4826,7 +5083,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 							for(ide=0; ide<iNtmindecCnt; ide++)
 								iNtminTimeSum += Ntmindecision[ide].FixCount;
 
-							if( iNtminTimeSum >= iSBdecision /* Ntmin_DECISION_NUM */) 
+							if( iNtminTimeSum >= iSBdecision /* Ntmin_DECISION_NUM */ ) 
 							{
 								iNtminpntFix=1;
 								//fprintf(stderr,"  iNtminTimeSum ---- OK (%d) \n", iNtminTimeSum );
@@ -4857,7 +5114,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 
 								if( iSBcount >= MAX_TABLE_SIZ )
 								{
-									fprintf(stderr,"++ERROR+%d+ gMaxTbl[%d] Table index over!! \n", __LINE__, iSBcount);
+									fprintf(stderr,"++ERROR+%d+ SB gMaxTbl[%d] Table index over!! \n", __LINE__, iSBcount);
 								} 
 								else
 								{
@@ -4908,7 +5165,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 
 								if( iSPcount >= MAX_TABLE_SIZ )
 								{
-									fprintf(stderr,"++ERROR+%d+ gMaxTbl[%d] Table index over!! \n", __LINE__, iSPcount);
+									fprintf(stderr,"++ERROR+%d+ SP gMaxTbl[%d] Table index over!! \n", __LINE__, iSPcount);
 								} 
 								else
 								{
@@ -4958,7 +5215,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 
 									if( iNtMaxcount >= MAX_TABLE_SIZ )
 									{
-										fprintf(stderr,"++ERROR+%d+ gMaxTbl[%d] Table index over!! \n", __LINE__, iNtMaxcount);
+										fprintf(stderr,"++ERROR+%d+ NtMax gMaxTbl[%d] Table index over!! \n", __LINE__, iNtMaxcount);
 									} 
 									else
 									{
@@ -4994,7 +5251,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 
 									if( iNtmincount >= MAX_TABLE_SIZ )
 									{
-										fprintf(stderr,"++ERROR+%d+ gMaxTbl[%d] Table over!! \n", __LINE__, iNtmincount);
+										fprintf(stderr,"++ERROR+%d+ Ntmin gMaxTbl[%d] Table over!! \n", __LINE__, iNtmincount);
 									} 
 									else
 									{
@@ -5108,8 +5365,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 
 
 
-
-	#if 0 // SAVEMODE
+			#if 0 // SAVEMODE
 				if(shiFile)
 				{
 				fprintf(shiFile, SAVEFMT,
@@ -5121,7 +5377,8 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 
 				fprintf(shiFile, "\n");
 				}
-	#endif
+			#endif
+
 
 			}
 
@@ -5136,7 +5393,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 					sq[0].Time01,	 sq[0].iPATs05, arrPATs_ModeID[sq[0].iPATs05].ModeID, sq[0].VSP03, sq[0].tqi07, 
 					sq[0].curGear08, sq[0].APS09,	sq[0].No10, sq[0].tgtGear11, 
 					iShift, 		 sq[0].ShiTy12, arrGear[sq[0].ShiTy12].sGear, sq[0].TqFr13, sq[0].ShiPh14, 
-					sq[0].Ne15, 	 sq[0].Nt16,    sq[0].LAcc17, LPFilteredLAcc,
+					sq[0].Ne15, 	 sq[0].Nt16,    sq[0].LAcc17,    LPFilteredLAcc,
 					sTimePos, sTimeNtPos, gearRatio, gearShift1One, gearShift2Two, fJerk0, MaxAcc, minAcc );
 
 			fprintf(shiFile, "\n");
@@ -5258,7 +5515,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 	else if(iSBdecision<=1)
 		fprintf(stderr,"  cont. SB/SP decision Number  : %d (Just One) - SB/SP-point can be determined wrongly. \n", iSBdecision );
 
-	fprintf(stderr,"  Jerk Time length (gMax/gmin) : %d msec ~ (SB point) ~ %d msec \n", iJerkTimeLen, iavgTime*gMax_Before_SB_POINT );
+	fprintf(stderr,"  Jerk Time length (gMax/gmin) : -%d msec ~ (SB point) ~ %d msec \n", iJerkTimeLen, iavgTime*gMax_Before_SB_POINT );
 	fprintf(stderr,"  Nt-Max/Nt-min Time length    : -%d msec ~ (SB point) / (SP point) ~ +%d msec \n", iNtTimeLen, iNtTimeLen );
 
 	fprintf(stderr,"  Shift Data Time Period ------: %9u msec \n", iavgTime );
@@ -5362,24 +5619,6 @@ int SSnNtPointFix(short aiPATs05, short SBposDecision, tSQData_PairCheck_type SP
 	unsigned int iCurrTime = 0;
 	unsigned int ignoredCount = 0;
 	unsigned int ignored2ndCnt = 0;
-
-#if 0
-	double gearShift1One = -1.0f; //, pre_gearShift1One = -1.0f;
-	double gearShift2Two = -1.0f;
-	tNtMaxdec_type NtMaxdecision[SP_DECISION_NUM];
-	unsigned short iNtMaxdecCnt = 0;
-	short iNtMaxpntFix = 0;
-	short iNtMaxstart = 0;
-	short iNtMaxTimeSum = 0;
-	
-	tNtmindec_type Ntmindecision[SP_DECISION_NUM];
-	unsigned short iNtmindecCnt = 0;
-	short iNtminpntFix = 0;
-	short iNtminstart = 0;
-	short iNtminTimeSum = 0;
-	short iOnce_NtMax = 1; /* NtMax */
-	short iOnce_Ntmin = 1; /* Ntmin */
-#endif
 
 	// =========================================================
 	// =========================================================
@@ -5583,7 +5822,7 @@ int SSnNtPointFix(short aiPATs05, short SBposDecision, tSQData_PairCheck_type SP
 			unsigned int i=0;
 
 			/* Read a line from input file. */
-			memset( QualData, 0x00, sizeof(QualData) );
+			memset( QualData, 0x00, QUAL_DATA_MAX_SIZE*sizeof(char) );
 
 			if( NULL == fgets( QualData, QUAL_DATA_MAX_SIZE, inpfile ) )
 			{
@@ -6092,8 +6331,6 @@ int SSnNtPointFix(short aiPATs05, short SBposDecision, tSQData_PairCheck_type SP
 
 
 
-
-
 			#if 1
 				/* -------------------------------------------------------- */
 				/* Adjust Case -> ignored --------------------------------- */
@@ -6120,7 +6357,7 @@ int SSnNtPointFix(short aiPATs05, short SBposDecision, tSQData_PairCheck_type SP
 							sq2[0].Time01,     sq2[0].iPATs05,    sq2[0].iPATs05S,  sq2[0].VSP03,      sq2[0].tqi07,      sq2[0].curGear08, 
 							sq2[0].APS09,      sq2[0].No10,	      sq2[0].tgtGear11, sq2[0].ShiNew12,   sq2[0].ShiTy12,    sq2[0].arrGear, 
 							sq2[0].TqFr13,     sq2[0].ShiPh14,    sq2[0].Ne15,      sq2[0].Nt16,       sq2[0].LAcc17,     sq2[0].LPFAcc,
-							sq2[0].sTimePos, iSxnumbering,
+							sq2[0].sTimePos,   iSxnumbering,
 							Gsum,              sq2[0].sTimeNtPos, sq2[0].gearRat,   sq2[0].gearShiOne, sq2[0].gearShiTwo, sq2[0].fJerk0,  
 							MaxAcc,     minAcc /* sq2[0].minAcc */ );
 
@@ -6648,9 +6885,6 @@ int ignored_QSData(short aiPATs05, short SBposDecision, tSQData_PairCheck_type *
 
 int FindGminMaxShiftData(short aiPATs05, tSQData_PairCheck_type SPoint, short ignoredCnt)
 {
-	//FILE *fp2gMax = NULL;
-	//FILE *fp2gmin = NULL;
-
 	FILE *fp2out = NULL;
 
 	unsigned int kkloop=0, KkLast;
@@ -8397,7 +8631,7 @@ unsigned int APSData_Filtering(short aiPATs05, int avgTime, short iSBchoicePnt, 
 #endif
 	
 	//fprintf(stderr,">>APS Filtering Sorted result file as below: %s %s \n", arrPATs_ModeID[aiPATs05].ModeID, shift_file );
-	fprintf(stderr,">>APS Filtering Sorted result file as below: %s \n", arrPATs_ModeID[aiPATs05].ModeID );
+	fprintf(stderr,">>NONE Data Filtering Sorted result file as below: %s \n", arrPATs_ModeID[aiPATs05].ModeID );
 
 	for(ii=0; ii<iSScount; ii++)
 	{
@@ -8447,13 +8681,25 @@ unsigned int APSData_Filtering(short aiPATs05, int avgTime, short iSBchoicePnt, 
 	SPoint->SPnum = iSPcount-iignoredCnt;
 	SPoint->SFnum = iSFcount-iignoredCnt;
 
+
+	if( 0==SPoint->SSnum && 0==SPoint->SBnum && 0==SPoint->SPnum )
+	{
+		fprintf(stderr,"----------------------------------------------------------------------------------\n" );
+		fprintf(stderr,">>Result Quality Data is NONE as below %s \n", arrPATs_ModeID[aiPATs05].ModeID );
+		fprintf(stderr,"   SS Point Counts -----------: %3u / %3u points \n", SPoint->SStot, SPoint->SSnum);
+		fprintf(stderr,"   SB Point Counts -----------: %3u / %3u points \n", SPoint->SBtot, SPoint->SBnum);
+		fprintf(stderr,"   SP Point Counts -----------: %3u / %3u points \n", SPoint->SPtot, SPoint->SPnum);
+		fprintf(stderr,"   SF Point Counts -----------: %3u / %3u points \n", SPoint->SFtot, SPoint->SFnum);
+		fprintf(stderr,"----------------------------------------------------------------------------------\n" );
+		fprintf(stderr,"   STOP it !!!!!\n\n");
+	}
 	return iignoredCnt;
 }
 
 
 
 
-int ShiftData_LastSorting(short aiPATs05, int avgTime, short iSBchoicePnt, unsigned int ignoredCnt)
+int ShiftData_LastSorting(short aiPATs05, int avgTime, short iSBchoicePnt, unsigned int ignoredCnt, short DelYesNo, unsigned int iSBchk)
 {
 	//sqdflt_type sq4[2];  /* 0:SS, 1:SB, 2:MaxNt, 3:MaxNe, 4:g_Max, 5:g_min, 6:SP */
 	sqdAps_type sq4[2];  /* 0:SS, 1:SB, 2:MaxNt, 3:MaxNe, 4:g_Max, 5:g_min, 6:SP */
@@ -8774,7 +9020,10 @@ int ShiftData_LastSorting(short aiPATs05, int avgTime, short iSBchoicePnt, unsig
 			iGMxcount = 0;
 			iGmncount = 0;
 
-			if( icurGear > icurMaxGear ) break;
+
+			//fprintf(stderr," cg =%d (%d), tg: %d (%d),  iAPSidx %d > iAPSMAXIdx %d \n", icurGear, icurMaxGear, itgtGear, itgtMaxGear, iAPSidx , iAPSMAXIdx );
+
+			if( icurGear >= icurMaxGear ) break;
 
 			do
 			{
@@ -8932,8 +9181,10 @@ int ShiftData_LastSorting(short aiPATs05, int avgTime, short iSBchoicePnt, unsig
 	if(inpfile) fclose(inpfile);
 	if(outfile) fclose(outfile);
 
+
 	icurGear--;
 	itgtGear--;
+
 
 	if( icurGear+1 == itgtGear )
 		fprintf(stderr, "  %s UP shift Ended ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, icurGear, itgtGear  );
@@ -9063,6 +9314,17 @@ int ShiftData_LastSorting(short aiPATs05, int avgTime, short iSBchoicePnt, unsig
 
 	fprintf(stderr,">>Final Sorted result text file: %s \n", shi_out );
 	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
+
+
+	if( 0==iSScountot || 0==iSBcountot || 0==iSPcountot )
+	{
+		fprintf(stderr,"\n\n>>Quality Shift Data NOT exist!!!  \n\n\n");
+		AllFilesClosed();
+		tempFileDeleteIt(DelYesNo, aiPATs05, iSBchk);
+
+		exit(0);
+		return 0;
+	}
 
 	return 1;
 }
@@ -10125,7 +10387,7 @@ int ShiftData_Report(short aiPATs05, int avgTime, short iSBchoicePnt, short gVal
 	#ifndef LOW_PASS_FILTER_GACC
 		fprintf(outfile,"    Shift     APS_Power(%%)   ShiftTime(sec)              Accel(G)           Jerk(G/sec)%d(%s)_%dmsec              rpm(SB-/SP+%dmsec)  \n", iSBdecision, iSBchoicePnt?"L":"F", iJerkTimeLen, iNtTimeLen);
 	#else
-		fprintf(outfile,"	 Shift	   APS_Power(%%)   ShiftTime(sec)		 LPF(%.3lf)-Accel(G)	   Jerk(G/sec)%d(%s)_%dmsec 			 rpm(SB-/SP+%dmsec)  \n", JERK_LPFfactor,iSBdecision, iSBchoicePnt?"L":"F", iJerkTimeLen, iNtTimeLen);
+		fprintf(outfile,"    Shift     APS_Power(%%)   ShiftTime(sec)            LPF-Accel(G)         Jerk(G/sec)%d(%s)_%dmsec              rpm(SB-/SP+%dmsec)  \n", iSBdecision, iSBchoicePnt?"L":"F", iJerkTimeLen, iNtTimeLen);
 	#endif
 	
 		fprintf(outfile, REPORT_TXT "\n");
@@ -10759,8 +11021,8 @@ int ShiftData_Report(short aiPATs05, int avgTime, short iSBchoicePnt, short gVal
 	/* -- Max Ne (S.B 부근) -------------- */
 	/* -- 3 ------------------------------ */
 
-	fprintf(outfile," %8s === Up shift Average Jerk1 === ","");
-	for(ii=0; ii<FUNC_SPC+24; ii++) fprintf(outfile," ");
+	fprintf(outfile," %8s === Up shift Average Jerk1 by LPF === ","");
+	for(ii=0; ii<FUNC_SPC+17; ii++) fprintf(outfile," ");
 	if(xxMore) for(ii=0; ii<(SPACE_ONE_UNIT-2)*xxMore; ii++) fprintf(outfile," ");
 
 	fprintf(outfile," %2s === Up shift Average Ne Max === ", "");
@@ -18529,20 +18791,22 @@ int main(int argc, char *argv[])
 		ignoredCnt = APSData_Filtering(iModeID, iavgtm, iSBchoicePnt, &SPoint);
 
 
-		// --------------------------------------------------------
-		// 6th STEP -----------------------------------------------
-		// input  : *.txt 
-		// output : *.gil
-		ShiftData_LastSorting(iModeID, iavgtm, iSBchoicePnt, ignoredCnt);
-		// --------------------------------------------------------
+		if( SPoint.SStot>0 && SPoint.SBtot>0 && SPoint.SPtot>0 )
+		{
+			// --------------------------------------------------------
+			// 6th STEP -----------------------------------------------
+			// input  : *.txt 
+			// output : *.gil
+			ShiftData_LastSorting(iModeID, iavgtm, iSBchoicePnt, ignoredCnt, itmpFileDeleted, iSBchk);
+			// --------------------------------------------------------
 
 
-		// --------------------------------------------------------
-		// 7th STEP -----------------------------------------------
-		// input  : *.gil 
-		// output : *.rpt
-		ShiftData_Report(iModeID, iavgtm, iSBchoicePnt, gValueDisplay);
-
+			// --------------------------------------------------------
+			// 7th STEP -----------------------------------------------
+			// input  : *.gil 
+			// output : *.rpt
+			ShiftData_Report(iModeID, iavgtm, iSBchoicePnt, gValueDisplay);
+		}
 		// --------------------------------------------------------
 		// 8th temp file deleted!! --------------------------------
 		tempFileDeleteIt(itmpFileDeleted, iModeID, iSBchk);
