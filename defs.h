@@ -70,6 +70,7 @@
 
 #define QUAL_TSV_CASE1_17_ITEM_NUM 		17 /* 5ms_16select.tsv - Original data nums */
 #define QUAL_TSV_CASE2_15_ITEM_NUM 		15 /* 5ms_16select.tsv - Original data nums */
+#define QUAL_TSV_CASE2_NEW_15_ITEM 		15 /*  - Original data nums */
 
 #define QUAL_TSV_CASE3_15_NEW_ITEMS 	15 /* New_FF8_PONUPSX2.tsv - Original data nums */
 #define QUAL_TSV_CASE4_15_NEW_ITEMS 	15 /* GN7_3.5GDI_PONDOWN_KD.tsv - Original data nums */
