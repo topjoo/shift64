@@ -3950,7 +3950,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 						gMaxTbl[iSScount-1].SFTime = (unsigned int)( (sq[0].Time01) * TIME_SCALE * JERK_TIME_SCALE );
 
 					#if DEBUG_MSG_1ST_POINT_TIME
-						fprintf(stderr,"aaa(%3d)-> SF:%9ld : SF-SP:%9.4lf, SP-SS:%9.4lf ", iSScount-1, gMaxTbl[iSScount-1].SFTime, 
+						fprintf(stderr,"aaa(%3d)-> SF:%11ld : SF-SP:%9.4lf, SP-SS:%9.4lf ", iSScount-1, gMaxTbl[iSScount-1].SFTime, 
 								(double)(gMaxTbl[iSScount-1].SFTime - gMaxTbl[iSScount-1].SPTime)/TIME_SCALE/JERK_TIME_SCALE,
 								(double)(gMaxTbl[iSScount-1].SPTime - gMaxTbl[iSScount-1].SSTime)/TIME_SCALE/JERK_TIME_SCALE );
 					#endif
@@ -4079,7 +4079,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 					gMaxTbl[iSScount].SFTime = 0L;
 
 				#if DEBUG_MSG_1ST_POINT_TIME
-						fprintf(stderr,"\nZZZ(%3d)-> SS:%9ld ", iSScount, gMaxTbl[iSScount].SSTime );
+						fprintf(stderr,"\nZZZ(%3d)-> SS:%11ld ", iSScount, gMaxTbl[iSScount].SSTime );
 				#endif
 
 					}
@@ -4374,7 +4374,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 								gMaxTbl[iSScount-1].NtMaxBegin = gMaxTbl[iSScount-1].SBTime - iNtTimeLen*JERK_TIME_SCALE;	/* JERK_TIME_mSec */
 
 						#if DEBUG_MSG_1ST_POINT_TIME
-									fprintf(stderr,"aaa(%3d)-> SB:%9ld ", iSScount-1, gMaxTbl[iSScount-1].SBTime );
+									fprintf(stderr,"aaa(%3d)-> SB:%11ld ", iSScount-1, gMaxTbl[iSScount-1].SBTime );
 						#endif
 
 								}
@@ -4419,7 +4419,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 								gMaxTbl[iSScount-1].NtminEnd  = gMaxTbl[iSScount-1].SPTime + iNtTimeLen*JERK_TIME_SCALE;	/* Nt-min end time */
 
 							#if DEBUG_MSG_1ST_POINT_TIME
-									fprintf(stderr,"aaa(%3d)-> SP:%9ld ", iSScount-1, gMaxTbl[iSScount-1].SPTime );
+									fprintf(stderr,"aaa(%3d)-> SP:%11ld ", iSScount-1, gMaxTbl[iSScount-1].SPTime );
 							#endif
 
 								}
@@ -5729,7 +5729,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 			iSxIgnCnt ++;
 			gMaxTbl[ii].ignored = IGN_BECAUSE_NOPAIR;
 	#if DEBUG_MSG_1ST_POINT_TIME
-			fprintf(stderr," NONE [%3d]: SS(%10ld) -SB(%10ld) -SP(%10ld) -SF(%10ld) \n", 
+			fprintf(stderr," NONE [%3d]: SS(%11ld) -SB(%11ld) -SP(%11ld) -SF(%11ld) \n", 
 							ii, gMaxTbl[ii].SSTime, gMaxTbl[ii].SBTime, gMaxTbl[ii].SPTime, gMaxTbl[ii].SFTime );
 	#endif
 		}
@@ -6181,7 +6181,7 @@ int SSnNtPointFix(short aiPATs05, short SBposDecision, tSQData_PairCheck_type SP
 					gMaxTbl[iSScount].SFTime = 0L;
 
 				#if DEBUG_MSG_OVER_TIME
-					fprintf(stderr,"\nBBB(%3d)-> SS:%9ld  ", iSScount, gMaxTbl[iSScount].SSTime );
+					fprintf(stderr,"\nBBB(%3d)-> SS:%11ld  ", iSScount, gMaxTbl[iSScount].SSTime );
 				#endif
 		
 					gMaxTbl[iSScount].Gavg0 = 0.0;
@@ -6248,7 +6248,7 @@ int SSnNtPointFix(short aiPATs05, short SBposDecision, tSQData_PairCheck_type SP
 						gMaxTbl[iSScount-1].SFTime = (unsigned int)( (sq2[0].Time01)*TIME_SCALE*JERK_TIME_SCALE );
 
 					#if DEBUG_MSG_OVER_TIME
-						fprintf(stderr,"bbb(%3d)-> SF:%9ld : SF-SP:%9.4lf, SP-SS:%9.4lf ", iSScount-1, gMaxTbl[iSScount-1].SFTime, 
+						fprintf(stderr,"bbb(%3d)-> SF:%11ld : SF-SP:%9.4lf, SP-SS:%9.4lf ", iSScount-1, gMaxTbl[iSScount-1].SFTime, 
 								(double)(gMaxTbl[iSScount-1].SFTime - gMaxTbl[iSScount-1].SPTime)/TIME_SCALE/JERK_TIME_SCALE,
 								(double)(gMaxTbl[iSScount-1].SPTime - gMaxTbl[iSScount-1].SSTime)/TIME_SCALE/JERK_TIME_SCALE );
 					#endif
@@ -6274,7 +6274,7 @@ int SSnNtPointFix(short aiPATs05, short SBposDecision, tSQData_PairCheck_type SP
 					{
 						strcpy( sq2[0].sTimePos, TXT_UNKNOWN ); /* change : SF -> (***) Unknown */
 				#if DEBUG_MSG_OVER_TIME
-						fprintf(stderr,"bbb(%3d)-> SF:%9ld  +++Unknown+++ \n", iSScount-1, gMaxTbl[iSScount-1].SFTime );
+						fprintf(stderr,"bbb(%3d)-> SF:%11ld  +++Unknown+++ \n", iSScount-1, gMaxTbl[iSScount-1].SFTime );
 				#endif
 					}					
 				}
@@ -6299,7 +6299,7 @@ int SSnNtPointFix(short aiPATs05, short SBposDecision, tSQData_PairCheck_type SP
 							gMaxTbl[iSScount-1].SBTime    = (unsigned int)( (sq2[0].Time01)*TIME_SCALE*JERK_TIME_SCALE );
 
 						#if DEBUG_MSG_OVER_TIME
-							fprintf(stderr,"bbb(%3d)-> SB:%9ld ", iSScount-1, gMaxTbl[iSScount-1].SBTime );
+							fprintf(stderr,"bbb(%3d)-> SB:%11ld ", iSScount-1, gMaxTbl[iSScount-1].SBTime );
 						#endif
 
 							gMaxTbl[iSScount-1].gMx1Begin  = gMaxTbl[iSScount-1].SBTime - iJerkTimeLen*JERK_TIME_SCALE;	/* JERK_TIME_mSec */
@@ -6352,7 +6352,7 @@ int SSnNtPointFix(short aiPATs05, short SBposDecision, tSQData_PairCheck_type SP
 							gMaxTbl[iSScount-1].NtminEnd  = gMaxTbl[iSScount-1].SPTime + Ntmin_After_mSec*JERK_TIME_SCALE;	/* Nt-min end time */
 
 						#if DEBUG_MSG_OVER_TIME
-							fprintf(stderr,"bbb(%3d)-> SP:%9ld ", iSScount-1, gMaxTbl[iSScount-1].SPTime );
+							fprintf(stderr,"bbb(%3d)-> SP:%11ld ", iSScount-1, gMaxTbl[iSScount-1].SPTime );
 						#endif
 
 							/* ---- SS~SP time : 2000msec case : ignored case ---- */
@@ -11507,7 +11507,7 @@ int ShiftData_Report(short aiPATs05, int avgTime, short iSBchoicePnt, short gVal
 //	fprintf(stderr,"----------------------------------------------------------------------------------\n" );
 //	fprintf(stderr,">>Shift Quality Data Sorting finished!!! %s [%s] -> [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, shi_out  ); 		
 
-	fprintf(stderr,"  Jerk1 Ignored Time Value     : abs(%d) msec under \n", iJerk1IgnoreTime );
+	fprintf(stderr,"  Jerk1 Ignored Time Value     : |%d| msec under \n", iJerk1IgnoreTime );
 	fprintf(stderr,"  Jerk1 Ignored Value          : %.1lf G/sec under \n", fJerk1IgnoreVal );
 
 	fprintf(stderr,">>Final Sorted result report file: %s \n", shi_out );
