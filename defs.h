@@ -92,6 +92,9 @@
 #define DEBUG_MSG_1ST_POINT_TIME 		0
 #define DEBUG_MSG_OVER_TIME 			0
 
+#define DEBUG_GMAX_GMIN_LOG 			0
+#define DEBUG_GMAX_GMIN_LOG2 			0
+
 #endif /* __DEFS_H__ */
 
 
