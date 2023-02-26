@@ -84,7 +84,7 @@
 #define QUAL_3RD_DATA_ITEM_NUM 		29 /* 2023-02-09, +Gsum, +LPFLAcc  */
 
 #define QUAL_FLT_DATA_ITEM_NUM 		28 /* 2023-02-09, +Gavg, +LPFLAcc  */
-#define QUAL_APS_DATA_ITEM_NUM 		29 /* 2023-01-23, +Gavg, +LPFLAcc   */
+#define QUAL_APS_DATA_ITEM_NUM 		27 /* 2023-02-25, +Gavg, +LPFLAcc, -tqi07, -TqFr13   */
 
 
 
