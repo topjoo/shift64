@@ -78,13 +78,13 @@
 
 
 
-#define QUAL_2ND_DATA_ITEM_NUM 		26 /* 2023-02-09, +LPFLAcc */
-#define QUAL_2ND_NEWDT_ITEM_NUM 	28 /* 2023-02-09, +Gsum, +LPFLAcc */
+#define QUAL_2ND_DATA_ITEM_NUM 		29 /* 2023-03-04, +LPFLAcc, +EngTemp06, +NetEng_Acor, +MSs_Ntg, */
+#define QUAL_2ND_NEWDT_ITEM_NUM 	31 /* 2023-03-04, +Gsum, +LPFLAcc, +EngTemp06, +NetEng_Acor, +MSs_Ntg */
 
-#define QUAL_3RD_DATA_ITEM_NUM 		29 /* 2023-02-09, +Gsum, +LPFLAcc  */
+#define QUAL_3RD_DATA_ITEM_NUM 		32 /* 2023-03-04, +Gsum, +LPFLAcc, +EngTemp06, +NetEng_Acor, +MSs_Ntg  */
 
-#define QUAL_FLT_DATA_ITEM_NUM 		28 /* 2023-02-09, +Gavg, +LPFLAcc  */
-#define QUAL_APS_DATA_ITEM_NUM 		27 /* 2023-02-25, +Gavg, +LPFLAcc, -tqi07, -TqFr13   */
+#define QUAL_FLT_DATA_ITEM_NUM 		31 /* 2023-03-04, +Gavg, +LPFLAcc, +EngTemp06, +NetEng_Acor, +MSs_Ntg  */
+#define QUAL_APS_DATA_ITEM_NUM 		30 /* 2023-03-04, +Gavg, +LPFLAcc, -tqi07, -TqFr13, +EngTemp06, +NetEng_Acor, +MSs_Ntg  */
 
 
 
