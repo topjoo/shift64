@@ -83,8 +83,15 @@
 
 #define QUAL_3RD_DATA_ITEM_NUM 		32 /* 2023-03-04, +Gsum, +LPFLAcc, +EngTemp06, +NetEng_Acor, +MSs_Ntg  */
 
+#define QUAL_4TH_DOWNSHI_ITEM_NUM 	35 /* 2023-03-09, +MSs_Ntg, New +sTimeMSpos, +MaxMSs, +minMSs  */
+
+
 #define QUAL_FLT_DATA_ITEM_NUM 		31 /* 2023-03-04, +Gavg, +LPFLAcc, +EngTemp06, +NetEng_Acor, +MSs_Ntg  */
 #define QUAL_APS_DATA_ITEM_NUM 		30 /* 2023-03-04, +Gavg, +LPFLAcc, -tqi07, -TqFr13, +EngTemp06, +NetEng_Acor, +MSs_Ntg  */
+
+
+#define QUAL_FLT_Down_ITEM_NUM 		34 /* 2023-03-11,  */
+#define QUAL_VS_Down_ITEM_NUM 		34 /* 2023-03-12  */
 
 
 
