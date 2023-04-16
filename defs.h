@@ -93,6 +93,7 @@
 #define QUAL_FLT_Down_ITEM_NUM 		34 /* 2023-03-11,  */
 #define QUAL_VS_Down_ITEM_NUM 		34 /* 2023-03-12  */
 
+#define QUAL_F_GIL_ITEM_NUM 		33 /* 2023-04-08  */
 
 
 /* ---- Just Debug Message ---- */
