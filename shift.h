@@ -43,7 +43,7 @@
 
 
 
-const char AttVersion[] = "1.5.3"; /* ver 1.4.5 : 2023.3.4 : DownShift - Shift Quality Data Sorting */
+const char AttVersion[] = "1.5.5"; /* ver 1.4.5 : 2023.3.4 : DownShift - Shift Quality Data Sorting */
 const char EmailText[]  = "tp.joo@daum.net";
 
 
@@ -59,6 +59,22 @@ enum {
 	MOT_HEX_S8 = 0x0100,
 	MOT_HEX_S9 = 0x0200
 };
+
+
+enum {
+	RED = 1,
+	GREEN,
+	YELLOW,
+	BLUE,
+	PINK,
+	WHITE,
+	BLACK
+};
+
+#define COLOR_RELEASED 		1
+#define BOLD_SET 			1
+#define BOLD_RELEASED 		0
+
 
 #define AVERAGE(LOW, HIGH) 		(((LOW)&(HIGH)) + ((LOW)^(HIGH))>>1)
 

@@ -344,12 +344,83 @@ char *commify(double val, char *buf, int round)
 
 
 
+void ColorSet(short bold, short blink, short color, short released)
+{
+	
+	if(bold)
+	{
+		fprintf(stderr,"\033[1m");
+	}
+	//fprintf("\033[1;32;5m Hello, World! \033[0m");
+
+	if(blink)
+	{
+		fprintf(stderr,"\033[5m");
+	}
+
+	/* color setting */
+	switch(color)
+	{
+		case RED:
+			if(bold)
+				fprintf(stderr,"\033[1;31m");
+			else
+				fprintf(stderr,"\033[31m");
+			break;
+		case GREEN:
+			if(bold)
+				fprintf(stderr,"\033[1;32m");
+			else
+				fprintf(stderr,"\033[32m");
+			break;
+		case YELLOW:
+			if(bold)
+				fprintf(stderr,"\033[1;33m");
+			else
+				fprintf(stderr,"\033[33m");
+			break;
+		case BLUE:
+			if(bold)
+				fprintf(stderr,"\033[1;34m");
+			else
+				fprintf(stderr,"\033[34m");
+			break;
+		case PINK:
+			if(bold)
+				fprintf(stderr,"\033[1;35m");
+			else
+				fprintf(stderr,"\033[35m");
+			break;
+		case WHITE:
+			if(bold)
+				fprintf(stderr, "\033[1;37m");
+			else
+				fprintf(stderr, "\033[37m");
+			break;
+		case BLACK:
+			if(bold)
+				fprintf(stderr, "\033[1;30m");
+			else
+				fprintf(stderr, "\033[0;30m");
+			break;
+			 
+	}	
+
+	if(released)
+		fprintf(stderr,"\033[0m"); /* RED Color setting */
+}
+
+
+
 void help_brief(void)
 {
 #if SHIFT_QUALITY_DATA_SORTING /* 2023-01-24 */
+
+	ColorSet(1, 0, 0, 0); /* BOLD  setting */
 	fprintf(stderr,"---------------------------------------------------------------\n" );
 	fprintf(stderr," shift.exe %s by TOP.JOO (%s)/ %s \n", AttVersion, EmailText, __DATE__ );
 	fprintf(stderr,"---------------------------------------------------------------\n" );
+	ColorSet(0, 0, 0, COLOR_RELEASED); /* Color setting */
 	
 #else
 
@@ -364,11 +435,11 @@ void help(void)
 {
 #if SHIFT_QUALITY_DATA_SORTING /* 2022-11-13 */
 
-	printf("\nUsage: shift.exe [Version %s, Build:%s] by TOP.JOO. \r\n"
+	printf("\n\033[1mUsage: shift.exe [Version %s, Build:%s] by TOP.JOO. \033[0m\r\n"
 
 #else
 
-    printf("\nUsage: ah.exe [Version %s, Build:%s] by TOP.JOO. \r\n"
+    fprintf(stderr,"\nUsage: ah.exe [Version %s, Build:%s] by TOP.JOO. \r\n"
            "--[ Helps ]----------------------------- -------------------------------------------------------------------------\n"
            "  -h or --help [intel|motorola]          intel    : Intel hex format help.  \n"
            "                                         motorola : Motorola hex format help. \n"
@@ -573,43 +644,52 @@ void help(void)
            " \n"
            "--[ Shift Quality Data Sorting ]-------- -------------------------------------------------------------------------\n"
          /*  "  -U or --upshift [ModeID] [Cont#1] [Jerk#1] [Nt-pos#] [J1Itime#] [J1Ivalue#] [PWR#1] [APS Tol#2] [APS#1] [APS#2] [APS#3]\n" */
-           "  --upshift [ModeID] [Cont#1] [Jerk#1] [Nt-pos#] [J1Itime#] [J1Ivalue#] [PWR#1] [APS Tol#2] [APS#1] [APS#2] [APS#3]\n" 
+           "\033[1m" /* BOLD */
+           "  --upshift [ModeID] [Cont#] [Jerk#] [Nt-pos#] [JItime#] [J1Ivalue#] [APS PWR#] [APS Tol#] [APS#1] [APS#2] [APS#3]\n" 
+           "\033[0m" /* Released */
            "             ModeID : ECO, SPT, NOR and you can add option as .last (default: first position) or gear ratio (.sx2, .gn7) \n"
-           "  Gear Vehicle type : .SX2(default table), .GN7  \n"
-           "             Cont#1 : SB/SP point decision continuous count. (default 3 times decision) \n"
-           "             Jerk#1 : Reverse time length at SB point for Jerk1 calcution. (default 200msec, range:100~2000msec) \n"
+           "         Gear ratio : .SX2(default table), .GN7  \n"
+           "              Cont# : SB/SP point decision continuous count. (default 3 times decision) \n"
+           "              Jerk# : Reverse time length at SB point for Jerk1 calcution. (default 200msec, range:100~2000msec) \n"
            "            Nt-pos# : Before or after time position for Nt-Max/Nt-min position (default: +/-50msec, range:50~200msec) \n"
-           "           J1Itime# : Jerk1 ignored time value (default: 50msec under) \n"
+           "            JItime# : Jerk1 ignored time value (default: 50msec under) \n"
            "          J1Ivalue# : Jerk1 ignored value (default: -10G/sec under). NOTE m10 means -10. \n"
-           "              PWR#1 : APS Power On low level as 3, or 4.5. -> Power On decision level (default 3%%) \n"
-           "          APS Tol#2 : APS Power tolerance as +/-2%%, or +/-3%% (default: +/-2%%) \n"
-           "        APS Start#1 : APS Power Start value. \n"
-           "          APS End#2 : APS Power End value. \n"
-           "         APS Step#3 : APS Power Step. \n"
+           "           APS PWR# : APS Power On low level as 3, or 4.5. -> Power On decision level (default 3%%) \n"
+           "           APS Tol# : APS Power tolerance as +/-2%%, or +/-3%% (default: +/-2%%) \n"
+           "              APS#1 : APS Power Start value. for example 20 \n"
+           "              APS#2 : APS Power End value. for example 100 \n"
+           "              APS#3 : APS Power Step. for example 10 \n"
            "\n"
-           " Ex) shift.exe --input 5ms_16select.tsv --output 5ms_eco.txt --upshift eco.gn7       3 200 50 50 m5 3 2    \n"
-           "     shift.exe --input 5ms_16select.tsv --output 5ms_spt.txt --upshift spt.g2.gn7    2 200 50 50 m10 3 1.5 \n"
-           "     shift.exe --input 5ms_16select.tsv --output 5ms_nor.txt --upshift NOR.last.SX2  5 100 90  \n"
-           "     shift.exe --input 5ms_16select.tsv --output 5ms_nor.txt --upshift spt.last.g2   3 100 70 60 m5 3 2 20 100 10 \n"
-           "     shift.exe --input 5ms_16select.tsv --output 5ms_spt.txt --upshift spt.gn7 \n"
+           " Ex) \033[1mshift.exe\033[0m \033[31m--input\033[0m 5ms_16select.tsv\033[31m --output \033[0m \033[35m5ms_eco.txt\033[0m \033[32m--upshift \033[0m \033[34meco\033[35m.gn7     \033[0m \033[33m 3 200 50 50 m15 3 2    \033[0m \n"
+           "     \033[1mshift.exe\033[0m \033[31m--input\033[0m 5ms_16select.tsv\033[31m --output \033[0m \033[35m5ms_spt.txt\033[0m \033[32m--upshift \033[0m \033[34mspt\033[35m.g1.sx2  \033[0m \033[33m 2 200 50 50 m10 3 1.5  \033[0m \n"
+           "     \033[1mshift.exe\033[0m \033[31m--input\033[0m 5ms_16select.tsv\033[31m --output \033[0m \033[35m5ms_nor.txt\033[0m \033[32m--upshift \033[0m \033[34mNOR\033[35m.last.SX2\033[0m \033[33m 5 100 90               \033[0m \n"
+           "     \033[1mshift.exe\033[0m \033[31m--input\033[0m 5ms_16select.tsv\033[31m --output \033[0m \033[35m5ms_nor.txt\033[0m \033[32m--upshift \033[0m \033[34mspt \033[0m \n"
+           "     \033[1mshift.exe\033[0m \033[31m--input\033[0m 5ms_16select.tsv\033[31m --output \033[0m \033[35m5ms_spt.txt\033[0m \033[32m--upshift \033[0m \033[34mspt \033[0m         \033[33m 3 100 70 60 m5 3 2 20 100 10 \033[0m \n"
            "        -> Sorted result output : 5ms_eco.gil and 5ms_eco.rpt \n"
+           "        -> \033[33mYellow color is optional. \033[0m \n"
            "\n" 
-         /*  "  -D or --downshift [ModeID] [Cont#1] [Jerk1/2#1] [Nt-pos#] [JItime#] [J1Ivalue#] [PWR#1] [VS Tol#1] \n"  */
-           "  --downshift [ModeID] [Cont#1] [Jerk1/2#1] [Nt-pos#] [JItime#] [J1Ivalue#] [PWR#1] [VS Tol#1] \n" 
-           "  Gear Vehicle type : .SX2(default table), .GN7 \n"
+           "\033[1m" /* BOLD */
+           "  --downshift [ModeID] [Cont#1] [Jerk#2] [Nt-pos#] [JItime#] [J1Ivalue#] [J2Ivalue#] [APS PWR#] [VS Tol#] \n" 
+           "\033[0m" /* Released */
+           "             ModeID : ECO, SPT, NOR and you can add option as .last (default: first position) or gear ratio (.sx2, .gn7) \n"
+           "         Gear ratio : .SX2(default table), .GN7 \n"
            "     DownShift type : .skip for skip downshift (default: sequential downshift) \n"
            "             Cont#1 : SB/SP point decision continuous count. (default 3 times decision) \n"
-           "             Jerk#1 : Reverse time length at SB point for Jerk1 calcution. (default 200msec, range:100~2000msec) \n"
+           "             Jerk#2 : Reverse time length at SB point for Jerk1, Jerk2 calcution. (range:100~2000ms) \n"
+           "                      default: 300msec for Skip downshift, 200msec for Sequential downshift \n"
            "            Nt-pos# : Before or after time position for Nt-Max/Nt-min position (default: +/-50msec, range:50~200msec) \n"
-           "           J1Itime# : Jerk1 and Jerk2 ignored time value (default: 50msec under) \n"
-           "          J1Ivalue# : Jerk1 and Jerk2 ignored value (default: -10G/sec under). NOTE m10 means -10. \n"
-           "          APS PWR#1 : APS Power On low level as 3%% or 4%%. (default 3%%) \n"
-           "           VS Tol#2 : Vehicle Speed tolerance as +/-5kph, (default +/-5kph) \n"
+           "            JItime# : Jerk1 and Jerk2 ignored time value (default: 50msec under) \n"
+           "          J1Ivalue# : Jerk1 ignored value (default: -10G/sec under). NOTE m10 means -10. \n"
+           "          J2Ivalue# : Jerk2 ignored value (default: 20G/sec over).  \n"
+           "           APS PWR# : APS Power On low level as 3%% or 4%%. (default 3%%) \n"
+           "            VS Tol# : Vehicle Speed tolerance as +/-5kph, (default +/-5kph) \n"
            "\n"
-           " Ex) shift.exe --input GN7_3.5GDI_PONDOWN_KD.tsv --output gn7_spt.txt --downshift SPT.gn7      3 100 60 70 m9 3 5 \n"
-           "     shift.exe --input GN7_3.5GDI_PONDOWN_KD.tsv --output gn7_eco.txt --downshift eco.skip     3 150 \n"
-           "     shift.exe --input GN7_3.5GDI_PONDOWN_KD.tsv --output gn7_eco.txt --downshift eco.gn7.skip 3 150 \n"
+           " Ex) \033[1mshift.exe\033[0m \033[31m--input\033[0m GN7_3.5GDI_PONDOWN_KD.tsv\033[31m --output\033[0m gn7_spt.txt \033[32m--downshift \033[0m \033[34mSPT\033[35m.gn7      \033[0m \033[33m 3 150 60 70 m15 20 3 5 \033[0m \n"
+           "     \033[1mshift.exe\033[0m \033[31m--input\033[0m GN7_3.5GDI_PONDOWN_KD.tsv\033[31m --output\033[0m gn7_eco.txt \033[32m--downshift \033[0m \033[34meco\033[32m.skip \033[0m    \033[0m  \n"
+           "     \033[1mshift.exe\033[0m \033[31m--input\033[0m GN7_3.5GDI_PONDOWN_KD.tsv\033[31m --output\033[0m gn7_eco.txt \033[32m--downshift \033[0m \033[34meco\033[35m.gn7\033[32m.skip\033[0m  \033[33m 3 250 \033[0m \n"
            "        -> Sorted result output : gn7_spt.gil and gn7_spt.rpt \n"
+           "        -> \033[33mYellow color is optional. \033[0m \n"
+
            "\n"
            " [ModeID]: HOT WUP MNL DN2 DN1 UP1 UP2 UP3 NOR ECO ECODN2 ECODN1 ECOUP1 ECOUP2 ECOUP3 CRZ CRZUP1 CRZUP2 BRK1 BRK2 \n" 
            "           HUP1 HUP2 HUP3 SPTDN2 SPTDN1 SPT SPTUP1 SPTUP2 SPTUP3 SS_XECO SS_ECODN2 SS_ECODN1 SS_ECO SS_ECOUP1 \n" 
@@ -635,12 +715,23 @@ void help(void)
            		AttVersion, __DATE__ , (INT2BIN_MEMORY_SIZE>>20), (MOT2BIN_MEMORY_SIZE>>20) );
 		#endif
 
+#if 0
+	fprintf(stderr, "\033[31mError message in red!\033[0m\n");
+	fprintf(stderr, "\033[32mError message in green!\033[0m\n");
+	fprintf(stderr, "\033[33mError message in yellow!\033[0m\n");
+	fprintf(stderr, "\033[34mError message in blue!\033[0m\n");
+	fprintf(stderr, "\033[35mError message in pink!\033[0m\n");
+
+	fprintf(stderr, "\033[1mThis text is bold!\033[0m\n");
+#endif
+
 	#if 1
 	exit(0);
 	#else
 	printf("Press [ENTER]...\r");
 	#endif
 }
+
 
 
 
@@ -784,9 +875,11 @@ void AllFilesClosed(void)
 
 #define gMax_Before_SB_POINT 	0 /* 5msec * 1 SB point + 5msec lines number */
 #define gmin_Before_SB_POINT 	1 /* 5msec * 1 SB point + 5msec lines number */
-#define JERK_TIME_mSec 			200 /* unit: msec, GMax point (msec) before SB point */
+#define JERK1_TIME_mSec 		200 /* Jerk1 unit: msec, GMax point (msec) before SB point, for Upshift and sequential downshift */
+#define JERK2_TIME_mSec_SKIP 	300 /* unit: msec, GMax point (msec) before SB point, for Skip downshift */
 
-#define JERK_TIME_mSec_SKIP 	300 /* unit: msec, GMax point (msec) before SB point */
+
+#define JERK_TIME_mSec_SKIP 	200 /* unit: msec, GMax point (msec) before SB point */
 
 #define JERK_min_TIME_mSec 		100 /* unit: msec, min 100 msec */
 #define JERK_MAX_TIME_mSec 		2000 /* unit: msec, max 2sec */
@@ -830,6 +923,10 @@ void AllFilesClosed(void)
 #define JERK1_INVALID_VALUE1 	(-10.0f) /* -10G/sec -> invalid */
 #define JERK1_INVALID_VALUE2 	(0.0f)   /* 0G/sec -> invalid */
 #define JERK1_T_INVALID 		(50) /* t = 50msec under -> invalid */
+
+#define JERK2_INVALID_VALUE1 	(20.0f) /* 20G/sec -> invalid */
+#define JERK2_INVALID_VALUE2 	(0.0f)   /* 0G/sec -> invalid */
+#define JERK2_T_INVALID 		(50) /* t = 50msec under -> invalid */
 
 #define MAX_RPT_X_BUF_SIZ 		(15) // (8)
 #define MAX_GEAR_Y_BUF_SIZ 		(20) // 10
@@ -1272,10 +1369,13 @@ static short  VSkphTblUP[VS_TABLE_NUM] = {
 static double fJerk1IgnoreVal = JERK1_INVALID_VALUE1;
 static int iJerk1IgnoreTime = JERK1_T_INVALID; /* abs 50msec under */
 
+static double fJerk2IgnoreVal = JERK2_INVALID_VALUE1;
+static int iJerk2IgnoreTime = JERK2_T_INVALID; /* abs 50msec under */
+
 static double fAPSpwrLvl   = UP_APS_PWR_ON_VAL;
 static double fAPStol      = UP_APS_TOLENANCE;  /* APS tolerance for Upshift */
 static short  iSBdecision  = SB_DECISION_TIMES;
-static int    iJerkTimeLen = JERK_TIME_mSec;
+static int    iJerkTimeLen = JERK1_TIME_mSec;
 static int    iNtTimeLen = NtMax_Before_mSec;
 
 static int 	  iVStolerance = DN_VS_TOLERANCE;  /* VS tolerance for DownShift */
@@ -2559,12 +2659,12 @@ short apsTableIndex(void)
 		}
 	}
 
-	fprintf(stderr,">>APS Table Nums   : %2d (", aps_index );
+	fprintf(stderr,">>APS Table Nums   :\033[32m %2d (", aps_index );
 	for(kk=0; kk<aps_index-1; kk++)
 	{
 		fprintf(stderr,"%d, ", (int)ApsTble[kk] );
 	}
-	fprintf(stderr,"%d) \n", (int)ApsTble[kk] );
+	fprintf(stderr,"%d) \033[0m\n", (int)ApsTble[kk] );
 	
 	return aps_index;
 }
@@ -2584,12 +2684,12 @@ short vsKPHTableIndex(void)
 		}
 	}
 
-	fprintf(stderr,">>VS Table Nums    : %2d (", vs_index );
+	fprintf(stderr,">>VS Table Nums    :\033[32m %2d (", vs_index );
 	for(kk=0; kk<vs_index-1; kk++)
 	{
 		fprintf(stderr,"%d, ", VSkphTblDN[kk] );
 	}
-	fprintf(stderr,"%d) kph \n", VSkphTblDN[kk]);	
+	fprintf(stderr,"%d) kph \033[0m\n", VSkphTblDN[kk]);	
 	
 	return vs_index;
 }
@@ -3140,6 +3240,34 @@ int isShiftType(int shiDir03, int sq_ShiTy12)
 
 
 
+void	MODEColorPrint(short aiPATs05)
+{
+	fprintf(stderr,"\033[1m"); /* BOLD */
+	fprintf(stderr,"\033[32m");
+
+	fprintf(stderr," %s ", arrPATs_ModeID[aiPATs05].ModeID  );
+
+	fprintf(stderr,"\033[0m"); /* color released */
+}
+
+
+void	ShiftTypePrint(int shiDir03)
+{
+	if( SHIFT_SKIP_DN==shiDir03 ) { fprintf(stderr,"\033[32m"); fprintf(stderr,"/ Skip DownShift "); }
+	else if( SHIFT_DN==shiDir03 ) { fprintf(stderr,"\033[34m"); fprintf(stderr,"/ Sequential DownShift "); }
+	else if( SHIFT_UP==shiDir03 ) { fprintf(stderr,"\033[35m"); fprintf(stderr,"/ UpShift "); }
+
+	fprintf(stderr,"\033[0m \r\n"); /* color released */
+}
+
+void	AbnormalRedPrint(void)
+{
+	fprintf(stderr,"\033[31m"); /* RED color */
+	fprintf(stderr," << Abnormal \n");
+	fprintf(stderr,"\033[0m"); /* color released */
+}
+
+
 /* ----------------------------------------------------------------------------- */
 /* DATE & TIME at operating time ----------------------------------------------- */
 /* ----------------------------------------------------------------------------- */
@@ -3548,7 +3676,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 		if( fAPSpwrLvl < 0.0f ) 
 		{
 			fAPSpwrLvl = UP_APS_PWR_ON_VAL; /* default value setting */
-			fprintf(stderr,">>APS default lvl  : %.2lf%% -- UpShift default(3%%) \n", fAPSpwrLvl );
+			fprintf(stderr,">>APS default lvl  :\033[32m %.2lf%% -- UpShift default(3%%) \n", fAPSpwrLvl );
 		}
 		
 		iAPSNum = apsTableIndex();
@@ -3561,11 +3689,11 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 		}
 
 		if(SHIFT_SKIP_DN==shiDir03) 
-			fprintf(stderr,">>APS default lvl  : %.2lf%% -- Skip DownShift default(3%%) \n", fAPSpwrLvl );
+			fprintf(stderr,">>APS default lvl  :\033[32m %.1lf%% -- Skip DownShift default(3%%) \033[0m\n", fAPSpwrLvl );
 		else if( SHIFT_DN==shiDir03 ) 
-			fprintf(stderr,">>APS default lvl  : %.2lf%% -- Sequential DownShift default(3%%) \n", fAPSpwrLvl );
+			fprintf(stderr,">>APS default lvl  :\033[32m %.1lf%% -- Sequential DownShift default(3%%) \033[0m\n", fAPSpwrLvl );
 		else
-			fprintf(stderr,">>APS default lvl  : %.2lf%% -- Check ++++ DownShift default(3%%) \n", fAPSpwrLvl );
+			fprintf(stderr,">>APS default lvl  :\033[31m %.1lf%% -- ++Check Error++ DownShift default(3%%) \033[0m\n", fAPSpwrLvl );
 		
 		ivsKPHNum = vsKPHTableIndex();
 	}
@@ -3576,13 +3704,13 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 	//fprintf(stderr,"\n");
 	//fprintf(stderr,">>ModeID %s Sorting... \n", arrPATs_ModeID[aiPATs05].ModeID );
 	fprintf(stderr,">>Shift Type       : %s \n", (iShiftType==SHI_PWR_ON?"PWR On":(iShiftType==SHI_PWR_OFF?"PWR Off":(iShiftType==SHI_STATIC?"Static":(iShiftType==SHI_N_STOP_DN?"Stop Dn":"Unknown")))) );
-	fprintf(stderr,">>Shift Direction  : %sShift \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Sequential Down": \
+	fprintf(stderr,">>Shift Direction  :\033[32m %sShift \033[0m\n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Sequential Down": \
 		(shiDir03==SHIFT_SKIP_DN?"Skip Down":(shiDir03==SHIFT_SKIP_UP?"SkipUp":"Unknown"))) ));			
 
 	if( 0 == iGearTableIndex )
-		fprintf(stderr,">>Gear Ratio type  : %s (default index:%d) \n", "SX2", iGearTableIndex ); 
+		fprintf(stderr,">>Gear Ratio type  :\033[32m %s (default index:%d) \033[0m\n", "SX2", iGearTableIndex ); 
 	else
-		fprintf(stderr,">>Gear Ratio type  : %s (Index:%d) \n", gVehicleType[iGearTableIndex], iGearTableIndex ); 
+		fprintf(stderr,">>Gear Ratio type  :\033[32m %s (Index:%d) \033[0m\n", gVehicleType[iGearTableIndex], iGearTableIndex ); 
 
 
 	/* ----- Vehicle Gear Type ----- */
@@ -3752,6 +3880,8 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 
 
 	fprintf(stderr,">>Sorting and analyzing SQ Data... Format...  (%d) \n", useInputCase);
+
+
 
 	do
 	{
@@ -4487,10 +4617,14 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 		fprintf(stderr,"  Error Shift Records (NG) ----: %9u lines <- invalid shift data record \n", iNGcount );
 		fprintf(stderr,"  Quality Shift Records (OK) --: %9u lines, %6.1lf min \n", iOKcount, (iOKcount*iavgTime)/TIME_SCALE/60 );
 		fprintf(stderr,"\n");
+		
+		ColorSet(0, 0, RED, 0); /* RED color setting */
 		fprintf(stderr,"  %-11s - Shift Quality Data is NONE... %llu lines \n", arrPATs_ModeID[aiPATs05].ModeID, chkPATs_ModeID[aiPATs05] );
 		fprintf(stderr,"  or *.tsv input file check (order, contents,...) \n");
 		//fprintf(stderr,"  Time, OTS, VSP, TqStnd, iPATs, EngTemp, TQI, cg, APS, No, tg, ShiType, TQFR, ShiPH, Ne, Nt, LAcc \n\n");
 		fprintf(stderr,"  There is NONE Quality Shift Data %-11s -> So STOP!!!! \n", arrPATs_ModeID[aiPATs05].ModeID);
+		ColorSet(0, 0, 0, COLOR_RELEASED); /* Color setting */
+
 		fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
 
 
@@ -5433,10 +5567,10 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 								//gMaxTbl[iSBcount].SBTime     = SBdecision[0].SBTime;  /* first One time choice */ 
 								gMaxTbl[iSScount-1].SBTime     = SBdecision[SBposDecision].SBTime;  /* first posistion or Last Position time choice */ 
 
-								gMaxTbl[iSScount-1].gMx1Begin  = gMaxTbl[iSScount-1].SBTime - iJerkTimeLen*JERK_TIME_SCALE;  /* JERK_TIME_mSec */
+								gMaxTbl[iSScount-1].gMx1Begin  = gMaxTbl[iSScount-1].SBTime - iJerkTimeLen*JERK_TIME_SCALE;  /* JERK1_TIME_mSec */
 								gMaxTbl[iSScount-1].gmn1End    = gMaxTbl[iSScount-1].SBTime; 
 
-								gMaxTbl[iSScount-1].UPNtMaxBegin = gMaxTbl[iSScount-1].SBTime - iNtTimeLen*JERK_TIME_SCALE;	/* UP Shift, JERK_TIME_mSec */
+								gMaxTbl[iSScount-1].UPNtMaxBegin = gMaxTbl[iSScount-1].SBTime - iNtTimeLen*JERK_TIME_SCALE;	/* UP Shift, JERK1_TIME_mSec */
 
 							#if DEBUG_MSG_1ST_POINT_TIME
 									fprintf(stderr,"aaa(%3d)-> SB:%11ld ", iSScount-1, gMaxTbl[iSScount-1].SBTime );
@@ -5477,7 +5611,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 								//gMaxTbl[iSPcount].Index     = iSPcount;
 								//gMaxTbl[iSPcount].SPTime    = SPdecision[0].SBTime;  /* first One time choice */ 
 								gMaxTbl[iSScount-1].SPTime    = SPdecision[SBposDecision].SPTime;  /* first One time choice */ 
-								//gMaxTbl[iSPcount].gmMxBegin = gMaxTbl[iSPcount].SPTime - iJerkTimeLen*JERK_TIME_SCALE;  /* JERK_TIME_mSec */
+								//gMaxTbl[iSPcount].gmMxBegin = gMaxTbl[iSPcount].SPTime - iJerkTimeLen*JERK_TIME_SCALE;  /* JERK1_TIME_mSec */
 
 								gMaxTbl[iSScount-1].UPNtminEnd  = gMaxTbl[iSScount-1].SPTime + iNtTimeLen*JERK_TIME_SCALE;	/* Nt-min end time */
 
@@ -5620,9 +5754,9 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 								gMaxTbl[iSScount-1].SBTime	   = SBdecision[SBposDecision].SBTime;	/* first posistion or Last Position time choice */ 
 								
 								gMaxTbl[iSScount-1].gMx1Begin  = gMaxTbl[iSScount-1].SBTime; 
-								gMaxTbl[iSScount-1].gmn1End    = gMaxTbl[iSScount-1].SBTime + iJerkTimeLen*JERK_TIME_SCALE; /* DownShift - JERK_TIME_mSec */
+								gMaxTbl[iSScount-1].gmn1End    = gMaxTbl[iSScount-1].SBTime + iJerkTimeLen*JERK_TIME_SCALE; /* DownShift - JERK1_TIME_mSec */
 
-								gMaxTbl[iSScount-1].DNNtminBegin = gMaxTbl[iSScount-1].SBTime - iNtTimeLen*JERK_TIME_SCALE;	/* DownShift - JERK_TIME_mSec */
+								gMaxTbl[iSScount-1].DNNtminBegin = gMaxTbl[iSScount-1].SBTime - iNtTimeLen*JERK_TIME_SCALE;	/* DownShift - JERK1_TIME_mSec */
 
 						#if DEBUG_MSG_1ST_POINT_TIME
 									fprintf(stderr,"aaa(%3d)-> DN@SB:%11ld ", iSScount-1, gMaxTbl[iSScount-1].SBTime );
@@ -5663,7 +5797,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 								//gMaxTbl[iSPcount].Index	  = iSPcount;
 								//gMaxTbl[iSPcount].SPTime	  = SPdecision[0].SBTime;  /* first One time choice */ 
 								gMaxTbl[iSScount-1].SPTime	  = SPdecision[SBposDecision].SPTime;  /* first One time choice */ 
-								//gMaxTbl[iSPcount].gmMxBegin = gMaxTbl[iSPcount].SPTime - iJerkTimeLen*JERK_TIME_SCALE;  /* DownShift - JERK_TIME_mSec */
+								//gMaxTbl[iSPcount].gmMxBegin = gMaxTbl[iSPcount].SPTime - iJerkTimeLen*JERK_TIME_SCALE;  /* DownShift - JERK1_TIME_mSec */
 
 								gMaxTbl[iSScount-1].DNNtMaxEnd  = gMaxTbl[iSScount-1].SPTime + iNtTimeLen*JERK_TIME_SCALE;	/* DownShift - Nt-MAX end time */
 
@@ -6701,10 +6835,10 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 								//gMaxTbl[iSBcount].SBTime     = SBdecision[0].SBTime;  /* first One time choice */ 
 								gMaxTbl[iSScount-1].SBTime     = SBdecision[SBposDecision].SBTime;  /* first posistion or Last Position time choice */ 
 
-								gMaxTbl[iSScount-1].gMx1Begin  = gMaxTbl[iSScount-1].SBTime - iJerkTimeLen*JERK_TIME_SCALE;  /* JERK_TIME_mSec */
+								gMaxTbl[iSScount-1].gMx1Begin  = gMaxTbl[iSScount-1].SBTime - iJerkTimeLen*JERK_TIME_SCALE;  /* JERK1_TIME_mSec */
 								gMaxTbl[iSScount-1].gmn1End    = gMaxTbl[iSScount-1].SBTime; 
 
-								gMaxTbl[iSScount-1].UPNtMaxBegin = gMaxTbl[iSScount-1].SBTime - NtMax_Before_mSec*JERK_TIME_SCALE;	/* JERK_TIME_mSec */
+								gMaxTbl[iSScount-1].UPNtMaxBegin = gMaxTbl[iSScount-1].SBTime - NtMax_Before_mSec*JERK_TIME_SCALE;	/* JERK1_TIME_mSec */
 
 							#if 0 //DEBUG_MSG_1ST_POINT_TIME
 									fprintf(stderr,"aaa(%3d)-> SB:%9ld ", iSScount-1, gMaxTbl[iSScount-1].SBTime );
@@ -6749,7 +6883,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 								//gMaxTbl[iSPcount].Index     = iSPcount;
 								//gMaxTbl[iSPcount].SPTime    = SPdecision[0].SBTime;  /* first One time choice */ 
 								gMaxTbl[iSScount-1].SPTime    = SPdecision[SBposDecision].SPTime;  /* first One time choice */ 
-								//gMaxTbl[iSPcount].gmMxBegin = gMaxTbl[iSPcount].SPTime - iJerkTimeLen*JERK_TIME_SCALE;  /* JERK_TIME_mSec */
+								//gMaxTbl[iSPcount].gmMxBegin = gMaxTbl[iSPcount].SPTime - iJerkTimeLen*JERK_TIME_SCALE;  /* JERK1_TIME_mSec */
 
 								gMaxTbl[iSScount-1].UPNtminEnd  = gMaxTbl[iSScount-1].SPTime + Ntmin_After_mSec*JERK_TIME_SCALE;	/* Nt-min end time */
 
@@ -7070,10 +7204,10 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 								//gMaxTbl[iSBcount].SBTime	   = SBdecision[0].SBTime;	/* first One time choice */ 
 								gMaxTbl[iSScount-1].SBTime	   = SBdecision[SBposDecision].SBTime;	/* first posistion or Last Position time choice */ 
 
-								gMaxTbl[iSScount-1].gMx1Begin  = gMaxTbl[iSScount-1].SBTime - iJerkTimeLen*JERK_TIME_SCALE;  /* JERK_TIME_mSec */
+								gMaxTbl[iSScount-1].gMx1Begin  = gMaxTbl[iSScount-1].SBTime - iJerkTimeLen*JERK_TIME_SCALE;  /* JERK1_TIME_mSec */
 								gMaxTbl[iSScount-1].gmn1End    = gMaxTbl[iSScount-1].SBTime; 
 
-								gMaxTbl[iSScount-1].UPNtMaxBegin = gMaxTbl[iSScount-1].SBTime - NtMax_Before_mSec*JERK_TIME_SCALE;	/* JERK_TIME_mSec */
+								gMaxTbl[iSScount-1].UPNtMaxBegin = gMaxTbl[iSScount-1].SBTime - NtMax_Before_mSec*JERK_TIME_SCALE;	/* JERK1_TIME_mSec */
 
 							#if 0 //DEBUG_MSG_1ST_POINT_TIME
 									fprintf(stderr,"aaa(%3d)-> SB:%9ld ", iSScount-1, gMaxTbl[iSScount-1].SBTime );
@@ -7117,7 +7251,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 								//gMaxTbl[iSPcount].Index	  = iSPcount;
 								//gMaxTbl[iSPcount].SPTime	  = SPdecision[0].SBTime;  /* first One time choice */ 
 								gMaxTbl[iSScount-1].SPTime	  = SPdecision[SBposDecision].SPTime;  /* first One time choice */ 
-								//gMaxTbl[iSPcount].gmMxBegin = gMaxTbl[iSPcount].SPTime - iJerkTimeLen*JERK_TIME_SCALE;  /* JERK_TIME_mSec */
+								//gMaxTbl[iSPcount].gmMxBegin = gMaxTbl[iSPcount].SPTime - iJerkTimeLen*JERK_TIME_SCALE;  /* JERK1_TIME_mSec */
 
 								gMaxTbl[iSScount-1].UPNtminEnd  = gMaxTbl[iSScount-1].SPTime + Ntmin_After_mSec*JERK_TIME_SCALE;	/* Nt-min end time */
 
@@ -7411,13 +7545,24 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 
 	//fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
 	fprintf(stderr,"======================================================================================\n" );
+#if 0
 	fprintf(stderr,">>Quality Shift Data Sorting Summary... %s \n", arrPATs_ModeID[aiPATs05].ModeID );
+#else
+	fprintf(stderr,">>Quality Shift Data Sorting Summary... ");
+	ColorSet(1, 0, GREEN, 0); /* GREEN and BOLD Color setting */
+	fprintf(stderr,"%s \n", arrPATs_ModeID[aiPATs05].ModeID );
+	ColorSet(0, 0, 0, COLOR_RELEASED); /* Color setting */
+#endif
+
+	fprintf(stderr,"  Shift type Direction         :\033[32m %sShift \033[0m\n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Sequential Down": \
+		(shiDir03==SHIFT_SKIP_DN?"Skip Down":(shiDir03==SHIFT_SKIP_UP?"SkipUp":"Unknown"))) ));
+
 	if(iSBdecision>=3)
 	{
 		if(0==SBposDecision)
-			fprintf(stderr,"  cont. SB/SP decision Number  : %d times, such as %s ", iSBdecision, PRINT_TXT_SB_SEQ_FIRST );
+			fprintf(stderr,"  cont. SB/SP decision Number  :\033[32m %d times, such as %s \033[0m", iSBdecision, PRINT_TXT_SB_SEQ_FIRST );
 		else
-			fprintf(stderr,"  cont. SB/SP decision Number  : %d times, such as %s ", iSBdecision, PRINT_TXT_SB_SEQ_LAST );
+			fprintf(stderr,"  cont. SB/SP decision Number  :\033[32m %d times, such as %s \033[0m", iSBdecision, PRINT_TXT_SB_SEQ_LAST );
 
 		if(SBposDecision) fprintf(stderr,"- last position \n"); 
 		else fprintf(stderr,"- first position \n"); 
@@ -7425,9 +7570,9 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 	else if(iSBdecision==2)
 	{
 		if(0==SBposDecision)
-			fprintf(stderr,"  cont. SB/SP decision Number  : %d times, such as %s.%s ", iSBdecision, TXT_SBTIME, TXT_SBSWING0 );
+			fprintf(stderr,"  cont. SB/SP decision Number  :\033[32m %d times, such as %s.%s \033[0m", iSBdecision, TXT_SBTIME, TXT_SBSWING0 );
 		else
-			fprintf(stderr,"  cont. SB/SP decision Number  : %d times, such as %s.%s ", iSBdecision, TXT_SBSWING0, TXT_SBTIME );
+			fprintf(stderr,"  cont. SB/SP decision Number  :\033[32m %d times, such as %s.%s \033[0m", iSBdecision, TXT_SBSWING0, TXT_SBTIME );
 
 		if(SBposDecision) fprintf(stderr,"- last position \n"); 
 		else fprintf(stderr,"- first position \n"); 
@@ -7435,13 +7580,19 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 	else if(iSBdecision<=1)
 		fprintf(stderr,"  cont. SB/SP decision Number  : %d (Just One) - SB/SP-point can be determined wrongly. \n", iSBdecision );
 
-	fprintf(stderr,"  Jerk Time length (gMax/gmin) : -%d msec ~ (SB point) ~ %d msec \n", iJerkTimeLen, iavgTime*gMax_Before_SB_POINT );
-	fprintf(stderr,"  Nt-Max/Nt-min Time length    : -%d msec ~ (SB point) / (SP point) ~ +%d msec \n", iNtTimeLen, iNtTimeLen );
-	fprintf(stderr,"  APS Power percent level      : %3.1lf%% \n", fAPSpwrLvl );
-
-	if( SHIFT_DN==shiDir03 || SHIFT_SKIP_DN==shiDir03 )
+	if( SHIFT_UP==shiDir03 )
 	{
-		fprintf(stderr,"  Vehicle Speed Tolerance(kph) : -/+%dkph -- default(-/+%dkph) \n", iVStolerance, DN_VS_TOLERANCE );
+		fprintf(stderr,"  Jerk Time length (gMax/gmin) :\033[32m -%d msec ~ (SB point) ~ %d msec \033[0m\n", iJerkTimeLen, iavgTime*gMax_Before_SB_POINT );
+		fprintf(stderr,"  Nt-Max/Nt-min Time length    :\033[32m -%d msec ~ (SB point) / (SP point) ~ +%d msec \033[0m\n", iNtTimeLen, iNtTimeLen );
+		fprintf(stderr,"  APS Power percent level      :\033[32m %3.1lf%% \033[0m\n", fAPSpwrLvl );
+	}
+	else if( SHIFT_DN==shiDir03 || SHIFT_SKIP_DN==shiDir03 )
+	{
+		fprintf(stderr,"  Jerk Time length (gMax/gmin) :\033[32m (SB/SP point) ~ %d msec \033[0m\n", iJerkTimeLen); //, iavgTime*gMax_Before_SB_POINT );
+		fprintf(stderr,"  Nt-Max/Nt-min Time length    :\033[32m -%d msec ~ (SB point) / (SP point) ~ +%d msec \033[0m\n", iNtTimeLen, iNtTimeLen );
+		fprintf(stderr,"  APS Power percent level      :\033[32m %3.1lf%% \033[0m\n", fAPSpwrLvl );
+
+		fprintf(stderr,"  Vehicle Speed Tolerance(kph) :\033[32m -/+%dkph -- default(-/+%dkph) \033[0m\n", iVStolerance, DN_VS_TOLERANCE );
 	}
 
 	fprintf(stderr,"  Shift Data Time Period ------: %9u msec \n", iavgTime );
@@ -7449,8 +7600,8 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 	fprintf(stderr,"  Shift Average Time(t2:SB~SP) : %9ld msec <- 1st average time \n", avg_t2 );
 	fprintf(stderr,"  Shift Average Time(t3:SP~SF) : %9ld msec <- 1st average time \n", avg_t3 );
 	fprintf(stderr,"  Total Quality Shift Records  : %9llu lines \n", RecordCnt );
-	fprintf(stderr,"  Error Shift Records (NG) ----: %9u lines <- invalid shift data record \n", iNGcount );
-	fprintf(stderr,"  Quality Shift Records (OK) --: %9u lines, %6.1lf min \n", iOKcount, (double)(iOKcount*iavgTime)/TIME_SCALE/60.0 );
+	fprintf(stderr,"  Error Shift Records (NG) ----: %9u lines \033[31m<- invalid shift data record \033[0m\n", iNGcount );
+	fprintf(stderr,"  Quality Shift Records (OK) --:\033[32m %9u lines, %6.1lf min \033[0m \n", iOKcount, (double)(iOKcount*iavgTime)/TIME_SCALE/60.0 );
 
 
 	totChkModeID = 0;
@@ -7494,14 +7645,14 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 	{
 		fprintf(stderr,">>Shift Quality Data is NONE in this option %s ", arrPATs_ModeID[aiPATs05].ModeID );
 
-		if( SHIFT_UP==shiDir03 )
-			fprintf(stderr," / UpShift \n\n");
-		else if( SHIFT_DN==shiDir03 )
-			fprintf(stderr," / Sequential DownShift \n\n");
-		else if( SHIFT_SKIP_DN==shiDir03 )
-			fprintf(stderr," / Skip DownShift \n\n");
-		else
-			fprintf(stderr,"\n\n");
+	#if 0
+		if( SHIFT_SKIP_DN==shiDir03 ) fprintf(stderr," / Skip DownShift \n\n");
+		else if( SHIFT_DN==shiDir03 ) fprintf(stderr," / Sequential DownShift \n\n");
+		else if( SHIFT_UP==shiDir03 ) fprintf(stderr," / UpShift \n\n");
+		else fprintf(stderr,"\n\n");
+	#else
+		ShiftTypePrint(shiDir03);
+	#endif
 
 		fprintf(stderr,">>Check out the summary above... \n");
 		fprintf(stderr,"  Analysis result has NO Quality Sorting Data...\n");
@@ -7643,12 +7794,16 @@ int SSnNtPointFix(short aiPATs05, short SBposDecision, int shiDir03, tSQData_Pai
 
 	if( (SPoint.SSnum==SPoint.SBnum) && (SPoint.SBnum==SPoint.SPnum) && (SPoint.SSnum==SPoint.SPnum) )
 	{
-		fprintf(stderr,">>Counter %s ...... Origin > SS(%d), SB(%d), SP(%d), SF(%d) - Same OK!!! \n", arrPATs_ModeID[aiPATs05].ModeID, SPoint.SSnum, SPoint.SBnum, SPoint.SPnum, SPoint.SFnum );
+		fprintf(stderr,">>Counter");
+		MODEColorPrint( aiPATs05 );
+		fprintf(stderr,"...... Origin > SS(%d), SB(%d), SP(%d), SF(%d) - Same OK!!! \n", SPoint.SSnum, SPoint.SBnum, SPoint.SPnum, SPoint.SFnum );
 	}
 	else if( (SPoint.SStot>SPoint.SBtot) || (SPoint.SStot>SPoint.SPtot) )
 	//else if( (SPoint.SStot>SPoint.SBtot && SPoint.SBtot==SPoint.SPtot && SPoint.SStot>SPoint.SPtot) )
 	{
-		fprintf(stderr,">>Counter %s ...... Adjust > SS(%d), SB(%d), SP(%d), SF(%d) - SS More!!! \n", arrPATs_ModeID[aiPATs05].ModeID, SPoint.SStot, SPoint.SBtot, SPoint.SPtot, SPoint.SFtot );
+		fprintf(stderr,">>Counter");
+		MODEColorPrint( aiPATs05 );
+		fprintf(stderr,"...... Adjust > SS(%d), SB(%d), SP(%d), SF(%d) - SS More!!! \n", SPoint.SStot, SPoint.SBtot, SPoint.SPtot, SPoint.SFtot );
 
 		for(ii=0; ii<SPoint.SStot; ii++)
 		{
@@ -8001,17 +8156,17 @@ int SSnNtPointFix(short aiPATs05, short SBposDecision, int shiDir03, tSQData_Pai
 
 							if( SHIFT_UP == shiDir03 )
 							{
-								gMaxTbl[iSScount-1].UPNtMaxBegin = gMaxTbl[iSScount-1].SBTime - iNtTimeLen*JERK_TIME_SCALE; /* UpShift - JERK_TIME_mSec */
+								gMaxTbl[iSScount-1].UPNtMaxBegin = gMaxTbl[iSScount-1].SBTime - iNtTimeLen*JERK_TIME_SCALE; /* UpShift - JERK1_TIME_mSec */
 
-								gMaxTbl[iSScount-1].gMx1Begin  = gMaxTbl[iSScount-1].SBTime - iJerkTimeLen*JERK_TIME_SCALE;	/* JERK_TIME_mSec */
+								gMaxTbl[iSScount-1].gMx1Begin  = gMaxTbl[iSScount-1].SBTime - iJerkTimeLen*JERK_TIME_SCALE;	/* JERK1_TIME_mSec */
 								gMaxTbl[iSScount-1].gmn1End    = gMaxTbl[iSScount-1].SBTime;
 							}
 							else if( SHIFT_DN == shiDir03 || SHIFT_SKIP_DN == shiDir03 )
 							{
-								gMaxTbl[iSScount-1].DNNtminBegin = gMaxTbl[iSScount-1].SBTime - iNtTimeLen*JERK_TIME_SCALE; /* DownShift - JERK_TIME_mSec */
+								gMaxTbl[iSScount-1].DNNtminBegin = gMaxTbl[iSScount-1].SBTime - iNtTimeLen*JERK_TIME_SCALE; /* DownShift - JERK1_TIME_mSec */
 
 								gMaxTbl[iSScount-1].gMx1Begin  = gMaxTbl[iSScount-1].SBTime; 
-								gMaxTbl[iSScount-1].gmn1End    = gMaxTbl[iSScount-1].SBTime + iJerkTimeLen*JERK_TIME_SCALE;	/* JERK_TIME_mSec */
+								gMaxTbl[iSScount-1].gmn1End    = gMaxTbl[iSScount-1].SBTime + iJerkTimeLen*JERK_TIME_SCALE;	/* JERK1_TIME_mSec */
 							}
 
 
@@ -8104,7 +8259,7 @@ int SSnNtPointFix(short aiPATs05, short SBposDecision, int shiDir03, tSQData_Pai
 								gMaxTbl[iSScount-1].DNNtMaxEnd  = gMaxTbl[iSScount-1].SPTime + iNtTimeLen*JERK_TIME_SCALE;	/* DownShift - Nt-Max end time */
 
 								gMaxTbl[iSScount-1].gmn2Begin   = gMaxTbl[iSScount-1].SPTime; 
-								gMaxTbl[iSScount-1].gMx2End     = gMaxTbl[iSScount-1].SPTime + iJerkTimeLen*JERK_TIME_SCALE; /* JERK_TIME_mSec */
+								gMaxTbl[iSScount-1].gMx2End     = gMaxTbl[iSScount-1].SPTime + iJerkTimeLen*JERK_TIME_SCALE; /* JERK1_TIME_mSec */
 
 							}
 
@@ -8349,17 +8504,17 @@ int SSnNtPointFix(short aiPATs05, short SBposDecision, int shiDir03, tSQData_Pai
 
 						if( SHIFT_UP == shiDir03 )
 						{
-							gMaxTbl[iSScount-1].UPNtMaxBegin = gMaxTbl[iSScount-1].SBTime - iNtTimeLen*JERK_TIME_SCALE; /* UpShift - JERK_TIME_mSec */
+							gMaxTbl[iSScount-1].UPNtMaxBegin = gMaxTbl[iSScount-1].SBTime - iNtTimeLen*JERK_TIME_SCALE; /* UpShift - JERK1_TIME_mSec */
 
-							gMaxTbl[iSScount-1].gMx1Begin  = gMaxTbl[iSScount-1].SBTime - iJerkTimeLen*JERK_TIME_SCALE;	/* JERK_TIME_mSec */
+							gMaxTbl[iSScount-1].gMx1Begin  = gMaxTbl[iSScount-1].SBTime - iJerkTimeLen*JERK_TIME_SCALE;	/* JERK1_TIME_mSec */
 							gMaxTbl[iSScount-1].gmn1End    = gMaxTbl[iSScount-1].SBTime;
 						}
 						else if( SHIFT_DN == shiDir03 || SHIFT_SKIP_DN == shiDir03 )
 						{
-							gMaxTbl[iSScount-1].DNNtminBegin = gMaxTbl[iSScount-1].SBTime - iNtTimeLen*JERK_TIME_SCALE; /* DownShift - JERK_TIME_mSec */
+							gMaxTbl[iSScount-1].DNNtminBegin = gMaxTbl[iSScount-1].SBTime - iNtTimeLen*JERK_TIME_SCALE; /* DownShift - JERK1_TIME_mSec */
 
 							gMaxTbl[iSScount-1].gMx1Begin  = gMaxTbl[iSScount-1].SBTime; 
-							gMaxTbl[iSScount-1].gmn1End    = gMaxTbl[iSScount-1].SBTime + iJerkTimeLen*JERK_TIME_SCALE;	/* JERK_TIME_mSec */
+							gMaxTbl[iSScount-1].gmn1End    = gMaxTbl[iSScount-1].SBTime + iJerkTimeLen*JERK_TIME_SCALE;	/* JERK1_TIME_mSec */
 						}
 
 						iSBcount++;
@@ -8406,7 +8561,7 @@ int SSnNtPointFix(short aiPATs05, short SBposDecision, int shiDir03, tSQData_Pai
 							gMaxTbl[iSScount-1].DNNtMaxEnd	= gMaxTbl[iSScount-1].SPTime + iNtTimeLen*JERK_TIME_SCALE;	/* DownShift - Nt-Max end time */
 						
 							gMaxTbl[iSScount-1].gmn2Begin	= gMaxTbl[iSScount-1].SPTime; 
-							gMaxTbl[iSScount-1].gMx2End 	= gMaxTbl[iSScount-1].SPTime + iJerkTimeLen*JERK_TIME_SCALE; /* JERK_TIME_mSec */
+							gMaxTbl[iSScount-1].gMx2End 	= gMaxTbl[iSScount-1].SPTime + iJerkTimeLen*JERK_TIME_SCALE; /* JERK1_TIME_mSec */
 
 						}
 
@@ -8832,7 +8987,7 @@ int SSnNtPointFix(short aiPATs05, short SBposDecision, int shiDir03, tSQData_Pai
 
 				gMaxTbl[ii].ignored = IGN_BECAUSE_OT_SP2SF;
 
-				fprintf(stderr," %5d (SS time: %12.4lf) : SP~SF time over!! (%4.1lf sec) <- invalid time.. \n", 
+				fprintf(stderr," %5d (SS time: %12.4lf) : SP~SF time over!! (%.1lf sec) <- invalid time.. \n", 
 					ii, (double)((gMaxTbl[ii].SSTime)/TIME_SCALE/JERK_TIME_SCALE), (double)((gMaxTbl[ii].SFTime - gMaxTbl[ii].SPTime)/TIME_SCALE/JERK_TIME_SCALE) );
 			}
 
@@ -8862,8 +9017,10 @@ int SSnNtPointFix(short aiPATs05, short SBposDecision, int shiDir03, tSQData_Pai
 			avg_t2 /= (iSScount-ignored2ndCnt);
 			avg_t3 /= (iSScount-ignored2ndCnt);
 		}
-		fprintf(stderr,">>2nd Average Time Measurement --- SS(%d), SB(%d), SP(%d), SF(%d) Records.. %s \n", 
-			iSScount-ignored2ndCnt, iSBcount-ignored2ndCnt, iSPcount-ignored2ndCnt, iSFcount-ignored2ndCnt, arrPATs_ModeID[aiPATs05].ModeID );
+		fprintf(stderr,">>2nd Average Time Measurement --- SS(%d), SB(%d), SP(%d), SF(%d) Records.. ", 
+			iSScount-ignored2ndCnt, iSBcount-ignored2ndCnt, iSPcount-ignored2ndCnt, iSFcount-ignored2ndCnt );
+		MODEColorPrint( aiPATs05 );
+		fprintf(stderr,"\r\n");
 		fprintf(stderr,"  Shift Average Time(t1:SS~SB) : %9ld msec <- 2nd average time  \n", avg_t1 );
 		fprintf(stderr,"  Shift Average Time(t2:SB~SP) : %9ld msec <- 2nd average time  \n", avg_t2 );
 		fprintf(stderr,"  Shift Average Time(t3:SP~SF) : %9ld msec <- 2nd average time  \n", avg_t3 );
@@ -9266,9 +9423,16 @@ int ignored_QSData(short aiPATs05, short SBposDecision, int shiDir03, tSQData_Pa
 			avg_t2 /= (iSScount-ignoredRecord);
 			avg_t3 /= (iSScount-ignoredRecord);
 		}
-		
+	#if 0
 		fprintf(stderr,">>3rd Average Time Measurement --- SS(%d), SB(%d), SP(%d), SF(%d) Records.. %s \n", 
 			iSScount-ignoredRecord, iSBcount-ignoredRecord, iSPcount-ignoredRecord, iSFcount-ignoredRecord, arrPATs_ModeID[aiPATs05].ModeID );
+	#else
+		fprintf(stderr,">>3rd Average Time Measurement --- SS(%d), SB(%d), SP(%d), SF(%d) Records..", 
+			iSScount-ignoredRecord, iSBcount-ignoredRecord, iSPcount-ignoredRecord, iSFcount-ignoredRecord );
+		MODEColorPrint( aiPATs05 );
+		fprintf(stderr,"\r\n");
+	#endif
+	
 		fprintf(stderr,"  Shift Average Time(t1:SS~SB) : %9ld msec <- 3rd average time  ign(%d==%d) \n", avg_t1, ignoredRecord, ignoredCount );
 		fprintf(stderr,"  Shift Average Time(t2:SB~SP) : %9ld msec <- 3rd average time  \n", avg_t2 );
 		fprintf(stderr,"  Shift Average Time(t3:SP~SF) : %9ld msec <- 3rd average time  \n", avg_t3 );
@@ -9922,13 +10086,27 @@ int FindGminMaxShiftData(short aiPATs05, tSQData_PairCheck_type SPoint, int shiD
 
 	if( SHIFT_UP==shiDir03 )
 	{
+	#if 0
 		fprintf(stderr,">>Searched Jerk1 G-Max/G-min %s before SB point --- SS(%d), SB(%d), SP(%d), SF(%d) \r\n", 
 						arrPATs_ModeID[aiPATs05].ModeID, SPoint.SStot, SPoint.SBtot, SPoint.SPtot, SPoint.SFtot );
+	#else
+		fprintf(stderr,">>Searched Jerk1 G-Max/G-min"); 
+		MODEColorPrint( aiPATs05 );
+		fprintf(stderr,"before SB point --- SS(%d), SB(%d), SP(%d), SF(%d) \r\n", 
+						SPoint.SStot, SPoint.SBtot, SPoint.SPtot, SPoint.SFtot );
+	#endif
 	}
 	else if( (SHIFT_DN==shiDir03) || (SHIFT_SKIP_DN==shiDir03) )
 	{
+	#if 0
 		fprintf(stderr,">>Searched Jerk1 G-Max/G-min %s after SB point --- SS(%d), SB(%d), SP(%d), SF(%d) \r\n", 
 						arrPATs_ModeID[aiPATs05].ModeID, SPoint.SStot, SPoint.SBtot, SPoint.SPtot, SPoint.SFtot );
+	#else
+		fprintf(stderr,">>Searched Jerk1 G-Max/G-min");
+		MODEColorPrint( aiPATs05 );
+		fprintf(stderr,"after SB point --- SS(%d), SB(%d), SP(%d), SF(%d) \r\n", 
+						SPoint.SStot, SPoint.SBtot, SPoint.SPtot, SPoint.SFtot );
+	#endif
 	}
 
 	//if(inpfile) fclose(inpfile);
@@ -11540,9 +11718,17 @@ int FindGminMax2ShiftData(short aiPATs05, tSQData_PairCheck_type SPoint, int shi
 
 
 	if( (SHIFT_DN==shiDir03) || (SHIFT_SKIP_DN==shiDir03) )
+	{
+#if 0
 		fprintf(stderr,">>Searched Jerk2 G-min/G-Max %s after SP point --- SS(%d), SB(%d), SP(%d), SF(%d)   \r\n", 
 					arrPATs_ModeID[aiPATs05].ModeID, SPoint.SStot, SPoint.SBtot, SPoint.SPtot, SPoint.SFtot );
-
+#else
+		fprintf(stderr,">>Searched Jerk2 G-min/G-Max");
+		MODEColorPrint( aiPATs05 );
+		fprintf(stderr,"after SP point --- SS(%d), SB(%d), SP(%d), SF(%d)	\r\n", 
+					SPoint.SStot, SPoint.SBtot, SPoint.SPtot, SPoint.SFtot );
+#endif
+	}
 	//fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
 
 #if 0
@@ -12778,13 +12964,22 @@ unsigned int ShiftData_Filtering(short aiPATs05, int avgTime, int shiDir03, shor
 			fclose(fp2in);
 			fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
 			//fprintf(stderr,">>Shift Quality Data Filtering completed!!! %s [%s] -> [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, shi_out ); 			
+		#if 0
 			fprintf(stderr,">>Shift Quality Data Filtering completed!!! %s ", arrPATs_ModeID[aiPATs05].ModeID ); 			
+		#else
+			fprintf(stderr,">>Shift Quality Data Filtering completed!!! "); 			
+			MODEColorPrint( aiPATs05 );
+		#endif
 
+		#if 0
 			if( SHIFT_SKIP_DN==shiDir03 ) fprintf(stderr,"/ Skip DownShift \r\n");
 			else if( SHIFT_DN==shiDir03 ) fprintf(stderr,"/ Sequential DownShift \r\n");
 			else if( SHIFT_UP==shiDir03 ) fprintf(stderr,"/ UpShift \r\n");
 			else fprintf(stderr,"\r\n");
-
+		#else
+			ShiftTypePrint(shiDir03);
+		#endif
+		
 			break;
 		}
 
@@ -13719,9 +13914,17 @@ unsigned int ShiftData_Filtering(short aiPATs05, int avgTime, int shiDir03, shor
 
 					gTimeDiff = (sq3[0].Time01 - gSBtime);
 
+				#if 0
 					fprintf(stderr," %5d (SS time: %12.4lf) : G-Min and G-min overlaps << Abnormal \n", 
 						iSScount-1, gMaxTbl[iSScount-1].SSTime/TIME_SCALE/JERK_TIME_SCALE );
+				#else
+					fprintf(stderr," %5d (SS time: %12.4lf) : 1st G-Max and G-min overlaps ", 
+						iSScount-1, gMaxTbl[iSScount-1].SSTime/TIME_SCALE/JERK_TIME_SCALE );
 
+					fprintf(stderr,"\033[31m"); /* RED color */
+					fprintf(stderr," << Abnormal \n");
+					fprintf(stderr,"\033[0m"); /* color released */
+				#endif
 				}
 
 				
@@ -13914,9 +14117,13 @@ unsigned int ShiftData_Filtering(short aiPATs05, int avgTime, int shiDir03, shor
 							strcat(sq3[0].sTimePos, TXT_g2SAME);
 						}
 				
-						fprintf(stderr," %5d (SS time: %12.4lf) : 2nd G2-min and G2-Max overlaps << Abnormal \n", 
+						fprintf(stderr," %5d (SS time: %12.4lf) : 2nd G2-min and G2-Max overlaps ", 
 							iSScount-1, gMaxTbl[iSScount-1].SSTime/TIME_SCALE/JERK_TIME_SCALE );
-				
+
+						fprintf(stderr,"\033[31m"); /* RED color */
+						fprintf(stderr," << Abnormal \n");
+						fprintf(stderr,"\033[0m"); /* color released */
+
 					}
 				}
 
@@ -15606,12 +15813,21 @@ unsigned int APSData_Filtering(short aiPATs05, int avgTime, int shiDir03, short 
 #endif
 	
 	//fprintf(stderr,">>APS Filtering Sorted result file as below: %s %s \n", arrPATs_ModeID[aiPATs05].ModeID, shift_file );
+#if 0
 	fprintf(stderr,">>NONE Data Filtering Sorted result file as below: %s ", arrPATs_ModeID[aiPATs05].ModeID );
-	
+#else
+	fprintf(stderr,">>NONE Data Filtering Sorted result file as below: ");
+	MODEColorPrint( aiPATs05 );
+#endif
+
+	#if 0
 	if( SHIFT_SKIP_DN==shiDir03 ) fprintf(stderr,"/ Skip DownShift \n");
 	else if( SHIFT_DN==shiDir03 ) fprintf(stderr,"/ Sequential DownShift \n");
 	else if( SHIFT_UP==shiDir03 ) fprintf(stderr,"/ UpShift \n");
 	else                          fprintf(stderr," \n");
+	#else
+	ShiftTypePrint(shiDir03);
+	#endif
 
 
 	for(ii=0; ii<iSScount; ii++)
@@ -15689,9 +15905,10 @@ unsigned int APSData_Filtering(short aiPATs05, int avgTime, int shiDir03, short 
 		fprintf(stderr,"   SB Point Counts--%-10s : %3u / %3u points \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), SPoint->SBtot, SPoint->SBnum );
 		fprintf(stderr,"   SP Point Counts--%-10s : %3u / %3u points \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), SPoint->SPtot, SPoint->SPnum );
 		fprintf(stderr,"   SF Point Counts--%-10s : %3u / %3u points \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), SPoint->SFtot, SPoint->SFnum );
-
 		fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
-		fprintf(stderr,"   STOP it !!!!!\n\n");
+		fprintf(stderr,"\033[31m"); /* RED color */
+		fprintf(stderr,"   STOP it because of above!!!\n\n");
+		fprintf(stderr,"\033[0m"); /* color released */
 	}
 	return iignoredCnt;
 	
@@ -16186,8 +16403,9 @@ int ShiftData_LastSorting(short aiPATs05, int avgTime, int shiDir03, short iSBch
 	
 		iGILidx = iTblminIdx;
 
+		MODEColorPrint( aiPATs05 );
 		if( icurGear+1 == itgtGear )
-			fprintf(stderr, "  %s UpShift Start ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, icurGear, itgtGear );
+			fprintf(stderr, " UpShift Start ... curGear(%d), tgtGear(%d) \n", icurGear, itgtGear );
 	}
 	else if( SHIFT_DN==shiDir03 || SHIFT_SKIP_DN==shiDir03 ) 
 	{
@@ -16626,7 +16844,8 @@ int ShiftData_LastSorting(short aiPATs05, int avgTime, int shiDir03, short iSBch
 		icurMaxGear = Txt2GilSort[0].curGear08;
 		itgtMaxGear = Txt2GilSort[0].tgtGear11;
 
-		fprintf(stderr, "  %s DownShift Start ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, icurMaxGear, icurMaxGear-1 );
+		MODEColorPrint( aiPATs05 );
+		fprintf(stderr, " DownShift Start ... curGear(%d), tgtGear(%d) \n", icurMaxGear, icurMaxGear-1 );
 
 		for(ii=0; ii<t2gIndex; ii++)
 		{
@@ -16677,16 +16896,17 @@ int ShiftData_LastSorting(short aiPATs05, int avgTime, int shiDir03, short iSBch
 		icurGear--;
 		itgtGear--;
 
+		MODEColorPrint( aiPATs05 );
 		if( icurGear+1 == itgtGear )
-			fprintf(stderr, "  %s UpShift Ended ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, icurGear, itgtGear	);
+			fprintf(stderr, " UpShift Ended ... curGear(%d), tgtGear(%d) \n", icurGear, itgtGear	);
 	}
 	else if( SHIFT_DN==shiDir03 || SHIFT_SKIP_DN==shiDir03 ) 
 	{
 		icurMinGear++;
 		itgtMinGear++;
 
-		//if( icurMaxGear == itgtMaxGear )
-			fprintf(stderr, "  %s DownShift Ended ... curGear(%d), tgtGear(%d) \n", arrPATs_ModeID[aiPATs05].ModeID, icurMinGear, itgtMinGear-1  );
+		MODEColorPrint( aiPATs05 );
+		fprintf(stderr, " DownShift Ended ... curGear(%d), tgtGear(%d) \n", icurMinGear, itgtMinGear-1  );
 	}
 
 
@@ -16826,8 +17046,16 @@ int ShiftData_LastSorting(short aiPATs05, int avgTime, int shiDir03, short iSBch
 		fprintf(stderr,"ERROR === iPosCount (%d/%d) \n\n", iPosCount[0], iPosCount[1] );
 	}
 
+#if 0
 	fprintf(stderr,">>Average Time after Last Sorting... SS(%d), SB(%d), SP(%d), SF(%d) Records. %s \n", 
 						iSScountot, iSBcountot, iSPcountot, iSFcountot, arrPATs_ModeID[aiPATs05].ModeID );
+#else
+	fprintf(stderr,">>Average Time after Last Sorting... SS(%d), SB(%d), SP(%d), SF(%d) Records. ", 
+						iSScountot, iSBcountot, iSPcountot, iSFcountot);
+	MODEColorPrint( aiPATs05 );
+	fprintf(stderr,"\r\n");
+#endif
+
 	fprintf(stderr,"  Shift Average Time(t1:SS~SB) : %9ld msec <- by %d points \n", avg_t1, (iPosCount[0]) );
 	fprintf(stderr,"  Shift Average Time(t2:SB~SP) : %9ld msec <- by %d points \n", avg_t2, (iPosCount[0]) );
 	fprintf(stderr,"  Shift Average Time(t3:SP~SF) : %9ld msec <- by %d points \n", avg_t3, (iPosCount[0]) );
@@ -16841,11 +17069,21 @@ int ShiftData_LastSorting(short aiPATs05, int avgTime, int shiDir03, short iSBch
 	}
 
 	fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
+#if 0
 	fprintf(stderr,">>Shift Quality Data Sorting finished!!! %s ", arrPATs_ModeID[aiPATs05].ModeID );
+#else
+	fprintf(stderr,">>Shift Quality Data Sorting finished!!! ");
+	MODEColorPrint( aiPATs05 );
+#endif
+
+	#if 0
 	if( SHIFT_SKIP_DN==shiDir03 ) fprintf(stderr,"/ Skip DownShift \r\n");
 	else if( SHIFT_DN==shiDir03 ) fprintf(stderr,"/ Sequential DownShift \r\n");
 	else if( SHIFT_UP==shiDir03 ) fprintf(stderr,"/ UpShift \r\n");
 	else                          fprintf(stderr," \r\n");
+	#else
+	ShiftTypePrint(shiDir03);
+	#endif
 
 	//fprintf(stderr,">>Shift Quality Data Sorting finished!!! %s [%s] -> [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, output  );
 
@@ -18250,6 +18488,7 @@ int t1t2GraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 		isDrawing = 0;
 		for(xx=0; xx<xxMax; xx++)
 		{
+			//fprintf(stderr, "yy(%d/%d) %d [%s] valid(%d) \n", xx, yy, tblV2[ xx ][ yy ].value, tblV2[ xx ][ yy ].gearTxt, yyCurValid[yy] );
 			if( tblV2[ xx ][ yy ].value ) isDrawing = 1;
 		}	
 
@@ -18259,9 +18498,7 @@ int t1t2GraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 		}
 		/* ----------------------------------- */
 		/* ----------------------------------- */
-		
 
-		
 		if( (yy>0) )
 		{
 			/* ------------- */
@@ -18301,19 +18538,20 @@ int t1t2GraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 				switch(gType)
 				{
 				case 1:
-					fprintf(outfile,"%6s%4s", tblV1[ xx ][ yy ].gearTxt, "" ); 				
+					fprintf(outfile,"%7s%3s", tblV1[ xx ][ yy ].gearTxt, "" ); 	/* (12) (87) */
 					break;
 				case 2:
-					fprintf(outfile,"%6s%-4.1lf", tblV1[ xx ][ yy ].gearTxt, (tblV1[ xx ][ yy ].value /TIME_SCALE/(float)TIME_FACTOR) );
+					fprintf(outfile,"%5s%-5.2lf", tblV1[ xx ][ yy ].gearTxt, (tblV1[ xx ][ yy ].value /TIME_SCALE/(float)TIME_FACTOR) );
 					break;
 
 				case 0:
 				default:
-					fprintf(outfile,"%6s%4s", tblV1[ xx ][ yy ].symbol, "" );					
+					fprintf(outfile,"%6s%4s", tblV1[ xx ][ yy ].symbol, "" ); /* a, g, j, k */
 					break;
 				}
 			}
 		}
+
 
 	}
 
@@ -18321,8 +18559,10 @@ int t1t2GraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 	/* ---------------------------------------------- */
 	/* 1st -- End Line : Y-axis */
 	/* ---------------------------------------------- */
+#if 0
 	fprintf(outfile,"\n");
 	fprintf(outfile,"%9s|","");
+#endif
 	fprintf(outfile,"\n");
 	fprintf(outfile,"%9s|","");
 	fprintf(outfile,"\n");
@@ -18410,22 +18650,22 @@ int t1t2GraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 		{
 			if( 0 == tblV2[ xx ][ yy ].value ) 
 			{
-				fprintf(outfile," %5s%4s","","" ); // ".."
+				fprintf(outfile,"%6s%4s","","" ); // ".."
 			}
 			else
 			{
 				switch(gType)
 				{
 				case 1:
-					fprintf(outfile," %5s%4s", tblV2[ xx ][ yy ].gearTxt, "" ); 				
+					fprintf(outfile,"%7s%3s", tblV2[ xx ][ yy ].gearTxt, "" ); 				
 					break;
 				case 2:
-					fprintf(outfile," %5s%-4.1lf", tblV2[ xx ][ yy ].gearTxt, (tblV2[ xx ][ yy ].value /TIME_SCALE/(float)TIME_FACTOR) );
+					fprintf(outfile,"%5s%-5.2lf", tblV2[ xx ][ yy ].gearTxt, (tblV2[ xx ][ yy ].value /TIME_SCALE/(float)TIME_FACTOR) );
 					break;
 
 				case 0:
 				default:
-					fprintf(outfile," %5s%4s", tblV2[ xx ][ yy ].symbol, "" );					
+					fprintf(outfile,"%6s%4s", tblV2[ xx ][ yy ].symbol, "" );					
 					break;
 				}
 			}
@@ -18437,8 +18677,10 @@ int t1t2GraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 	/* ---------------------------------------------- */
 	/* 2nd -- End Line : Y-axis */
 	/* ---------------------------------------------- */
+	#if 0
 	fprintf(outfile,"\n");
 	fprintf(outfile,"%9s|","");
+	#endif
 	fprintf(outfile,"\n");
 	fprintf(outfile,"%9s|","");
 	fprintf(outfile,"\n");
@@ -18754,9 +18996,9 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 #endif
 
 
-	gYMaxt1 /= (float)RPT_JERK_SCALE;
-	gYMaxt0 /= (float)RPT_JERK_SCALE;
-	gYMaxt2 /= (float)RPT_NE_SCALE;
+	gYMaxt1 /= (float)RPT_JERK_SCALE; /* for Jerk1 */
+	gYMaxt0 /= (float)RPT_JERK_SCALE; /* for Jerk2 */
+	gYMaxt2 /= (float)RPT_NE_SCALE;   /* for Ne-Max */
 
 	gYmint1 /= (float)RPT_JERK_SCALE;
 	gYmint0 /= (float)RPT_JERK_SCALE;
@@ -18773,7 +19015,7 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 	fprintf(outfile,"%9s|","");
 	fprintf(outfile,"\n");
 
-	/* ----------- Jerk1 1t Graph ------------------ */
+	/* ----------- 1st Jerk1 Graph ------------------ */
 	for(yy=0; yy<=yyMax; yy++)
 	{
 		/* ----------------------------------- */
@@ -18797,26 +19039,6 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 			fprintf(outfile,"\n");
 			fprintf(outfile,"%9s|","");
 			fprintf(outfile,"\n");
-
-			// ----------------------------------
-			// 1st JERK Table Value
-			// ----------------------------------
-			if(2==gType) /* shift and value, for example <1-2>1.2 */
-			{
-				for(xx=0; xx<xxMax; xx++)
-				{
-					if( 0 == tblV1[ xx ][ yy ].value ) 
-					{
-						fprintf(outfile," %5s%4s"," ","");
-					}
-					else
-					{
-						fprintf(outfile," %-9.2lf", (tblV1[ xx ][ yy ].value/(float)RPT_JERK_SCALE) );
-					}
-				}
-				fprintf(outfile,"\n"); /// NEW
-				fprintf(outfile,"%9s|","");
-			}
 		}
 
 		if(yy==0)
@@ -18832,6 +19054,27 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 			fprintf(outfile,"%9s|", "");
 		}
 
+		
+		// ----------------------------------
+		// 1st JERK1 Value
+		// ----------------------------------
+		if(2==gType) /* shift and value, for example <1-2>1.2 */
+		{
+			for(xx=0; xx<xxMax; xx++)
+			{
+				if( 0 == tblV1[ xx ][ yy ].value ) 
+				{
+					fprintf(outfile,"%6s%4s","","");
+				}
+				else
+				{
+					fprintf(outfile,"%2s%-8.3lf", "",(float)(tblV1[ xx ][ yy ].value/(float)RPT_JERK_SCALE) );
+				}
+			}
+			fprintf(outfile,"\n"); /// NEW
+			fprintf(outfile,"%9s|","");
+		}
+
 
 		/* ----------------------------- */
 		/* 1st JERK graph -------- */
@@ -18840,19 +19083,19 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 		{
 			if( 0 == tblV1[ xx ][ yy ].value ) 
 			{
-				fprintf(outfile," %5s%4s","","");  /* */
+				fprintf(outfile,"%6s%4s","","");  /* */
 			}
 			else
 			{
 				if( (0==yy || yy==yyMax) && xx==xxMax-1 )
 				{
-					if(gType) fprintf(outfile," %5s%4s", tblV1[ xx ][ yy ].gearTxt, "" ); /* shift, for example <1-2> */
-					if(0==gType) fprintf(outfile," %4s%5s", tblV1[ xx ][ yy ].symbol, "" ); /* 0 means symbol only */
+					if(gType) fprintf(outfile,"%7s%3s", tblV1[ xx ][ yy ].gearTxt, "" ); /* shift, for example <1-2> */
+					if(0==gType) fprintf(outfile,"%6s%4s", tblV1[ xx ][ yy ].symbol, "" ); /* 0 means symbol only */
 				}
 				else
 				{
-					if(gType) fprintf(outfile," %5s%4s", tblV1[ xx ][ yy ].gearTxt, "" ); /* shift, for example <1-2> */
-					if(0==gType) fprintf(outfile," %4s%5s", tblV1[ xx ][ yy ].symbol, "" ); /* 0 means symbol only */
+					if(gType) fprintf(outfile,"%7s%3s", tblV1[ xx ][ yy ].gearTxt, "" ); /* shift, for example <1-2> */
+					if(0==gType) fprintf(outfile,"%6s%4s", tblV1[ xx ][ yy ].symbol, "" ); /* 0 means symbol only */
 				}
 			}
 		}
@@ -18863,7 +19106,7 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 	if( 0==gType )
 	{
 		/* ------------------------------------ */
-		/* 1st JERK area */
+		/* 1st JERK1 area */
 		/* ------------------------------------ */		
 		fprintf(outfile,"\n");
 		fprintf(outfile,"%9s|","");
@@ -18875,7 +19118,7 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 		fprintf(outfile,"%9s|","");
 
 		// ----------------------------------
-		// 1st JERK Table Value
+		// 1st JERK1 Table Value
 		// ----------------------------------
 		if(2==gType)
 		{
@@ -18883,23 +19126,22 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 			{
 				if( 0 == tblV1[ xx ][ yy ].value ) 
 				{
-					fprintf(outfile," %5s%4s","  ","");
+					fprintf(outfile,"%6s%4s","","");
 				}
 				else
 				{
-					fprintf(outfile," %-9.2lf", (tblV1[ xx ][ yy ].value /(float)RPT_JERK_SCALE) );
+					fprintf(outfile,"%2s%-8.2lf", "", (float)(tblV1[ xx ][ yy ].value /(float)RPT_JERK_SCALE) );
 				}
 			}
-			fprintf(outfile,"\n"); /// NEW
-			fprintf(outfile,"%9s|","ss");
 		}
 		fprintf(outfile,"\n");
 	}
 
-
+#if 0
 	fprintf(outfile,"%9s|","");
 	fprintf(outfile,"\n");
-
+#endif
+	
 	fprintf(outfile,"%9s+","");
 	for(ii=0; ii<SPACE_DOWN_ONE; ii++) fprintf(outfile,"-");
 	if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile,"-");
@@ -18911,8 +19153,7 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 		fprintf(outfile," %9d", VSkphTblDN[xx] );
 	}
 	fprintf(outfile,"       kph \n");
-	fprintf(outfile,"\n");
-	fprintf(outfile,"\n");
+	fprintf(outfile,"\n\n");
 
 	/* ==================================================================== */
 	/* ==================================================================== */
@@ -18953,25 +19194,6 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 			fprintf(outfile,"\n");
 			fprintf(outfile,"%9s|","");
 			fprintf(outfile,"\n");
-
-			// ----------------------------------
-			// 1st JERK Table Value
-			// ----------------------------------
-			if(2==gType) /* shift and value, for example <1-2>1.2 */
-			{
-				for(xx=0; xx<xxMax; xx++)
-				{
-					if( 0 == tblV0[ xx ][ yy ].value ) 
-					{
-						fprintf(outfile," %5s%4s"," ","");
-					}
-					else
-					{
-						fprintf(outfile," %-9.2lf", (tblV0[ xx ][ yy ].value/(float)RPT_JERK_SCALE) );
-					}
-				}
-				fprintf(outfile,"%10s|","");
-			}
 		}
 
 		if(yy==0)
@@ -18987,6 +19209,26 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 			fprintf(outfile,"%9s|", "");
 		}
 
+		
+		// ----------------------------------
+		// 1st JERK2 Value
+		// ----------------------------------
+		if(2==gType) /* shift and value, for example <1-2>1.2 */
+		{
+			for(xx=0; xx<xxMax; xx++)
+			{
+				if( 0 == tblV0[ xx ][ yy ].value ) 
+				{
+					fprintf(outfile,"%6s%4s"," ","");
+				}
+				else
+				{
+					fprintf(outfile,"%2s%-8.3lf", "", (float)(tblV0[ xx ][ yy ].value/(float)RPT_JERK_SCALE) );
+				}
+			}
+			fprintf(outfile,"\n"); /// NEW
+			fprintf(outfile,"%9s|","");
+		}
 
 		/* ----------------------------- */
 		/* 1st JERK graph -------- */
@@ -18995,19 +19237,19 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 		{
 			if( 0 == tblV0[ xx ][ yy ].value ) 
 			{
-				fprintf(outfile," %5s%4s","","");  /* */
+				fprintf(outfile,"%6s%4s","","");  /* */
 			}
 			else
 			{
 				if( (0==yy || yy==yyMax) && xx==xxMax-1 )
 				{
-					if(gType) fprintf(outfile," %5s%4s", tblV0[ xx ][ yy ].gearTxt, "" ); /* shift, for example <1-2> */
-					if(0==gType) fprintf(outfile," %4s%5s", tblV0[ xx ][ yy ].symbol, "" ); /* 0 means symbol only */
+					if(gType) fprintf(outfile,"%7s%3s", tblV0[ xx ][ yy ].gearTxt, "" ); /* shift, for example <1-2> */
+					if(0==gType) fprintf(outfile,"%6s%4s", tblV0[ xx ][ yy ].symbol, "" ); /* 0 means symbol only */
 				}
 				else
 				{
-					if(gType) fprintf(outfile," %5s%4s", tblV0[ xx ][ yy ].gearTxt, "" ); /* shift, for example <1-2> */
-					if(0==gType) fprintf(outfile," %4s%5s", tblV0[ xx ][ yy ].symbol, "" ); /* 0 means symbol only */
+					if(gType) fprintf(outfile,"%7s%3s", tblV0[ xx ][ yy ].gearTxt, "" ); /* shift, for example <1-2> */
+					if(0==gType) fprintf(outfile,"%6s%4s", tblV0[ xx ][ yy ].symbol, "" ); /* 0 means symbol only */
 				}
 			}
 		}
@@ -19018,7 +19260,7 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 	if( 0==gType )
 	{
 		/* ------------------------------------ */
-		/* 2nd JERK area */
+		/* 2nd JERK2 area */
 		/* ------------------------------------ */		
 		fprintf(outfile,"\n");
 		fprintf(outfile,"%9s|","");
@@ -19038,24 +19280,22 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 			{
 				if( 0 == tblV0[ xx ][ yy ].value ) 
 				{
-					if( (0==yy || yy==yyMax-1) && xx==xxMax-1 )
-						fprintf(outfile," %5s%4s","  ","");
-					else
-						fprintf(outfile," %5s%4s","  ","");
+					fprintf(outfile,"%6s%4s","","");
 				}
 				else
 				{
-					fprintf(outfile," %-9.2lf", (tblV0[ xx ][ yy ].value /(float)RPT_JERK_SCALE) );
+					fprintf(outfile,"%2s%-8.2lf", "", (float)(tblV0[ xx ][ yy ].value /(float)RPT_JERK_SCALE) );
 				}
 			}
-			fprintf(outfile,"%10s|","");
+			//fprintf(outfile,"%10s|","");
 		}
 		fprintf(outfile,"\n");
 	}
 
-
+#if 0
 	fprintf(outfile,"%9s|","");
 	fprintf(outfile,"\n");
+#endif
 
 	fprintf(outfile,"%9s+","");
 	for(ii=0; ii<SPACE_DOWN_ONE; ii++) fprintf(outfile,"-");
@@ -19068,7 +19308,7 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 		fprintf(outfile," %9d", VSkphTblDN[xx] );
 	}
 	fprintf(outfile,"       kph \n");
-	fprintf(outfile,"\n");
+	fprintf(outfile,"\n\n");
 
 	/* ==================================================================== */
 	/* ==================================================================== */
@@ -19076,7 +19316,7 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 
 
 	/* ---------------------------------------------- */
-	/* 2nd GRAPH-- Y-axis Title Disply ------- */
+	/* 3rd Ne-Max GRAPH-- Y-axis Title Disply ------- */
 	/* ---------------------------------------------- */
 	fprintf(outfile,"\n");
 	fprintf(outfile,"\n");
@@ -19086,7 +19326,7 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 	fprintf(outfile,"%9s|","");
 	fprintf(outfile,"\n");
 
-	/* ----------- 2nd GRAPH Ne MAX Graph ------------------ */
+	/* ----------- 3rd Ne MAX Graph ------------------ */
 	for(yy=0; yy<=yyMax; yy++)
 	{
 
@@ -19112,25 +19352,6 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 			fprintf(outfile,"\n");
 			fprintf(outfile,"%9s|","");
 			fprintf(outfile,"\n");
-
-			// ----------------------------------
-			// Ne MAX, Right Table Value
-			// ----------------------------------
-			if(2==gType) /* shift and value, for example <1-2>1.2 */
-			{
-				for(xx=0; xx<xxMax; xx++)
-				{
-					if( 0 == tblV2[ xx ][ yy ].value ) 
-					{
-						fprintf(outfile," %5s%4s"," ","");
-					}
-					else
-					{
-						fprintf(outfile," %-9.2lf", (tblV2[ xx ][ yy ].value /(float)RPT_NE_SCALE) );
-					}
-				}
-			}
-
 		}
 
 
@@ -19148,6 +19369,27 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 		}
 
 
+		
+		// ----------------------------------
+		// Ne MAX Value
+		// ----------------------------------
+		if(2==gType) /* shift and value, for example <1-2>1.2 */
+		{
+			for(xx=0; xx<xxMax; xx++)
+			{
+				if( 0 == tblV2[ xx ][ yy ].value ) 
+				{
+					fprintf(outfile,"%6s%4s"," ","");
+				}
+				else
+				{
+					fprintf(outfile,"%2s%-8.2lf", "", (float)(tblV2[ xx ][ yy ].value /(float)RPT_NE_SCALE) );
+				}
+			}
+			fprintf(outfile,"\n"); /// NEW
+			fprintf(outfile,"%9s|","");
+		}
+
 	#if 1
 		if( isDrawing )
 		{
@@ -19155,13 +19397,13 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 			{
 				if( (0==yy || yy==yyMax) && xx==xxMax-1 )
 				{
-					if(gType) fprintf(outfile," %5s%4s", tblV2[ xx ][ yy ].gearTxt, "" );
-					if(0==gType) fprintf(outfile," %4s%5s", tblV2[ xx ][ yy ].symbol, "" );
+					if(gType) fprintf(outfile,"%7s%3s", tblV2[ xx ][ yy ].gearTxt, "" );
+					if(0==gType) fprintf(outfile,"%6s%4s", tblV2[ xx ][ yy ].symbol, "" );
 				}
 				else
 				{
-					if(gType) fprintf(outfile," %5s%4s", tblV2[ xx ][ yy ].gearTxt, "" );
-					if(0==gType) fprintf(outfile," %4s%5s", tblV2[ xx ][ yy ].symbol, "" );
+					if(gType) fprintf(outfile,"%7s%3s", tblV2[ xx ][ yy ].gearTxt, "" );
+					if(0==gType) fprintf(outfile,"%6s%4s", tblV2[ xx ][ yy ].symbol, "" );
 				}
 			}
 
@@ -19171,19 +19413,19 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 		{
 			if( 0 == tblV2[ xx ][ yy ].value ) 
 			{
-				fprintf(outfile," %5s%4s"," ","");
+				fprintf(outfile,"%6s%4s"," ","");
 			}
 			else
 			{
 				if( (0==yy || yy==yyMax) && xx==xxMax-1 )
 				{
-					if(gType) fprintf(outfile," %5s%4s", tblV2[ xx ][ yy ].gearTxt, "" );
-					if(0==gType) fprintf(outfile," %4s%5s", tblV2[ xx ][ yy ].symbol, "" );
+					if(gType) fprintf(outfile,"%7s%3s", tblV2[ xx ][ yy ].gearTxt, "" );
+					if(0==gType) fprintf(outfile,"%6s%4s", tblV2[ xx ][ yy ].symbol, "" );
 				}
 				else
 				{
-					if(gType) fprintf(outfile," %5s%4s", tblV2[ xx ][ yy ].gearTxt, "" );
-					if(0==gType) fprintf(outfile," %4s%5s", tblV2[ xx ][ yy ].symbol, "" );
+					if(gType) fprintf(outfile,"%7s%3s", tblV2[ xx ][ yy ].gearTxt, "" );
+					if(0==gType) fprintf(outfile,"%6s%4s", tblV2[ xx ][ yy ].symbol, "" );
 				}
 				
 			}
@@ -19195,7 +19437,7 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 	if( 0==gType )
 	{
 		/* ------------------------------------ */
-		/* 2nd GRAPH area */
+		/* 3rd Ne-Max GRAPH area */
 		/* ------------------------------------ */		
 		fprintf(outfile,"\n");
 		fprintf(outfile,"%9s|","");
@@ -19207,7 +19449,7 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 		fprintf(outfile,"%9s|","");
 
 		// ----------------------------------
-		// Right Table Value
+		// 3rd Ne-Max Table Value
 		// ----------------------------------
 		if(2==gType)
 		{
@@ -19215,23 +19457,21 @@ int JerkGraphAferQsortDown(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData
 			{
 				if( 0 == tblV2[ xx ][ yy ].value ) 
 				{
-					if( (0==yy || yy==yyMax-1) && xx==xxMax-1 )
-						fprintf(outfile," %5s%4s","  ","");
-					else
-						fprintf(outfile," %5s%4s","  ","");
+					fprintf(outfile,"%6s%4s","","");
 				}
 				else
 				{
-					fprintf(outfile," %-9.2lf", (tblV2[ xx ][ yy ].value /(float)RPT_NE_SCALE) );
+					fprintf(outfile,"%2s%-8.2lf", "", (float)(tblV2[ xx ][ yy ].value /(float)RPT_NE_SCALE) );
 				}
 			}
 		}
 		fprintf(outfile,"\n");
 	}
 
-
+#if 0
 	fprintf(outfile,"%9s|","");
 	fprintf(outfile,"\n");
+#endif
 
 	fprintf(outfile,"%9s+","");
 	for(ii=0; ii<SPACE_DOWN_ONE; ii++) fprintf(outfile,"-");
@@ -19586,12 +19826,21 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 	index = 0;
 	memset( yyCurValid, 0x00, sizeof(yyCurValid) );
 
-
+	#if 0
 	fprintf(stderr,">>Abnormal cases are as below %s ", arrPATs_ModeID[aiPATs05].ModeID );
+	#else
+	fprintf(stderr,">>Abnormal cases are as below ");
+	MODEColorPrint( aiPATs05 );
+	#endif
+
+	#if 0
 	if( SHIFT_SKIP_DN==shiDir03 ) fprintf(stderr,"/ Skip DownShift \r\n");
 	else if( SHIFT_DN==shiDir03 ) fprintf(stderr,"/ Sequential DownShift \r\n");
 	else if( SHIFT_UP==shiDir03 ) fprintf(stderr,"/ UpShift \r\n");
 	else                          fprintf(stderr,"\r\n");
+	#else
+	ShiftTypePrint(shiDir03);
+	#endif
 
 
 	do
@@ -19609,11 +19858,21 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 			
 			fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
 			//fprintf(stderr,">>Shift Quality Data final Report!!! %s [%s] -> [%s] \r\n", arrPATs_ModeID[aiPATs05].ModeID, shi_inp, shi_out  );			
+		#if 0
 			fprintf(stderr,">>Shift Quality Data final Report!!! %s ", arrPATs_ModeID[aiPATs05].ModeID );			
+		#else
+			fprintf(stderr,">>Shift Quality Data final Report!!! ");
+			MODEColorPrint( aiPATs05 );
+		#endif
+
+		#if 0
 			if( SHIFT_SKIP_DN==shiDir03 ) fprintf(stderr,"/ Skip DownShift \r\n");
 			else if( SHIFT_DN==shiDir03 ) fprintf(stderr,"/ Sequential DownShift \r\n");
 			else if( SHIFT_UP==shiDir03 ) fprintf(stderr,"/ UpShift \r\n");
 			else						  fprintf(stderr," \r\n");	
+		#else
+			ShiftTypePrint(shiDir03);
+		#endif
 
 			break;
 		}
@@ -19846,8 +20105,12 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 						sq4[idxSP].TableIdx < 0 || 
 						sq4[idxSF].TableIdx < 0 )
 					{
-						fprintf(stderr,"  *Out of APS Power Table      : SSTime %12.5lf, SS(%.1lf),SB(%.1lf),SP(%.1lf),SF(%.1lf) << Abnormal \n", 
+						fprintf(stderr,"  *Out of APS Power Table      : SSTime %12.5lf, SS(%.1lf),SB(%.1lf),SP(%.1lf),SF(%.1lf) ", 
 									sq4[idxSS].Time01, sq4[idxSS].APS09, sq4[idxSB].APS09, sq4[idxSP].APS09, sq4[idxSF].APS09 );
+
+						fprintf(stderr,"\033[31m"); /* RED color */
+						fprintf(stderr," << Abnormal \r\n");
+						fprintf(stderr,"\033[0m"); /* color released */
 
 						is2File = 0; /* File NOT Saved!! */
 					}
@@ -19860,9 +20123,24 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 						(sq4[idxJerk].deltams <= iJerk1IgnoreTime /* JERK1_T_INVALID */) )
 					{
 				
-						fprintf(stderr,"  *Jerk1, Jerk1-Time range err : SSTime %12.5lf, %6.3lf / %3dms   << Abnormal \n", 
-									sq4[idxSS].Time01, sq4[idxJerk].fJerk1, sq4[idxJerk].deltams );
+						if( 0==strcmp( sq4[idxgSame].sTimeGpos, TXT_g1SAME) )
+						{
+							fprintf(stderr,"  *Jerk1, Jerk1-Time range err : SSTime %12.5lf, 1st G- same point(SB-%dms) ", 
+										sq4[idxSS].Time01, (int)(sq4[idxgSame].DiffTime*TIME_SCALE) );	
 
+							fprintf(stderr,"\033[31m"); /* RED color */
+							fprintf(stderr," << Abnormal \r\n");
+							fprintf(stderr,"\033[0m"); /* color released */
+						}
+						else
+						{
+							fprintf(stderr,"  *Jerk1, Jerk1-Time range err : SSTime %12.5lf, %6.3lf/ %3dms ", 
+										sq4[idxSS].Time01, sq4[idxJerk].fJerk1, sq4[idxJerk].deltams );
+
+							fprintf(stderr,"\033[31m"); /* RED color */
+							fprintf(stderr," << Abnormal \r\n");
+							fprintf(stderr,"\033[0m"); /* color released */
+						}
 						//memset( (void*)&sq4[idxJerk], 0x00, sizeof(sqdAps_type) );
 						is2File = 0; /* DO NOT Saved to File !! */
 					}
@@ -20174,27 +20452,43 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 						sq4[idxMSmn].TableIdx < 0 */  )
 					{
 						is2File = 0; /* DO NOT Saved !!! */
-						fprintf(stderr,"  *Out of Vehicle Speed Table  : SSTime %12.5lf, SS(%.1lf),SB(%.1lf),SP(%.1lf),SF(%.1lf) << Abnormal \n", 
+						fprintf(stderr,"  *Out of Vehicle Speed Table  : SSTime %12.5lf, SS(%.1lf),SB(%.1lf),SP(%.1lf),SF(%.1lf) ", 
 									sq4[idxSS].Time01, sq4[idxSS].VSP03, sq4[idxSB].VSP03, sq4[idxSP].VSP03, sq4[idxSF].VSP03  );
+
+						fprintf(stderr,"\033[31m"); /* RED color */
+						fprintf(stderr," << Abnormal \r\n");
+						fprintf(stderr,"\033[0m"); /* color released */
 					}
 				
 					else if( sq4[idxNSS].curGear08 != sq4[idxSS].curGear08 )
 					{
 						is2File = 0; /* DO NOT Saved !!! */
-						fprintf(stderr,"  *DownShift gear changing err : SSTime %12.5lf, NSHS(%d) -> SS(%d/%d)   << Abnormal \n", 
+						fprintf(stderr,"  *DownShift gear changing err : SSTime %12.5lf, NSHS(%d) -> SS(%d/%d) ", 
 									sq4[idxSS].Time01, sq4[idxNSS].curGear08, sq4[idxSS].curGear08, sq4[idxSS].tgtGear11 );
+
+						fprintf(stderr,"\033[31m"); /* RED color */
+						fprintf(stderr," << Abnormal \r\n");
+						fprintf(stderr,"\033[0m"); /* color released */
 					}
 					else if( (sq4[idxSS].DiffTime*NO_SHIFT_UNIT) < NO_SHIFT_START_KEEP_TIME ) /* 1sec under -> skip */
 					{
 						is2File = 0; /* DO NOT Saved !!! */
-						fprintf(stderr,"  *NoShift Begin Keep Time     : SSTime %12.5lf, %3dms/ default(%dms) << Abnormal \n", 
+						fprintf(stderr,"  *NoShift Begin Keep Time     : SSTime %12.5lf, %3dms/ default(%dms) ", 
 									sq4[idxSS].Time01, (int)(sq4[idxSS].DiffTime*NO_SHIFT_UNIT), (int)(NO_SHIFT_START_KEEP_TIME) );
+
+						fprintf(stderr,"\033[31m"); /* RED color */
+						fprintf(stderr," << Abnormal \r\n");
+						fprintf(stderr,"\033[0m"); /* color released */
 					}
 					else if( (sq4[idxNSE].DiffTime*NO_SHIFT_UNIT) < NO_SHIFT_ENDED_KEEP_TIME ) /* 1sec under -> skip */
 					{
 						is2File = 0; /* DO NOT Saved !!! */
-						fprintf(stderr,"  *NoShift End Keep Time(%d->%d) : SSTime %12.5lf, %3dms/ default(%dms) << Abnormal \n", 
+						fprintf(stderr,"  *NoShift End Keep Time(%d->%d) : SSTime %12.5lf, %3dms/ default(%dms) ", 
 									sq4[idxSS].curGear08, sq4[idxNSE].curGear08, sq4[idxSS].Time01, (int)(sq4[idxNSE].DiffTime*NO_SHIFT_UNIT), (int)(NO_SHIFT_ENDED_KEEP_TIME) );
+
+						fprintf(stderr,"\033[31m"); /* RED color */
+						fprintf(stderr," << Abnormal \r\n");
+						fprintf(stderr,"\033[0m"); /* color released */
 					}
 					
 					/* ----------------------------------------------------
@@ -20217,29 +20511,42 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 						(sq4[idxJerk].deltams <= iJerk1IgnoreTime /* JERK1_T_INVALID */)  )
 					{
 				
-						fprintf(stderr,"  *Jerk1, Jerk1-Time range err : SSTime %12.5lf, %6.3lf / %3dms << Abnormal", 
-									sq4[idxSS].Time01, sq4[idxJerk].fJerk1, sq4[idxJerk].deltams );
-
 						if( 0==strcmp( sq4[idxgSame].sTimeGpos, TXT_g1SAME) )
-							fprintf(stderr," << 1st G- Same point \n");
+						{
+							fprintf(stderr,"  *Jerk1, Jerk1-Time range err : SSTime %12.5lf, 1st G- same point(SB+%dms) ", 
+										sq4[idxSS].Time01, (int)(sq4[idxgSame].DiffTime*TIME_SCALE) );	
+						}
 						else
-							fprintf(stderr,"\n");
+						{
+							fprintf(stderr,"  *Jerk1, Jerk1-Time range err : SSTime %12.5lf, %6.3lf/ %3dms ", 
+										sq4[idxSS].Time01, sq4[idxJerk].fJerk1, sq4[idxJerk].deltams );
+						}
+
+						fprintf(stderr,"\033[31m"); /* RED color */
+						fprintf(stderr," << Abnormal \r\n");
+						fprintf(stderr,"\033[0m"); /* color released */
 
 						//memset( (void*)&sq4[idxJerk], 0x00, sizeof(sqdAps_type) );
 						is2File = 0; /* File NOT Saved!! */
 					}
 				
-					if( (sq4[idxJerk2].fJerk2 >= fabs(fJerk1IgnoreVal) /* JERK1_INVALID_VALUE1 */ ) || 
-						(sq4[idxJerk2].deltams2 <= iJerk1IgnoreTime /* JERK1_T_INVALID */) )
+					if( (sq4[idxJerk2].fJerk2 >= fabs(fJerk2IgnoreVal) /* JERK2_INVALID_VALUE1 */ ) || 
+						(sq4[idxJerk2].deltams2 <= iJerk2IgnoreTime /* JERK2_T_INVALID */) )
 					{
-					
-						fprintf(stderr,"  *Jerk2, Jerk2-Time range err : SSTime %12.5lf, %6.3lf / %3dms << Abnormal", 
-									sq4[idxSS].Time01, sq4[idxJerk2].fJerk2, sq4[idxJerk2].deltams2 );
-
 						if( 0==strcmp( sq4[idxg2Same].sTimeGpos, TXT_g2SAME) )
-							fprintf(stderr," << 2nd G- Same point \n");
+						{
+							fprintf(stderr,"  *Jerk2, Jerk2-Time range err : SSTime %12.5lf, 2nd G- same point(SP+%dms) ", 
+										sq4[idxSS].Time01, (int)(sq4[idxg2Same].DiffTime*TIME_SCALE) );
+						}
 						else
-							fprintf(stderr,"\n");
+						{
+							fprintf(stderr,"  *Jerk2, Jerk2-Time range err : SSTime %12.5lf, %6.3lf/ %3dms ", 
+										sq4[idxSS].Time01, sq4[idxJerk2].fJerk2, sq4[idxJerk2].deltams2 );
+						}
+
+						fprintf(stderr,"\033[31m"); /* RED color */
+						fprintf(stderr," << Abnormal \r\n");
+						fprintf(stderr,"\033[0m"); /* color released */
 
 						//memset( (void*)&sq4[idxJerk2], 0x00, sizeof(sqdAps_type) );
 						is2File = 0; /* File NOT Saved!! */
@@ -20253,8 +20560,12 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 						ssApsMin > sq4[idxSP].APS09 || sq4[idxSP].APS09 > ssApsMax ||
 						ssApsMin > sq4[idxSF].APS09 || sq4[idxSF].APS09 > ssApsMax )
 					{
-						fprintf(stderr,"  *Out of APS Power Level      : SSTime %12.5lf, SS(%.1lf),SB(%.1lf),SP(%.1lf),SF(%.1lf) << Abnormal \n", 
+						fprintf(stderr,"  *Out of APS Power Level      : SSTime %12.5lf, SS(%.1lf),SB(%.1lf),SP(%.1lf),SF(%.1lf) ", 
 									sq4[idxSS].Time01, sq4[idxSS].APS09, sq4[idxSB].APS09, sq4[idxSP].APS09, sq4[idxSF].APS09 );
+
+						fprintf(stderr,"\033[31m"); /* RED color */
+						fprintf(stderr," << Abnormal \r\n");
+						fprintf(stderr,"\033[0m"); /* color released */
 
 						is2File = 0; /* File NOT Saved!! */
 					}
@@ -20264,9 +20575,13 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 					{
 						if( (int)(sq4[idxkickDown].DiffTime * TIME_SCALE) > KICK_IN_TIME_MS )
 						{
-							fprintf(stderr,"  *Out of KickDown SS(%d/%d)->%d  : SSTime %12.5lf, KickDown Time:%dms/ default(%dms) << Abnormal \n", 
+							fprintf(stderr,"  *Out of KickDown SS(%d/%d)->%d  : SSTime %12.5lf, KickDown Time:%dms/ default(%dms) ", 
 										sq4[idxSS].curGear08, sq4[idxSS].tgtGear11, sq4[idxSF].tgtGear11, sq4[idxSS].Time01, (int)(sq4[idxkickDown].DiffTime * TIME_SCALE), KICK_IN_TIME_MS );
-							
+
+							fprintf(stderr,"\033[31m"); /* RED color */
+							fprintf(stderr," << Abnormal \r\n");
+							fprintf(stderr,"\033[0m"); /* color released */
+
 							is2File = 0; /* File NOT Saved!! */
 						}
 					}
@@ -21051,7 +21366,7 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 
 		t1t2GraphAferQsortDown(tblT1, tblT2, xxMax, yyMax, yymin, yyCurValid, gValueDisplay);
 
-		fprintf(outfile,"\r\n\r\n\r\n");
+		fprintf(outfile,"\r\n\n\n");
 
 
 
@@ -21261,7 +21576,7 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 	else if( 0 == iReportCount )
 	{
 		fprintf(outfile,"\r\n\n\n");
-		fprintf(outfile,"  There is NONE Quality Sorting Data... \n");
+		fprintf(outfile,"  There are no quality sorting data result... \n");
 		fprintf(outfile,"  Please check *.tsv (%s) file. \n", shift_in);
 		fprintf(outfile,"\r\n");
 	}
@@ -21278,22 +21593,35 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 
 	if( SHIFT_DN==shiDir03 || SHIFT_SKIP_DN==shiDir03 ) 
 	{
-	fprintf(stderr,"  Ignored Jerk2 Time Value     : <= %dms (default: %dmsec)\n", iJerk1IgnoreTime, JERK1_T_INVALID );
-	fprintf(stderr,"  Ignored Jerk2 Value          : >= %.1lfG/s (default: %.1lfG/sec) \n", fabs(fJerk1IgnoreVal), fabs(JERK1_INVALID_VALUE1) );
+	fprintf(stderr,"  Ignored Jerk2 Time Value     : <= %dms (default: %dmsec)\n", iJerk2IgnoreTime, JERK2_T_INVALID );
+	fprintf(stderr,"  Ignored Jerk2 Value          : >= %.1lfG/s (default: %.1lfG/sec) \n", fabs(fJerk2IgnoreVal), fabs(JERK2_INVALID_VALUE1) );
 	}
 
 
 	fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
+#if 0
 	fprintf(stderr,">>Final Sorted result report   : %s %s ", shi_out, arrPATs_ModeID[aiPATs05].ModeID );
+#else
+	fprintf(stderr,">>Final Sorted result report   : %s", shi_out );
+	MODEColorPrint( aiPATs05 );
+#endif
+
+#if 0
 	if( SHIFT_SKIP_DN==shiDir03 ) fprintf(stderr,"/ Skip DownShift \r\n");
 	else if( SHIFT_DN==shiDir03 ) fprintf(stderr,"/ Sequential DownShift \r\n");
 	else if( SHIFT_UP==shiDir03 ) fprintf(stderr,"/ UpShift \r\n");
 	else                          fprintf(stderr," \r\n");	
+#else
+	ShiftTypePrint(shiDir03);
+#endif
+
 	fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
 
 	if( 0==iReportCount )
 	{
-		fprintf(stderr,"  Quality Sorting Data is NONE... No data in [%s] file...\n", shi_out);
+		ColorSet(BOLD_SET, 0, RED, 0);
+		fprintf(stderr,"  There are no quality sorting data result...  No data in [%s] file...\n", shi_out);
+		ColorSet(0, 0, 0, COLOR_RELEASED);
 		fprintf(stderr,"  So check out [%s] file...\n", shi_inp);
 		fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
 	}
@@ -24920,7 +25248,7 @@ int main(int argc, char *argv[])
 					int i, len;
 
 						isDownShift  = SHIFT_SKIP_DN;  /* default: Skip DownShift */
-						iJerkTimeLen = JERK_TIME_mSec_SKIP; /* default value for skip downshift */
+						iJerkTimeLen = JERK2_TIME_mSec_SKIP; /* default value for skip downshift */
 
 						len = strlen( str_ShiftOp[0] );
 						for(i=len; i>0; i--)
@@ -25121,6 +25449,10 @@ int main(int argc, char *argv[])
 
 						case 2:
 							// 4>> Jerk#1 and Jerk#2
+							/* ------------------------------------------------ */
+							// default value 200msec : sequential downshift
+							// default value 300msec : skip downshift
+							/* ------------------------------------------------ */
 							iJerkTimeLen = atoi( str_ShiftOp[kk] ); 
 							if( (iJerkTimeLen <= JERK_MAX_TIME_mSec) && (iJerkTimeLen >= JERK_min_TIME_mSec) )
 							{
@@ -25175,8 +25507,8 @@ int main(int argc, char *argv[])
 							fprintf(stderr,">>Jerk1 ignore time: <<%d>> %d msec, default (50msec under) ", kk, iJerk1IgnoreTime ); 
 							break;
 
-						case 5: /* Jerk1 and Jerk2 value ignored range */
-							// 1>> Jerk1 and Jerk2 value SKIP range
+						case 5: /* Jerk1 value ignored range */
+							// 1>> Jerk1 value SKIP range
 							olen = strlen(str_ShiftOp[kk]);
 
 							if( 'm' == str_ShiftOp[kk][0] ) 
@@ -25189,11 +25521,28 @@ int main(int argc, char *argv[])
 								fJerk1IgnoreVal = atof( str_ShiftOp[kk] ); 
 							}
 							fprintf(stderr,"\n");
-							fprintf(stderr,">>Jerk1 ignore lvl : <<%d>> %.1lf G/sec, default (-10G/sec under) \n", kk, fJerk1IgnoreVal ); 
-							fprintf(stderr,">>Jerk2 ignore lvl :       %.1lf G/sec, default (10G/sec under) ", fabs(fJerk1IgnoreVal) ); 
+							fprintf(stderr,">>Jerk1 ignore lvl : <<%d>> %.1lf G/sec, default (%dG/sec under) \n", kk, fJerk1IgnoreVal, JERK1_INVALID_VALUE1 ); 
 							break;
 
-						case 6: /* Power On/Off  APS Level */
+
+						case 6: /* Jerk2 value ignored range */
+							// 1>> Jerk2 value SKIP range
+							olen = strlen(str_ShiftOp[kk]);
+
+							if( 'm' == str_ShiftOp[kk][0] ) 
+							{
+								fJerk2IgnoreVal = atof( &str_ShiftOp[kk][1] ); 
+								fJerk2IgnoreVal *= -1;
+							}
+							else
+							{
+								fJerk2IgnoreVal = atof( str_ShiftOp[kk] ); 
+							}
+							fprintf(stderr,"\n");
+							fprintf(stderr,">>Jerk2 ignore lvl : <<%d>> %.1lf G/sec, default (%dG/sec under) \n", kk, fabs(fJerk2IgnoreVal), JERK2_INVALID_VALUE1 ); 
+							break;
+
+						case 7: /* Power On/Off  APS Level */
 							// 1>> APS POWER ON/OFF Level
 							olen = strlen(str_ShiftOp[kk]);
 							fAPSpwrLvl = atof( str_ShiftOp[kk] ); 
@@ -25204,7 +25553,7 @@ int main(int argc, char *argv[])
 							fprintf(stderr,">>POWER ON/OFF     :       %s", (iPwrOnOff==SHI_PWR_ON?"PWR On":(iPwrOnOff==SHI_PWR_OFF?"PWR Off":(iPwrOnOff==SHI_STATIC?"Static":(iPwrOnOff==SHI_N_STOP_DN?"Stop Dn":"Unknown")))) ); 
 							break;
 							
-						case 7:
+						case 8:
 							// 2>> DownShift VS tolerance
 							iVStolerance = atoi( str_ShiftOp[kk] ); 
 							fprintf(stderr,"\n");
@@ -25212,53 +25561,7 @@ int main(int argc, char *argv[])
 							break;
 
 
-					#if 0
-						case 8:
-							vs1 = atoi( str_ShiftOp[kk] ); 
-							fprintf(stderr,"\n");
-							fprintf(stderr,">>VS Table Init    : <<%d>> %d ", kk, vs1 ); 
-							break;
 						case 9:
-							vs2 = atoi( str_ShiftOp[kk] ); 
-							fprintf(stderr,"\n");
-							fprintf(stderr,">>VS Table Last    : <<%d>> %d ", kk, vs2 ); 
-							break;
-						case 10:
-							vstep = atoi( str_ShiftOp[kk] ); 
-
-							if( vs1>vs2 && vstep>0 )
-							{
-								fprintf(stderr,"\n");
-								fprintf(stderr,">>VS Table Step    : <<%d>> %d <-- VSt Table is updated as below.", kk, vstep ); 
-
-								memset( VSkphTblDN, 0x00, VS_TABLE_NUM*sizeof(short) );
-								for(ll=0, vs=vs1; ((vs<=vs2) && (ll<APS_TABLE_NUM)); vs+=vstep, ll++)
-								{
-									VSkphTblDN[ll] = vs;
-								}
-
-								/* ------------------------------------------- */
-								/* Because of graph, minimu count is 6 points */
-								/* ------------------------------------------- */
-								if( ll<6 )
-								{
-									for(ii=ll; ii<6; ii++)
-									{
-										VSkphTblDN[ii] = vs + vstep*(ii-ll);
-									}
-								}
-							}
-							else
-							{
-								fprintf(stderr,"\n");
-								fprintf(stderr,">>VS Table Step    : <<%d>> %d -> VS Start, VS End, VS Step value checking... ", kk, vstep ); 
-								fprintf(stderr,"\n");
-							}
-							break;
-					#endif
-
-
-						case 11:
 
 						default:
 							fprintf(stderr,"\n");
