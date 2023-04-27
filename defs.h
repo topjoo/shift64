@@ -103,6 +103,12 @@
 #define DEBUG_GMAX_GMIN_LOG 			0
 #define DEBUG_GMAX_GMIN_LOG2 			0
 
+
+
+#define VEHICLE_TYPE_FILE_REC_LEN 		512		
+#define VEHICLE_TYPE_NUMS 				11
+
+
 #endif /* __DEFS_H__ */
 
 

@@ -633,7 +633,7 @@ void help(void)
            "  --upshift [ModeID] [Cont#] [Jerk#] [Nt-pos#] [JItime#] [J1Ivalue#] [APS PWR#] [APS Tol#] [APS#1] [APS#2] [APS#3]\n" 
            "\033[0m" /* Released */
            "             ModeID : ECO, SPT, NOR and you can add option as .last (default: first position) or gear ratio (.sx2, .gn7) \n"
-           "         Gear ratio : .SX2(default table), .GN7  \n"
+           "         Gear ratio : .SX2(default table), .GN7 or .file \n"
            "              Cont# : SB/SP point decision continuous count. (default 3 times decision) \n"
            "              Jerk# : Reverse time length at SB point for Jerk1 calcution. (default 200msec, range:100~2000msec) \n"
            "            Nt-pos# : Before or after time position for Nt-Max/Nt-min position (default: +/-50msec, range:50~200msec) \n"
@@ -657,7 +657,7 @@ void help(void)
            "  --downshift [ModeID] [Cont#1] [Jerk#2] [Nt-pos#] [JItime#] [J1Ivalue#] [J2Ivalue#] [APS PWR#] [VS Tol#] \n" 
            "\033[0m" /* Released */
            "             ModeID : ECO, SPT, NOR and you can add option as .last (default: first position) or gear ratio (.sx2, .gn7) \n"
-           "         Gear ratio : .SX2(default table), .GN7 \n"
+           "         Gear ratio : .SX2(default table), .GN7 or .file \n"
            "     DownShift type : .skip for skip downshift (default: sequential downshift) \n"
            "             Cont#1 : SB/SP point decision continuous count. (default 3 times decision) \n"
            "             Jerk#2 : Reverse time length at SB point for Jerk1, Jerk2 calcution. (range:100~2000ms) \n"
@@ -670,7 +670,7 @@ void help(void)
            "            VS Tol# : Vehicle Speed tolerance as +/-5kph, (default +/-5kph) \n"
            "\n"
            " Ex) \033[1mshift.exe\033[0m \033[31m--input\033[0m GN7_3.5GDI_PONDOWN_KD.tsv\033[31m --output\033[0m gn7_spt.txt \033[32m--downshift \033[0m \033[34mSPT\033[35m.gn7.g1   \033[0m \033[33m 3 150 60 70 m15 20 3 5 \033[0m \n"
-           "     \033[1mshift.exe\033[0m \033[31m--input\033[0m GN7_3.5GDI_PONDOWN_KD.tsv\033[31m --output\033[0m gn7_eco.txt \033[32m--downshift \033[0m \033[34meco\033[32m.skip \033[0m    \033[0m  \n"
+           "     \033[1mshift.exe\033[0m \033[31m--input\033[0m GN7_3.5GDI_PONDOWN_KD.tsv\033[31m --output\033[0m gn7_eco.txt \033[32m--downshift \033[0m \033[34meco\033[32m.skip\033[35m.file \033[0m   \n"
            "     \033[1mshift.exe\033[0m \033[31m--input\033[0m GN7_3.5GDI_PONDOWN_KD.tsv\033[31m --output\033[0m gn7_eco.txt \033[32m--downshift \033[0m \033[34meco\033[35m.gn7\033[32m.skip\033[0m  \033[33m 3 250 \033[0m \n"
            "        -> Sorted result output : gn7_spt.gil and gn7_spt.rpt \n"
            "        -> \033[33mYellow color is optional. \033[0m \n"
@@ -1146,8 +1146,9 @@ const char ShiftText[4][30] = {
 
 //unsigned int iSBnewPoint[500] = {0,};
 short iGearTableIndex = 0;
+char gVehicleTypeinFile[10];
 
-const char gVehicleType[10][15] = {
+const char gVehicleType[10][10] = {
 	"SX2", /* index 0 => default vehicle */
 	"SX2", /* index 1 */
 	"GN7", /* index 2 */
@@ -3194,7 +3195,7 @@ int is_YoonYear(int year)
 }
 
 
-int isShiftType(int shiDir03, int sq_ShiTy12)
+int isShiftType(int iPwrOnOff, int shiDir03, int sq_ShiTy12)
 {
 
 	/* sN:0, s1:1, s2:2, s3:3, s4:4, s5:5, s6:6, s7:7, s8:8, sP:9, 
@@ -3203,32 +3204,72 @@ int isShiftType(int shiDir03, int sq_ShiTy12)
 		return 1;
 
 	/* ----------------------------- */
+	/* ----------------------------- */
 	/* Power On */
 	/* ----------------------------- */
-	if(SHIFT_UP==shiDir03)
+	/* ----------------------------- */
+	if( SHI_PWR_ON == iPwrOnOff )
 	{
-		/* s12Z: 15, s23Z:16, s34Z:17, s45Z:18, s56Z:19, s67Z:20, s78Z:21 */	
-		if( sq_ShiTy12>=15 && sq_ShiTy12<=21 )
-			return 2;
-	}
-	else if(SHIFT_DN==shiDir03)
-	{
-		/* s21Z: 36, s32Z:37, s43Z:38, s54Z:39, s65Z:40, s76Z:41, s87Z:42 */	
-		if( sq_ShiTy12>=36 && sq_ShiTy12<=42 )
-			return 3;
-	}
-	else if(SHIFT_SKIP_DN==shiDir03)
-	{
-		/* ------------------------------------------- */
-		/* s31Z                     : 57 ------------- */	
-		/* s41Z~s42Z                : 58~59 ---------- */
-		/* s52Z~s53Z                : 60~61 ---------- */	
-		/* s62Z,s63Z,s64Z           : 62,63,64 ------- */	
-		/* s72Z,s73Z,s74Z,s75Z      : 65,66,67,68 ---- */	
-		/* s82Z,s83Z,s84Z,s85Z,s86Z : 69,70,71,72,73 - */	
-		if( sq_ShiTy12>=57 && sq_ShiTy12<=73 )
+		if(SHIFT_UP==shiDir03)
 		{
-			return 4;
+			/* s12Z: 15, s23Z:16, s34Z:17, s45Z:18, s56Z:19, s67Z:20, s78Z:21 */	
+			if( sq_ShiTy12>=15 && sq_ShiTy12<=21 )
+				return 2;
+		}
+		else if(SHIFT_DN==shiDir03)
+		{
+			/* s21Z: 36, s32Z:37, s43Z:38, s54Z:39, s65Z:40, s76Z:41, s87Z:42 */	
+			if( sq_ShiTy12>=36 && sq_ShiTy12<=42 )
+				return 3;
+		}
+		else if(SHIFT_SKIP_DN==shiDir03)
+		{
+			/* ------------------------------------------- */
+			/* s31Z                     : 57 ------------- */	
+			/* s41Z~s42Z                : 58~59 ---------- */
+			/* s52Z~s53Z                : 60~61 ---------- */	
+			/* s62Z,s63Z,s64Z           : 62,63,64 ------- */	
+			/* s72Z,s73Z,s74Z,s75Z      : 65,66,67,68 ---- */	
+			/* s82Z,s83Z,s84Z,s85Z,s86Z : 69,70,71,72,73 - */	
+			if( sq_ShiTy12>=57 && sq_ShiTy12<=73 )
+			{
+				return 4;
+			}
+		}
+	}
+
+	/* ----------------------------- */
+	/* ----------------------------- */
+	/* Power Off */
+	/* ----------------------------- */
+	/* ----------------------------- */
+	else if( SHI_PWR_OFF == iPwrOnOff)
+	{
+		if(SHIFT_UP==shiDir03)
+		{
+			/* s12S: 22, s23S:23, s34S:24, s45S:25, s56S:26, s67S:27, s78S:28 */	
+			if( sq_ShiTy12>=22 && sq_ShiTy12<=28 )
+				return 5;
+		}
+		else if(SHIFT_DN==shiDir03)
+		{
+			/* s21S: 43, s32S:44, s43S:45, s54S:46, s65S:47, s76S:48, s87S:49 */	
+			if( sq_ShiTy12>=43 && sq_ShiTy12<=49 )
+				return 6;
+		}
+		else if(SHIFT_SKIP_DN==shiDir03)
+		{
+			/* -------------- */
+			/* s31S : 74 ---- */	
+			/* s42S : 75 ---- */
+			/* s53S : 76 ---- */	
+			/* s64S : 77 ---- */	
+			/* s75S : 78 ---- */	
+			/* s86S : 79 ---- */	
+			if( sq_ShiTy12>=74 && sq_ShiTy12<=79 )
+			{
+				return 7;
+			}
 		}
 	}
 
@@ -3469,7 +3510,7 @@ int cgtg = -1;
 
 
 
-unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short SBposDecision, tSQData_PairCheck_type *SPoint, unsigned int *SBswingcnt, short isOriFileSave)
+unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SBposDecision, tSQData_PairCheck_type *SPoint, unsigned int *SBswingcnt, short isOriFileSave)
 {
 	FILE *shiFile=NULL;
 	FILE *oriFile=NULL;
@@ -3609,9 +3650,10 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 	short ctSameGearStatus = 1;
 
 	/* gear.gil file read */
-	double gRatioFile[11];
+	double gRatioFile[VEHICLE_TYPE_NUMS];
 	char geartype[10];
-
+	short isGearFileOK = 0;
+	unsigned int rdlines = 0;
 	
 	memset(QualData, 0x00, QUAL_DATA_MAX_SIZE*sizeof(char) );
 	memset(sq, 0x00, sizeof(sq) );
@@ -3704,18 +3746,21 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 	/* get file  */
 	//fprintf(stderr,"\n");
 	//fprintf(stderr,">>ModeID %s Sorting... \n", arrPATs_ModeID[aiPATs05].ModeID );
-	fprintf(stderr,">>Shift Type       : %s \n", (iShiftType==SHI_PWR_ON?"PWR On":(iShiftType==SHI_PWR_OFF?"PWR Off":(iShiftType==SHI_STATIC?"Static":(iShiftType==SHI_N_STOP_DN?"Stop Dn":"Unknown")))) );
-	fprintf(stderr,">>Shift Direction  :\033[32m %sShift \033[0m\n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Sequential Down": \
+	fprintf(stderr,">>Shift Type       : %s \n", (iPwrOnOff==SHI_PWR_ON?"PWR On":(iPwrOnOff==SHI_PWR_OFF?"PWR Off":(iPwrOnOff==SHI_STATIC?"Static":(iPwrOnOff==SHI_N_STOP_DN?"Stop Dn":"Unknown")))) );
+	fprintf(stderr,">>Shift Direction  :\033[1;35m %sShift \033[0m\n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Sequential Down": \
 		(shiDir03==SHIFT_SKIP_DN?"Skip Down":(shiDir03==SHIFT_SKIP_UP?"SkipUp":"Unknown"))) ));			
 
 
-	/* ----- Vehicle Gear Type ----- */
+	/* ------------------------------------------------ */
+	/* ----- Vehicle Gear Type > FILE ----- */
+	/* ------------------------------------------------ */
+	isGearFileOK = 0;
 	if( -1 == iGearTableIndex )
 	{
 		/* gear.gil file */
 		FILE *gfrd=NULL;
 		FILE *gfwr=NULL;
-		char GearData[200];
+		char GearData[VEHICLE_TYPE_FILE_REC_LEN];
 		
 		if( NULL == (gfrd = fopen( "gear.gil", "rb")) ) 
 		{
@@ -3727,16 +3772,17 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 			else
 			{
 				fprintf(gfwr,";%s", gVehicleType[0]);
-				for(ii=1; ii<11; ii++)
+				for(ii=1; ii<VEHICLE_TYPE_NUMS; ii++)
 					fprintf(gfwr,"  %.4lf", gearTable_SX2[ii]);
 				fprintf(gfwr,"\r\n");
 
 				fprintf(gfwr,"%s", gVehicleType[0]);				
-				for(ii=1; ii<11; ii++)
+				for(ii=1; ii<VEHICLE_TYPE_NUMS; ii++)
 					fprintf(gfwr,"  %.4lf", gearTable_SX2[ii]);
 				fprintf(gfwr,"\r\n");
 
-				fprintf(stderr,">>Shift GearRatio  :\033[1;32m gear.gil file is created.. \033[0m \n");
+				fprintf(stderr,">>Shift GearRatio  :\033[1;32m gear.gil file is created.. default vehicle SX2 \033[0m \n");
+				isGearFileOK = 1;
 			}
 			fclose(gfwr);
 
@@ -3749,6 +3795,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 		{
 			memset( gRatioFile, 0x00, sizeof(gRatioFile) );
 			memset( geartype, 0x00, sizeof(geartype) );
+			rdlines = 0;
 
 			do
 			{
@@ -3757,18 +3804,18 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 				/* Read a line from input file. */
 				memset( GearData, 0x00, sizeof(GearData) );
 
-				if( NULL == fgets( GearData, 200, gfrd ) )
+				if( NULL == fgets( GearData, VEHICLE_TYPE_FILE_REC_LEN, gfrd ) )
 				{
 					break;
 				}
 
-				//RecordCnt++;
+				rdlines ++;
 
 				/* Remove carriage return/line feed at the end of line. */
 				i = strlen(GearData);
-				if(i >= 200)
+				if(i >= VEHICLE_TYPE_FILE_REC_LEN)
 				{
-					fprintf(stderr,"[%s]:%u:ERROR: Not enough Buffer length(%lld/%u) \r\n", __FUNCTION__, __LINE__, RecordCnt, i );
+					fprintf(stderr,"VEHICLE_TYPE_FILE_REC_LEN is small (%d) \r\n", i );
 				}
 
 				if (--i > 0)
@@ -3780,44 +3827,54 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 								geartype,  &gRatioFile[1], &gRatioFile[2], &gRatioFile[3], &gRatioFile[4], &gRatioFile[5], 
 									       &gRatioFile[6], &gRatioFile[7], &gRatioFile[8], &gRatioFile[9], &gRatioFile[10] );
 
-					if(11 == result) 
+					if(VEHICLE_TYPE_NUMS == result) 
 					{
 						if( GearData[0]==';' || GearData[0]==':' ) continue; /* comment */
 
+						memset(gVehicleTypeinFile, 0x00, sizeof(gVehicleTypeinFile) );
+						
 						/* OK */
-						fprintf(stderr,">>Shift GearRatio  :\033[1;32m %s - in gear.gil file \033[0m \n", geartype );
+						fprintf(stderr,">>Gear Ratio type  :\033[1;32m %s - in gear.gil file \033[0m \n", geartype ); 
 
 						fprintf(stderr,"                     " );
 						ColorSet(0, 0, PINK, 0); /* PINK color setting */
-						for(ii=1; ii<=5; ii++)
-							fprintf(stderr,"(%d):%.4lf, ", ii,gRatioFile[ii] );
-						ColorSet(0, 0, 0, COLOR_RELEASED); /* Color setting */
-						fprintf(stderr,"\n");
+
+						fprintf(stderr,"(%d):%.4lf", 1,gRatioFile[1] );
+						for(ii=2; ii<=5; ii++)
+							fprintf(stderr,", (%d):%.4lf", ii,gRatioFile[ii] );
+						//ColorSet(0, 0, 0, COLOR_RELEASED); /* Color setting */
+						fprintf(stderr,",\n");
 
 						fprintf(stderr,"                     " );
-						ColorSet(0, 0, PINK, 0); /* PINK color setting */
-						for(ii=6; ii<11; ii++)
-							fprintf(stderr,"(%d):%.4lf, ", ii,gRatioFile[ii] );
+						//ColorSet(0, 0, PINK, 0); /* PINK color setting */
+						fprintf(stderr,"(%d):%.4lf", 6,gRatioFile[6] );
+						for(ii=7; ii<9; ii++)
+							fprintf(stderr,", (%d):%.4lf", ii,gRatioFile[ii] );
+
+						fprintf(stderr,", (%s):%.4lf", "R", gRatioFile[9] );
+						fprintf(stderr,", (%s):%.4lf", "F", gRatioFile[10] );
 						ColorSet(0, 0, 0, COLOR_RELEASED); /* Color setting */
 						fprintf(stderr,"\n");
 
 						memcpy( gearTable, gRatioFile, sizeof(gRatioFile) );
+						memcpy( gVehicleTypeinFile, geartype, sizeof(geartype) );
+
+						isGearFileOK = 1;
 
 						break; /* 1st OK and then break and STOP */
 					}
-					else if( (11 != result) && (result!=-1 && i>0) )  /* QUAL_TSV_DATA_ITEM_NUM */
+					else if( (VEHICLE_TYPE_NUMS != result) && (result!=-1 && i>0) )  /* QUAL_TSV_DATA_ITEM_NUM */
 					{
-						ColorSet(0, 0, RED, 0); /* RED color setting */
-						fprintf(stderr," Check gear.gil file for gear ratio... (%d) \n\n", result );
-						ColorSet(0, 0, 0, COLOR_RELEASED); /* Color setting */
-
+						//ColorSet(0, 0, RED, 0); /* RED color setting */
+						//fprintf(stderr," Check gear.gil file for gear ratio... (%d) \n\n", result );
+						//ColorSet(0, 0, 0, COLOR_RELEASED); /* Color setting */
 						continue; /* reading Next item because of FAIL item */
 					}
 					else
 					{
-						ColorSet(0, 0, RED, 0); /* RED color setting */
-						fprintf(stderr," Check gear.gil file for gear ratio.. (%d) \n\n", result );
-						ColorSet(0, 0, 0, COLOR_RELEASED); /* Color setting */
+						//ColorSet(0, 0, RED, 0); /* RED color setting */
+						//fprintf(stderr," Check gear.gil file for gear ratio.. (%d) \n\n", result );
+						//ColorSet(0, 0, 0, COLOR_RELEASED); /* Color setting */
 
 						continue; /* reading Next item because of FAIL item */
 					}
@@ -3831,7 +3888,18 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 		}
 		fclose(gfrd);
 		fclose(gfwr);
-		
+
+		if( 0==isGearFileOK )
+		{
+			ColorSet(0, 0, RED, 0); /* RED color setting */
+			fprintf(stderr,"  Check gear.gil file for gear ratio... \n");
+			fprintf(stderr,"  It requires the vehicle gear name and 10 gear ratio... \n");
+			fprintf(stderr,"  Check %dth line and %dth columns in gear.gil file... \n\n", rdlines, result );
+			ColorSet(0, 0, 0, COLOR_RELEASED); /* Color setting */
+
+			AllFilesClosed();
+			exit(0);	
+		}
 	}
 	else if( 0 == iGearTableIndex )
 	{
@@ -3891,7 +3959,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 		if( NULL == (shiFile = fopen( shift_out, "wb")) )	
 		{
 			// FAIL
-			printf("\n\nCan not create output file(%s).. check plz... \n\n", shift_out );
+			fprintf(stderr,"\n\nCan not create output file(%s).. check plz... \n\n", shift_out );
 			AllFilesClosed();
 			exit(0);
 		}
@@ -3903,7 +3971,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 			if( NULL == (oriFile = fopen( shift_ori, "wb")) )	
 			{
 				// FAIL
-				printf("\n\nCan not create output ori file(%s).. check plz... \n\n", shift_ori );
+				fprintf(stderr,"\n\nCan not create output ori file(%s).. check plz... \n\n", shift_ori );
 				AllFilesClosed();
 				exit(0);
 			}
@@ -4671,7 +4739,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 
 
 		#if 0
-			if( iShiftType == SHI_PWR_ON )
+			if( iPwrOnOff == SHI_PWR_ON )
 			{
 				if( sq[0].APS09 < fAPSpwrLvl ) continue; /* APS power level check and ignored */
 			}
@@ -5201,11 +5269,12 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 			/* === 3 STEP : ModeID check ===================== */
 			
 			
-			if( iShiftType == SHI_PWR_ON )
+			if( SHI_PWR_ON == iPwrOnOff )
 			{
 				if( sq[0].APS09 < fAPSpwrLvl ) continue; /* APS power level check and ignored */
 			}
 
+			
 			//if( (SHIFT_UP==shiDir03) && (sq[0].curGear08 != sq[0].tgtGear11) && (sq[0].curGear08+1 == sq[0].tgtGear11+0) )
 			{
 				if( 0 == sq[0].curGear08 ) continue; /* 0-DAN ignored */
@@ -5270,7 +5339,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 			/* ------------------------------------------------------------------- */
 			/* ------------------------------------------------------------------- */
 			//if( (sq[0].iPATs05 == aiPATs05) && (sq[0].curGear08 == sq[0].tgtGear11) && (curSmPreGear+1==sq[0].curGear08) )
-			if( isShiftType(shiDir03, sq[0].ShiTy12) && (sq[0].iPATs05 == aiPATs05) && 
+			if( isShiftType(iPwrOnOff, shiDir03, sq[0].ShiTy12) && (sq[0].iPATs05 == aiPATs05) && 
 				(sq[0].curGear08 == sq[0].tgtGear11) && 
 				(curSmPreGear + iFIX_GEAR == sq[0].curGear08 || 
 				 curSmPreGear + iFIX_G6 == sq[0].curGear08 || curSmPreGear + iFIX_G5 == sq[0].curGear08 ||
@@ -5348,7 +5417,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 			/* -- Power On / Up Shift -------------------------------------------- */
 			/* ------------------------------------------------------------------- */
 			//else if( (sq[0].iPATs05 == aiPATs05) && (sq[0].curGear08 +1 == sq[0].tgtGear11) )
-			else if( isShiftType(shiDir03, sq[0].ShiTy12) && (sq[0].iPATs05 == aiPATs05) && 
+			else if( isShiftType(iPwrOnOff, shiDir03, sq[0].ShiTy12) && (sq[0].iPATs05 == aiPATs05) && 
 				(sq[0].curGear08 + iFIX_GEAR == sq[0].tgtGear11 ||
 				 sq[0].curGear08 + iFIX_G6 == sq[0].tgtGear11 || sq[0].curGear08 + iFIX_G5 == sq[0].tgtGear11 ||
 				 sq[0].curGear08 + iFIX_G4 == sq[0].tgtGear11 || sq[0].curGear08 + iFIX_G3 == sq[0].tgtGear11) )
@@ -6330,7 +6399,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 			/* For UpShift, 2023-03-18 */
 			if( SHIFT_UP == shiDir03 )
 			{
-				if( iShiftType == SHI_PWR_ON )
+				if( iPwrOnOff == SHI_PWR_ON )
 				{
 					if( sq[0].APS09 < fAPSpwrLvl ) continue; /* APS power level check and ignored */
 				}
@@ -6401,7 +6470,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 			/* 3rd STEP ---------------------------------------------------------- */
 			/* ------------------------------------------------------------------- */
 			//if( (sq[0].iPATs05 == aiPATs05) && (sq[0].curGear08 == sq[0].tgtGear11) && (curSmPreGear+1==sq[0].curGear08) )
-			if( isShiftType(shiDir03, sq[0].ShiTy12) && (sq[0].iPATs05 == aiPATs05) && (sq[0].curGear08 == sq[0].tgtGear11) && 
+			if( isShiftType(iPwrOnOff, shiDir03, sq[0].ShiTy12) && (sq[0].iPATs05 == aiPATs05) && (sq[0].curGear08 == sq[0].tgtGear11) && 
 				(curSmPreGear + iFIX_GEAR == sq[0].curGear08 ||
 				 curSmPreGear + iFIX_G6 == sq[0].curGear08 || curSmPreGear + iFIX_G5 == sq[0].curGear08 || 
 				 curSmPreGear + iFIX_G4 == sq[0].curGear08 || curSmPreGear + iFIX_G3 == sq[0].curGear08 ) )
@@ -6474,7 +6543,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 			/* -- Power On / Up Shift -------------------------------------------- */
 			/* ------------------------------------------------------------------- */
 			//else if( (sq[0].iPATs05 == aiPATs05) && (sq[0].curGear08 +1 == sq[0].tgtGear11) )
-			else if( isShiftType(shiDir03, sq[0].ShiTy12) && (sq[0].iPATs05 == aiPATs05) && 
+			else if( isShiftType(iPwrOnOff, shiDir03, sq[0].ShiTy12) && (sq[0].iPATs05 == aiPATs05) && 
 				(sq[0].curGear08 + iFIX_GEAR == sq[0].tgtGear11 ||
 				 sq[0].curGear08 + iFIX_G6 == sq[0].tgtGear11 || sq[0].curGear08 + iFIX_G5 == sq[0].tgtGear11 ||
 				 sq[0].curGear08 + iFIX_G4 == sq[0].tgtGear11 || sq[0].curGear08 + iFIX_G3 == sq[0].tgtGear11) )
@@ -7547,7 +7616,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 
 			}
 
-			else if( /*isShiftType(shiDir03, sq[0].ShiTy12) &&*/ (sq[0].iPATs05 == aiPATs05) && (sq[0].curGear08 == sq[0].tgtGear11) && 
+			else if( /*isShiftType(iPwrOnOff, shiDir03, sq[0].ShiTy12) &&*/ (sq[0].iPATs05 == aiPATs05) && (sq[0].curGear08 == sq[0].tgtGear11) && 
 				ctSameGearStatus )
 			{
 
@@ -7582,7 +7651,7 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 
 			}
 
-			else if( /*isShiftType(shiDir03, sq[0].ShiTy12) && (sq[0].iPATs05 == aiPATs05) &&*/ (sq[0].curGear08 != sq[0].tgtGear11) )
+			else if( /*isShiftType(iPwrOnOff, shiDir03, sq[0].ShiTy12) && (sq[0].iPATs05 == aiPATs05) &&*/ (sq[0].curGear08 != sq[0].tgtGear11) )
 			{
 				ctSameGearStatus = 1;
 				is2File = 0;
@@ -7751,10 +7820,10 @@ unsigned int ShiftQualData(short aiPATs05, int iShiftType, int shiDir03, short S
 	}
 	fprintf(stderr,"  Sum of Quality Records ------: %9u lines \n", totChkModeID );
 	fprintf(stderr,"  Shift Sorted Rec %-11s : %9u/ %llu lines \n", arrPATs_ModeID[aiPATs05].ModeID, iSortCount, chkPATs_ModeID[aiPATs05] );
-	fprintf(stderr,"     SS Point Counts--%-8s : %9u points \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), iSScount );
-	fprintf(stderr,"     SB Point Counts--%-8s : %9u points \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), iSBcount );
-	fprintf(stderr,"     SP Point Counts--%-8s : %9u points \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), iSPcount );
-	fprintf(stderr,"     SF Point Counts--%-8s : %9u points \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), iSFcount );
+	fprintf(stderr,"    SS Point Counts %-10s : %9u points -- %s \n", "", iSScount, (shiDir03==SHIFT_UP?"UpShift":(shiDir03==SHIFT_DN?"DownShift":(shiDir03==SHIFT_SKIP_DN?"Skip DownShift":"Unknown"))) );
+	fprintf(stderr,"    SB Point Counts %-10s : %9u points -- %s \n", "", iSBcount, (shiDir03==SHIFT_UP?"UpShift":(shiDir03==SHIFT_DN?"DownShift":(shiDir03==SHIFT_SKIP_DN?"Skip DownShift":"Unknown"))) );
+	fprintf(stderr,"    SP Point Counts %-10s : %9u points -- %s \n", "", iSPcount, (shiDir03==SHIFT_UP?"UpShift":(shiDir03==SHIFT_DN?"DownShift":(shiDir03==SHIFT_SKIP_DN?"Skip DownShift":"Unknown"))) );
+	fprintf(stderr,"    SF Point Counts %-10s : %9u points -- %s \n", "", iSFcount, (shiDir03==SHIFT_UP?"UpShift":(shiDir03==SHIFT_DN?"DownShift":(shiDir03==SHIFT_SKIP_DN?"Skip DownShift":"Unknown"))) );
 	fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
 
 
@@ -9158,10 +9227,12 @@ int SSnNtPointFix(short aiPATs05, short SBposDecision, int shiDir03, tSQData_Pai
 			avg_t3 /= (iSScount-ignored2ndCnt);
 		}
 		fprintf(stderr,">>2nd Average Time Measurement --- SS(%d), SB(%d), SP(%d), SF(%d) Records.. ", 
-			iSScount-ignored2ndCnt, iSBcount-ignored2ndCnt, iSPcount-ignored2ndCnt, iSFcount-ignored2ndCnt );
+			iSScount, iSBcount, iSPcount, iSFcount );
+			/* iSScount-ignored2ndCnt, iSBcount-ignored2ndCnt, iSPcount-ignored2ndCnt, iSFcount-ignored2ndCnt ); */
+
 		MODEColorPrint( aiPATs05 );
 		fprintf(stderr,"\r\n");
-		fprintf(stderr,"  Shift Average Time(t1:SS~SB) : %9ld msec <- 2nd average time  \n", avg_t1 );
+		fprintf(stderr,"  Shift Average Time(t1:SS~SB) : %9ld msec <- 2nd average time (ign:%d) \n", avg_t1, ignored2ndCnt );
 		fprintf(stderr,"  Shift Average Time(t2:SB~SP) : %9ld msec <- 2nd average time  \n", avg_t2 );
 		fprintf(stderr,"  Shift Average Time(t3:SP~SF) : %9ld msec <- 2nd average time  \n", avg_t3 );
 		fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
@@ -9555,7 +9626,8 @@ int ignored_QSData(short aiPATs05, short SBposDecision, int shiDir03, tSQData_Pa
 			}
 
 		}
-		fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
+
+//		fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
 
 		if(iSScount-ignoredRecord)
 		{
@@ -9563,12 +9635,15 @@ int ignored_QSData(short aiPATs05, short SBposDecision, int shiDir03, tSQData_Pa
 			avg_t2 /= (iSScount-ignoredRecord);
 			avg_t3 /= (iSScount-ignoredRecord);
 		}
+
 	#if 0
 		fprintf(stderr,">>3rd Average Time Measurement --- SS(%d), SB(%d), SP(%d), SF(%d) Records.. %s \n", 
 			iSScount-ignoredRecord, iSBcount-ignoredRecord, iSPcount-ignoredRecord, iSFcount-ignoredRecord, arrPATs_ModeID[aiPATs05].ModeID );
 	#else
 		fprintf(stderr,">>3rd Average Time Measurement --- SS(%d), SB(%d), SP(%d), SF(%d) Records..", 
-			iSScount-ignoredRecord, iSBcount-ignoredRecord, iSPcount-ignoredRecord, iSFcount-ignoredRecord );
+			iSScount, iSBcount, iSPcount, iSFcount );
+			/* iSScount-ignoredRecord, iSBcount-ignoredRecord, iSPcount-ignoredRecord, iSFcount-ignoredRecord ); */
+			
 		MODEColorPrint( aiPATs05 );
 		fprintf(stderr,"\r\n");
 	#endif
@@ -10232,8 +10307,8 @@ int FindGminMaxShiftData(short aiPATs05, tSQData_PairCheck_type SPoint, int shiD
 	#else
 		fprintf(stderr,">>Searched Jerk1 G-Max/G-min"); 
 		MODEColorPrint( aiPATs05 );
-		fprintf(stderr,"before SB point --- SS(%d), SB(%d), SP(%d), SF(%d) \r\n", 
-						SPoint.SStot, SPoint.SBtot, SPoint.SPtot, SPoint.SFtot );
+		fprintf(stderr,"before SB point --- SS(%d), SB(%d), SP(%d), SF(%d) \r\n", iSScount, iSBcount, iSPcount, iSFcount );
+						/* SPoint.SStot, SPoint.SBtot, SPoint.SPtot, SPoint.SFtot ); */
 	#endif
 	}
 	else if( (SHIFT_DN==shiDir03) || (SHIFT_SKIP_DN==shiDir03) )
@@ -10244,8 +10319,8 @@ int FindGminMaxShiftData(short aiPATs05, tSQData_PairCheck_type SPoint, int shiD
 	#else
 		fprintf(stderr,">>Searched Jerk1 G-Max/G-min");
 		MODEColorPrint( aiPATs05 );
-		fprintf(stderr,"after SB point --- SS(%d), SB(%d), SP(%d), SF(%d) \r\n", 
-						SPoint.SStot, SPoint.SBtot, SPoint.SPtot, SPoint.SFtot );
+		fprintf(stderr,"after SB point --- SS(%d), SB(%d), SP(%d), SF(%d) \r\n", iSScount, iSBcount, iSPcount, iSFcount );
+						/* SPoint.SStot, SPoint.SBtot, SPoint.SPtot, SPoint.SFtot ); */
 	#endif
 	}
 
@@ -11865,8 +11940,8 @@ int FindGminMax2ShiftData(short aiPATs05, tSQData_PairCheck_type SPoint, int shi
 #else
 		fprintf(stderr,">>Searched Jerk2 G-min/G-Max");
 		MODEColorPrint( aiPATs05 );
-		fprintf(stderr,"after SP point --- SS(%d), SB(%d), SP(%d), SF(%d)          \r\n", 
-					SPoint.SStot, SPoint.SBtot, SPoint.SPtot, SPoint.SFtot );
+		fprintf(stderr,"after SP point --- SS(%d), SB(%d), SP(%d), SF(%d)          \r\n", iSScount, iSBcount, iSPcount, iSFcount );
+					/* SPoint.SStot, SPoint.SBtot, SPoint.SPtot, SPoint.SFtot ); */
 #endif
 	}
 	//fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
@@ -16036,22 +16111,21 @@ unsigned int APSData_Filtering(short aiPATs05, int avgTime, int shiDir03, short 
 	SPoint->SPnum = iSPcount-iignoredCnt;
 	SPoint->SFnum = iSFcount-iignoredCnt;
 
-
-	if( 0==SPoint->SSnum && 0==SPoint->SBnum && 0==SPoint->SPnum )
+	if( 0>=SPoint->SSnum || 0>=SPoint->SBnum || 0>=SPoint->SPnum || 0>=SPoint->SFnum )
 	{
 		fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
 		fprintf(stderr,">>Result Quality Data is NONE as below %s \n", arrPATs_ModeID[aiPATs05].ModeID );
-		fprintf(stderr,"   SS Point Counts--%-10s : %3u / %3u points \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), SPoint->SStot, SPoint->SSnum );
-		fprintf(stderr,"   SB Point Counts--%-10s : %3u / %3u points \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), SPoint->SBtot, SPoint->SBnum );
-		fprintf(stderr,"   SP Point Counts--%-10s : %3u / %3u points \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), SPoint->SPtot, SPoint->SPnum );
-		fprintf(stderr,"   SF Point Counts--%-10s : %3u / %3u points \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDn":"Unknown"))), SPoint->SFtot, SPoint->SFnum );
+		fprintf(stderr,"   SS Point Counts--%-10s : %3u / %3u points \n", (shiDir03==SHIFT_UP?"UpShift":(shiDir03==SHIFT_DN?"DownShift":(shiDir03==SHIFT_SKIP_DN?"Skip DownShift":"Unknown"))), SPoint->SStot, SPoint->SSnum );
+		fprintf(stderr,"   SB Point Counts--%-10s : %3u / %3u points \n", (shiDir03==SHIFT_UP?"UpShift":(shiDir03==SHIFT_DN?"DownShift":(shiDir03==SHIFT_SKIP_DN?"Skip DownShift":"Unknown"))), SPoint->SBtot, SPoint->SBnum );
+		fprintf(stderr,"   SP Point Counts--%-10s : %3u / %3u points \n", (shiDir03==SHIFT_UP?"UpShift":(shiDir03==SHIFT_DN?"DownShift":(shiDir03==SHIFT_SKIP_DN?"Skip DownShift":"Unknown"))), SPoint->SPtot, SPoint->SPnum );
+		fprintf(stderr,"   SF Point Counts--%-10s : %3u / %3u points \n", (shiDir03==SHIFT_UP?"UpShift":(shiDir03==SHIFT_DN?"DownShift":(shiDir03==SHIFT_SKIP_DN?"Skip DownShift":"Unknown"))), SPoint->SFtot, SPoint->SFnum );
 		fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
 		fprintf(stderr,"\033[31m"); /* RED color */
-		fprintf(stderr,"   STOP it because of above!!!\n\n");
+		fprintf(stderr,"   Stopped because of reasons as above!!!\n\n");
 		fprintf(stderr,"\033[0m"); /* color released */
 	}
 	return iignoredCnt;
-	
+
 }
 
 
@@ -16124,6 +16198,7 @@ int ShiftData_LastSorting(short aiPATs05, int avgTime, int shiDir03, short iSBch
 	long dif_nt=0, dif_gx=0, dif_g2x=0;;
 	long avg_nt=0, avg_gx=0, avg_g2x=0;
 	long dif_ms=0, avg_ms=0;
+	int avg_ntcnt=0, avg_gxcnt=0, avg_g2xcnt=0, avg_mscnt=0;
 
 	unsigned int iNtMxcountot = 0;
 	unsigned int iNtmncountot = 0;
@@ -16251,10 +16326,10 @@ int ShiftData_LastSorting(short aiPATs05, int avgTime, int shiDir03, short iSBch
 	if( -1==iGearTableIndex )
 	{
 		/* gear.gil file */
-		fprintf(outfile,"Version:%s - Shift Quality Report %s/%sShift/gear.gil - %s *MD5*%s by GIL&S \n", 
+		fprintf(outfile,"Version:%s - Shift Quality Report %s/%sShift/gear.gil(%s) - %s *MD5*%s by GIL&S \n", 
 					AttVersion, arrPATs_ModeID[aiPATs05].ModeID, 
 					(shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDown":"*Unknown"))), 
-					sToday, md5Value );			
+					gVehicleTypeinFile, sToday, md5Value );			
 	}
 	else
 	{
@@ -17052,8 +17127,8 @@ int ShiftData_LastSorting(short aiPATs05, int avgTime, int shiDir03, short iSBch
 	}
 	else if( SHIFT_DN==shiDir03 || SHIFT_SKIP_DN==shiDir03 ) 
 	{
-		icurMinGear++;
-		itgtMinGear++;
+		//icurMinGear++;
+		//itgtMinGear++;
 
 		MODEColorPrint( aiPATs05 );
 		fprintf(stderr, " DownShift Ended ... curGear(%d), tgtGear(%d) \n", icurMinGear, itgtMinGear );
@@ -17071,6 +17146,10 @@ int ShiftData_LastSorting(short aiPATs05, int avgTime, int shiDir03, short iSBch
 	avg_g2x = 0L;
 	avg_ms = 0L;
 	ignoredCount = 0;
+	avg_ntcnt =0;
+	avg_gxcnt =0;
+	avg_g2xcnt=0;
+	avg_mscnt = 0;
 
 	//fprintf(stderr, "%d %d %d \n", iSScount, iSBcount, iSPcount );
 	for(ii=0; ii<iSScountot; ii++)
@@ -17079,15 +17158,32 @@ int ShiftData_LastSorting(short aiPATs05, int avgTime, int shiDir03, short iSBch
 		dif_t2 = (gMaxTbl[ii].SPTime - gMaxTbl[ii].SBTime)/JERK_TIME_SCALE ;		
 		dif_t3 = (gMaxTbl[ii].SFTime - gMaxTbl[ii].SPTime)/JERK_TIME_SCALE ;
 
-		dif_nt = (gMaxTbl[ii].NtMaxTime - gMaxTbl[ii].NtminTime)/JERK_TIME_SCALE ;
-		dif_gx = (gMaxTbl[ii].gmn1End - gMaxTbl[ii].gMx1Begin)/JERK_TIME_SCALE ;
-
+		if( gMaxTbl[ii].NtMaxTime && gMaxTbl[ii].NtminTime )
+		{
+			dif_nt = (gMaxTbl[ii].NtMaxTime - gMaxTbl[ii].NtminTime)/JERK_TIME_SCALE ;
+			avg_ntcnt++;
+		}
+		
+		if( gMaxTbl[ii].gmn1End && gMaxTbl[ii].gMx1Begin )
+		{
+			dif_gx = (gMaxTbl[ii].gmn1End - gMaxTbl[ii].gMx1Begin)/JERK_TIME_SCALE ;
+			avg_gxcnt++;
+		}
 
 		if( SHIFT_DN==shiDir03 || SHIFT_SKIP_DN==shiDir03 ) 
 		{
-			dif_g2x = (gMaxTbl[ii].gMx2End - gMaxTbl[ii].gmn2Begin)/JERK_TIME_SCALE ;
-			dif_ms  = (gMaxTbl[ii].MSmin - gMaxTbl[ii].MSMax)/JERK_TIME_SCALE ;
 
+			if( gMaxTbl[ii].gMx2End && gMaxTbl[ii].gmn2Begin )
+			{
+				dif_g2x = (gMaxTbl[ii].gMx2End - gMaxTbl[ii].gmn2Begin)/JERK_TIME_SCALE ;
+				avg_g2xcnt ++;
+			}
+			
+			if( gMaxTbl[ii].MSmin && gMaxTbl[ii].MSMax )
+			{
+				dif_ms  = (gMaxTbl[ii].MSmin - gMaxTbl[ii].MSMax)/JERK_TIME_SCALE ;
+				avg_mscnt ++;
+			}
 
 			ignTimeSS2SP = DN_SS2SP_OVER_TIME;  /* DownShift (SS~SP) 1500 msec over -> so ignored */
 			ignTimeSP2SF = DN_SP2SF_OVER_TIME;  /* DownShift (SP~SF)  500 msec over -> so ignored */
@@ -17162,8 +17258,11 @@ int ShiftData_LastSorting(short aiPATs05, int avgTime, int shiDir03, short iSBch
 			avg_nt += abs(dif_nt);
 			avg_gx += abs(dif_gx);
 
-			avg_g2x += abs(dif_g2x);
-			avg_ms += abs(dif_ms);
+			if( SHIFT_DN==shiDir03 || SHIFT_SKIP_DN==shiDir03 ) 
+			{
+				avg_g2x += abs(dif_g2x);
+				avg_ms += abs(dif_ms);
+			}
 			//fprintf(stderr, " %2d -> %10lld  %10lld  \n", ii, avg_t1, avg_t2 );
 		}
 
@@ -17186,10 +17285,27 @@ int ShiftData_LastSorting(short aiPATs05, int avgTime, int shiDir03, short iSBch
 		avg_t1 /= (iPosCount[0]);
 		avg_t2 /= (iPosCount[0]);
 		avg_t3 /= (iPosCount[0]);
-		avg_nt /= (iPosCount[0]);
-		avg_gx /= (iPosCount[0]);
-		avg_g2x /= (iPosCount[0]);
-		avg_ms /= (iPosCount[0]);
+
+		if(avg_ntcnt)
+			avg_nt /= avg_ntcnt; // (iPosCount[0]);
+		else
+			avg_nt /= (iPosCount[0]);
+
+		if(avg_gxcnt)
+			avg_gx /= avg_gxcnt; // (iPosCount[0]);
+		else
+			avg_gx /= (iPosCount[0]);
+
+		if(avg_g2xcnt)
+			avg_g2x /= avg_g2xcnt; // (iPosCount[0]);
+		else
+			avg_g2x /= (iPosCount[0]);
+
+		if(avg_mscnt)
+			avg_ms /= avg_mscnt; // (iPosCount[0]);
+		else
+			avg_ms /= (iPosCount[0]);
+			
 	}
 	else
 	{
@@ -17209,12 +17325,12 @@ int ShiftData_LastSorting(short aiPATs05, int avgTime, int shiDir03, short iSBch
 	fprintf(stderr,"  Shift Average Time(t1:SS~SB) : %9ld msec <- by %d points \n", avg_t1, (iPosCount[0]) );
 	fprintf(stderr,"  Shift Average Time(t2:SB~SP) : %9ld msec <- by %d points \n", avg_t2, (iPosCount[0]) );
 	fprintf(stderr,"  Shift Average Time(t3:SP~SF) : %9ld msec <- by %d points \n", avg_t3, (iPosCount[0]) );
-	fprintf(stderr,"  Shift Average Time(NtMx~min) : %9ld msec <- by %d points \n", avg_nt, (iPosCount[0]) );
-	fprintf(stderr,"  Shift Average Time(GMax~min) : %9ld msec <- by %d points \n", avg_gx, (iPosCount[0]) );
+	fprintf(stderr,"  Shift Average Time(NtMx~min) : %9ld msec <- by %d points \n", avg_nt, avg_ntcnt ); // (iPosCount[0]) );
+	fprintf(stderr,"  Shift Average Time(GMax~min) : %9ld msec <- by %d points \n", avg_gx, avg_gxcnt ); // (iPosCount[0]) );
 	if( SHIFT_DN==shiDir03 || SHIFT_SKIP_DN==shiDir03 ) 
 	{
-	fprintf(stderr,"  Shift Average Time(Gmin~Max) : %9ld msec <- after SP. by %d points \n", avg_g2x, (iPosCount[0]) );
-	fprintf(stderr,"  Shift Average Time(MSMX~MSm) : %9ld msec <- after SP. by %d points \n", avg_ms, (iPosCount[0]) );
+	fprintf(stderr,"  Shift Average Time(Gmin~Max) : %9ld msec <- after SP. by %d points \n", avg_g2x, avg_g2xcnt ); // (iPosCount[0]) );
+	fprintf(stderr,"  Shift Average Time(MSMX~MSm) : %9ld msec <- after SP. by %d points \n", avg_ms, avg_mscnt ); // (iPosCount[0]) );
 	//fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
 	}
 
@@ -17457,14 +17573,14 @@ int t1t2GraphAferQsort(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData_typ
 	/* ----------------------------------------------------- */
 	fprintf(outfile,"t2(SB~SP)");
 
-
-	fprintf(outfile,"\n   [sec]");	
+	fprintf(outfile,"\n");
+	fprintf(outfile,"%3s[sec]", "");
 	for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile," ");
 	if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
 	/* ----------------------------------------------------- */
 	/* Y-Axis Title : Right -------------------------------- */
 	/* ----------------------------------------------------- */
-	fprintf(outfile,"   [sec]\n");
+	fprintf(outfile,"%4s[sec]\n","");
 
 
 	/* ----------------------------------------------------- */
@@ -17479,7 +17595,7 @@ int t1t2GraphAferQsort(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData_typ
 	/* Y-Axis Title : Right --------------------------------- */
 	/* 1st line */
 	/* ----------------------------------------------------- */
-	fprintf(outfile,"%7s|","");
+	fprintf(outfile,"%8s|","");
 	fprintf(outfile,"\n");
 
 
@@ -17593,7 +17709,7 @@ int t1t2GraphAferQsort(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData_typ
 			/* ---------------------------------------------- */
 			/* Right Graph : Y-Axis */
 			/* ---------------------------------------------- */
-			fprintf(outfile,"%7s|","");
+			fprintf(outfile,"%8s|","");
 			fprintf(outfile,"\n");
 		}
 
@@ -17612,7 +17728,7 @@ int t1t2GraphAferQsort(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData_typ
 			fprintf(outfile,"%7s|", "");
 
 		/* ---------------------------------------------- */
-		/* LEFT Graph : Data Area*/
+		/* LEFT 1st Graph : Data Area*/
 		/* ---------------------------------------------- */
 		for(xx=0; xx<xxMax; xx++)
 		{
@@ -17633,25 +17749,25 @@ int t1t2GraphAferQsort(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData_typ
 
 				case 0:
 				default:
-					fprintf(outfile,"%6s%4s", tblV1[ xx ][ yy ].symbol, "" );					
+					fprintf(outfile,"%5s%5s", tblV1[ xx ][ yy ].symbol, "" );					
 					break;
 				}
 			}
 		}
 
 		/* ---------------------------------------------- */
-		/* RIGHT Graph : Y-axis */
+		/* RIGHT 2nd Graph : Y-axis */
 		/* ---------------------------------------------- */
 		if(yy==0)
 		{
-			fprintf(outfile,"%10.2lf|", (float)(gYMaxt2-yy)/(float)TIME_FACTOR  );
+			fprintf(outfile,"%11.2lf|", (float)(gYMaxt2-yy)/(float)TIME_FACTOR  );
 		}
 		else if(yy==yyMax)
 		{
-			fprintf(outfile,"%10.2lf|", (gYmint2)/(float)TIME_FACTOR  );
+			fprintf(outfile,"%11.2lf|", (gYmint2)/(float)TIME_FACTOR  );
 		}
 		else
-			fprintf(outfile,"%10s|", "");
+			fprintf(outfile,"%11s|", "");
 
 
 		/* ---------------------------------------------- */
@@ -17676,7 +17792,7 @@ int t1t2GraphAferQsort(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData_typ
 				
 				case 0: /* symbol */
 				default:
-					fprintf(outfile,"%6s%4s", tblV2[ xx ][ yy ].symbol, "" );					
+					fprintf(outfile,"%5s%5s", tblV2[ xx ][ yy ].symbol, "" );					
 					break;
 				}
 
@@ -17709,29 +17825,29 @@ int t1t2GraphAferQsort(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData_typ
 
 
 	/* ---------------------------------------------- */
-	/* LEFT -- End Line : Y-axis */
+	/* LEFT 1st -- End Line : Y-axis */
 	/* ---------------------------------------------- */
 	fprintf(outfile,"%7s|","");
 	for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile," ");
 	if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
 
 	/* ---------------------------------------------- */
-	/* RIGHT -- End Line : Y-axis */
+	/* RIGHT 2nd -- End Line : Y-axis */
 	/* ---------------------------------------------- */
-	fprintf(outfile,"%7s|","");
+	fprintf(outfile,"%8s|","");
 	fprintf(outfile,"\n");
 
 	/* ---------------------------------------------- */
-	/* LEFT -- End Line : Y-axis */
+	/* LEFT 1st -- End Line : Y-axis */
 	/* ---------------------------------------------- */
 	fprintf(outfile,"%7s+","");
 	for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile,"-");
 	if(xxMore) for(ii=0; ii<(SPACE_ONE_UNIT)*xxMore; ii++) fprintf(outfile,"-");
 
 	/* ---------------------------------------------- */
-	/* RIGHT -- End Line : Y-axis */
+	/* RIGHT 2nd -- End Line : Y-axis */
 	/* ---------------------------------------------- */
-	fprintf(outfile,"%7s+","");
+	fprintf(outfile,"%8s+","");
 	for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile,"-");
 	if(xxMore) for(ii=0; ii<(SPACE_ONE_UNIT)*xxMore; ii++) fprintf(outfile,"-");
 
@@ -17952,14 +18068,15 @@ int JerkGraphAferQsort(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData_typ
 	/* ---------------------------------------------- */
 	/* LEFT -- Y-axis Title Disply ------- */
 	/* ---------------------------------------------- */
-	fprintf(outfile,"\n  Jerk1");
+	fprintf(outfile,"\n");
+	fprintf(outfile,"%2sJerk1", "");
 	for(ii=0; ii<SPACE_ONE-1; ii++) fprintf(outfile," ");
 	if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
 
 	/* ---------------------------------------------- */
 	/* Right -- Y-axis Title Disply ------- */
 	/* ---------------------------------------------- */
-	fprintf(outfile,"   Ne-Max");
+	fprintf(outfile,"%4sNe-Max", "");
 	/* ----------------------------------------------------------------------- */
 
 	fprintf(outfile,"\n [G/sec]");
@@ -17969,7 +18086,7 @@ int JerkGraphAferQsort(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData_typ
 	/* ---------------------------------------------- */
 	/* Right -- Y-axis Title Disply ------- */
 	/* ---------------------------------------------- */
-	fprintf(outfile,"    [rpm]\n");
+	fprintf(outfile,"%5s[rpm]\n", "");
 
 	/* ---------------------------------------------- */
 	/* LEFT -- Y-axis ------- */
@@ -17981,7 +18098,7 @@ int JerkGraphAferQsort(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData_typ
 	/* ---------------------------------------------- */
 	/* RIGHT -- Y-axis ------- */
 	/* ---------------------------------------------- */
-	fprintf(outfile,"%7s|","");
+	fprintf(outfile,"%8s|","");
 	fprintf(outfile,"\n");
 
 
@@ -18118,20 +18235,20 @@ int JerkGraphAferQsort(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData_typ
 				{
 					if( 0 == tblV1[ xx ][ yy-1 ].value ) 
 					{
-						fprintf(outfile," %5s%4s","","");
+						fprintf(outfile,"%6s%4s","","");
 					}
 					else
 					{
-						fprintf(outfile," %-9.2lf", (tblV1[ xx ][ yy-1 ].value/(float)RPT_JERK_SCALE) );
+						fprintf(outfile,"%2s%-8.2lf", "", (tblV1[ xx ][ yy-1 ].value/(float)RPT_JERK_SCALE) );
 					}
 				}
-				fprintf(outfile,"%10s|","");
+				fprintf(outfile,"%11s|","");
 			}
 			else
 			{
 				for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile," ");
 				if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
-				fprintf(outfile,"%7s|","");
+				fprintf(outfile,"%8s|","");
 			}
 
 			// ----------------------------------
@@ -18143,11 +18260,11 @@ int JerkGraphAferQsort(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData_typ
 				{
 					if( 0 == tblV2[ xx ][ yy-1 ].value ) 
 					{
-						fprintf(outfile," %5s%4s","","");
+						fprintf(outfile,"%6s%4s","","");
 					}
 					else
 					{
-						fprintf(outfile," %-9.2lf", (tblV2[ xx ][ yy-1 ].value /(float)RPT_NE_SCALE) );
+						fprintf(outfile,"%2s%-8.1lf", "", (tblV2[ xx ][ yy-1 ].value /(float)RPT_NE_SCALE) );
 					}
 				}
 			}
@@ -18175,19 +18292,19 @@ int JerkGraphAferQsort(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData_typ
 		{
 			if( 0 == tblV1[ xx ][ yy ].value ) 
 			{
-				fprintf(outfile," %5s%4s","","");
+				fprintf(outfile,"%6s%4s","","");
 			}
 			else
 			{
 				if( (0==yy || yy==yyMax) && xx==xxMax-1 )
 				{
-					if(gType) fprintf(outfile," %5s%4s", tblV1[ xx ][ yy ].gearTxt, "" ); /* shift, for example <1-2> */
-					if(0==gType) fprintf(outfile," %4s%5s", tblV1[ xx ][ yy ].symbol, "" ); /* 0 means symbol only */
+					if(gType) fprintf(outfile,"%6s%4s", tblV1[ xx ][ yy ].gearTxt, "" ); /* shift, for example <1-2> */
+					if(0==gType) fprintf(outfile,"%5s%5s", tblV1[ xx ][ yy ].symbol, "" ); /* 0 means symbol only */
 				}
 				else
 				{
-					if(gType) fprintf(outfile," %5s%4s", tblV1[ xx ][ yy ].gearTxt, "" ); /* shift, for example <1-2> */
-					if(0==gType) fprintf(outfile," %4s%5s", tblV1[ xx ][ yy ].symbol, "" ); /* 0 means symbol only */
+					if(gType) fprintf(outfile,"%6s%4s", tblV1[ xx ][ yy ].gearTxt, "" ); /* shift, for example <1-2> */
+					if(0==gType) fprintf(outfile,"%5s%5s", tblV1[ xx ][ yy ].symbol, "" ); /* 0 means symbol only */
 				}
 			}
 		}
@@ -18195,34 +18312,34 @@ int JerkGraphAferQsort(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData_typ
 
 		if(yy==0)
 		{
-			fprintf(outfile,"%10.1lf|", (float)(gYMaxt2-yy)  );
+			fprintf(outfile,"%11.1lf|", (float)(gYMaxt2-yy)  );
 		}
 		else if(yy==yyMax)
 		{
-			fprintf(outfile,"%10.1lf|", (gYmint2)  );
+			fprintf(outfile,"%11.1lf|", (gYmint2)  );
 		}
 		else
 		{
-			fprintf(outfile,"%10s|", "");
+			fprintf(outfile,"%11s|", "");
 		}
 
 		for(xx=0; xx<xxMax; xx++)
 		{
 			if( 0 == tblV2[ xx ][ yy ].value ) 
 			{
-				fprintf(outfile," %5s%4s","","");
+				fprintf(outfile,"%6s%4s","","");
 			}
 			else
 			{
 				if( (0==yy || yy==yyMax) && xx==xxMax-1 )
 				{
-					if(gType) fprintf(outfile," %5s%4s", tblV2[ xx ][ yy ].gearTxt, "" );
-					if(0==gType) fprintf(outfile," %5s%4s", tblV2[ xx ][ yy ].symbol, "" );
+					if(gType) fprintf(outfile,"%6s%4s", tblV2[ xx ][ yy ].gearTxt, "" );
+					if(0==gType) fprintf(outfile,"%5s%5s", tblV2[ xx ][ yy ].symbol, "" );
 				}
 				else
 				{
-					if(gType) fprintf(outfile," %5s%4s", tblV2[ xx ][ yy ].gearTxt, "" );
-					if(0==gType) fprintf(outfile," %5s%4s", tblV2[ xx ][ yy ].symbol, "" );
+					if(gType) fprintf(outfile,"%6s%4s", tblV2[ xx ][ yy ].gearTxt, "" );
+					if(0==gType) fprintf(outfile,"%5s%5s", tblV2[ xx ][ yy ].symbol, "" );
 				}
 				
 			}
@@ -18243,7 +18360,7 @@ int JerkGraphAferQsort(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData_typ
 		/* ------------------------------------ */
 		/* RIGHT area */
 		/* ------------------------------------ */		
-		fprintf(outfile,"%7s|","");
+		fprintf(outfile,"%8s|","");
 		fprintf(outfile,"\n");
 	}
 	else
@@ -18260,23 +18377,20 @@ int JerkGraphAferQsort(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData_typ
 			{
 				if( 0 == tblV1[ xx ][ yy-1 ].value ) 
 				{
-					if( (0==yy || yy==yyMax-1) && xx==xxMax-1 )
-						fprintf(outfile," %5s%4s","  ","");
-					else
-						fprintf(outfile," %5s%4s","  ","");
+					fprintf(outfile,"%6s%4s","","");
 				}
 				else
 				{
-					fprintf(outfile," %-9.2lf", (tblV1[ xx ][ yy-1 ].value /(float)RPT_JERK_SCALE) );
+					fprintf(outfile,"%-10.2lf", (tblV1[ xx ][ yy-1 ].value /(float)RPT_JERK_SCALE) );
 				}
 			}
-			fprintf(outfile,"%10s|","");
+			fprintf(outfile,"%11s|","");
 		}
 		else
 		{
 			for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile," ");
 			if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile," ");
-			fprintf(outfile,"%7s|","");
+			fprintf(outfile,"%8s|","");
 		}
 
 		// ----------------------------------
@@ -18288,14 +18402,11 @@ int JerkGraphAferQsort(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData_typ
 			{
 				if( 0 == tblV2[ xx ][ yy-1 ].value ) 
 				{
-					if( (0==yy || yy==yyMax-1) && xx==xxMax-1 )
-						fprintf(outfile," %5s%4s","  ","");
-					else
-						fprintf(outfile," %5s%4s","  ","");
+					fprintf(outfile,"%6s%4s","","");
 				}
 				else
 				{
-					fprintf(outfile," %-9.2lf", (tblV2[ xx ][ yy-1 ].value /(float)RPT_NE_SCALE) );
+					fprintf(outfile,"%-10.2lf", (tblV2[ xx ][ yy-1 ].value /(float)RPT_NE_SCALE) );
 				}
 			}
 		}
@@ -18315,7 +18426,7 @@ int JerkGraphAferQsort(graphData_type tblV1[][MAX_GEAR_Y_BUF_SIZ], graphData_typ
 	for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile,"-");
 	if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile,"-");
 
-	fprintf(outfile,"%7s+","");
+	fprintf(outfile,"%8s+","");
 	for(ii=0; ii<SPACE_ONE; ii++) fprintf(outfile,"-");
 	if(xxMore) for(ii=0; ii<SPACE_ONE_UNIT*xxMore; ii++) fprintf(outfile,"-");
 	
@@ -19857,82 +19968,14 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 	memset(currPath, 0x00, PATH_MAX*sizeof(char) );
 
 	memset(yyCurValid, 0x00, MAX_GEAR_Y_BUF_SIZ*sizeof(int) );
-		
 
 	RecordCnt  = 0ULL;
 	iNGcount   = 0ULL;
 	iOKcount   = 0ULL;
 
-#if 0
-	/* ----------------------------------------------------------------------------- */
-	/* DATE & TIME at operating time ----------------------------------------------- */
-	/* ----------------------------------------------------------------------------- */
-	{
-	time_t	rawtime;
-	struct tm *localTime;
-	struct tm* gm_timeinfo;
-	int iYr, iMo, iDy, iHr, imn, ise, iwd;
-	int bmoHr=0, bjaHr=0;
-	int bmoDay=0, bjaDay=0;
-	static int iYOONDAY = 29;
-		
-	time( &rawtime );
-	localTime = localtime( &rawtime ); /* time_t	형식으로 변환합니다. */
 
-	iYr = localTime->tm_year+1900;
-	iMo = localTime->tm_mon+1;
-	iDy = localTime->tm_mday;
-	iHr = localTime->tm_hour+9;
-	imn = localTime->tm_min;
-	ise = localTime->tm_sec;
-	iwd = localTime->tm_wday;
-
-	memset(sToday, 0x00, sizeof(sToday) );
-
-	#if 0
-	printf("local time and date : %s\n", asctime(localTime));
-	gm_timeinfo = gmtime(&rawtime);
-	printf("gm time and date : %s\n", asctime(gm_timeinfo));
-	#endif
-
-	if( 2==iMo )
-	{
-		if( is_YoonYear( iYr ) ) iYOONDAY = 29;
-		else iYOONDAY = 28;
-
-		bmoDay= iDy/iYOONDAY;
-		bjaDay = iDy%iYOONDAY; 
-		
-		iMo += bmoDay;
-		if(iHr >= 24)
-			iDy = 0;
-		else
-			iDy = 1;
-	}
-
-	if(iHr >= 24)
-	{
-
-		bmoHr = iHr/24;
-		bjaHr = iHr%24; 
-
-		iDy += bmoHr;
-		iHr = bjaHr;
-
-		iwd += bmoHr;
-		iwd %= 6;
-	}
-
-	sprintf(sToday, "%4d/%02d/%02d(%s), %02d:%02d:%02d", 
-			iYr, iMo, iDy, WeekTXT[ iwd ], iHr, imn, ise );
-
-	}
-	/* ----------------------------------------------------------------------------- */
-	/* ----------------------------------------------------------------------------- */
-#else
 	memset(sToday, 0x00, sizeof(sToday) );
 	CurrDatenTime(sToday);
-#endif
 
 
 #if SAVEMODE
@@ -19943,11 +19986,11 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 			fprintf(stderr, "[++ERROR++] Can not check current directory!! \n\n") ;
 		} 
 
-		if( -1==iGearTableIndex )
+		if( -1==iGearTableIndex ) /* gear.gil file */
 		{
-			fprintf(outfile," Version:%s - Shift Quality Report %s/%sShift/gear.gil - %s by GIL&S \n", 
+			fprintf(outfile," Version:%s - Shift Quality Report %s/%sShift/gear.gil(%s) - %s by GIL&S \n", 
 						AttVersion, arrPATs_ModeID[aiPATs05].ModeID, 
-						(shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDown":"*Unknown"))), sToday );
+						(shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDown":"*Unknown"))), gVehicleTypeinFile, sToday );
 		}
 		else
 		{
@@ -19955,8 +19998,8 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 						AttVersion, arrPATs_ModeID[aiPATs05].ModeID, 
 						(shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Down":(shiDir03==SHIFT_SKIP_DN?"SkipDown":"*Unknown"))), gVehicleType[iGearTableIndex], sToday );
 		}
-		
 		fprintf(outfile," FileName: %s\\%s *MD5*%s\n", currPath, shift_in, md5Value );
+
 
 		if( SHIFT_UP==shiDir03 ) 
 		{
@@ -19980,7 +20023,6 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 
 			fprintf(outfile, REPORT_TXT_DN "\n");
 		}
-
 
 	}
 #endif
@@ -21152,7 +21194,7 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 		/* ----------------------------------------------------- */
 		fprintf(outfile," %10s === UpShift Average t1(SS~SB) time(sec) === ", "");
 
-		for(ii=0; ii<FUNC_SPC+14; ii++) fprintf(outfile," ");
+		for(ii=0; ii<FUNC_SPC+10; ii++) fprintf(outfile," ");
 		if(xxMore) for(ii=0; ii<(SPACE_ONE_UNIT-2)*xxMore; ii++) fprintf(outfile," ");
 
 		/* ----------------------------------------------------- */
@@ -21249,7 +21291,7 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 
 		t1t2GraphAferQsort(tblT1, tblT2, xxMax, yyMax, gValueDisplay);
 
-		fprintf(outfile,"\r\n\r\n");
+		fprintf(outfile,"\r\n\n");
 
 
 
@@ -21260,14 +21302,17 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 		/* -- Max Ne (S.B 부근) -------------- */
 		/* -- 3 ------------------------------ */
 
+		/* Left Jerk1 average TITLE */
 		fprintf(outfile," %10s === UpShift Average Jerk1 by LPF(%.1lf%%) === ","", JERK_LPFfactor*100 );
+
 		for(ii=0; ii<FUNC_SPC+10; ii++) fprintf(outfile," ");
 		if(xxMore) for(ii=0; ii<(SPACE_ONE_UNIT-2)*xxMore; ii++) fprintf(outfile," ");
 
+		/* Right Max Ne average TITLE */
 		fprintf(outfile," %4s === UpShift Average Ne Max(rmp) === ", "");
 		fprintf(outfile,"\r\n");
 		
-		//fprintf(outfile,"<<Jerk1>> ");
+		/* Left Jerk1 average Title */
 		fprintf(outfile,"    <Jerk1>  ");
 		for(xx=0; xx<APS_TABLE_NUM && (int)ApsTble[xx]; xx++)
 		{
@@ -21276,8 +21321,8 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 
 		for(ii=0; ii<FUNC_SPC; ii++) fprintf(outfile," ");
 
-		//fprintf(outfile,"<<Ne Max>>");
-		fprintf(outfile,"    <Ne Max> ");
+		/* Right Max Ne average Title */
+		fprintf(outfile,"   <Ne Max> ");
 		for(xx=0; xx<APS_TABLE_NUM && (int)ApsTble[xx]; xx++)
 		{
 			fprintf(outfile," %4d(%%)", (int)ApsTble[ xx ] );
@@ -21288,6 +21333,7 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 		xxMore = xxMax-6;
 
 
+		/* Left Title bar */
 		fprintf(outfile,"\n");
 		fprintf(outfile,"%2s","");
 		for(ii=0; ii<60; ii++) fprintf(outfile,"-");
@@ -21295,16 +21341,16 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 
 		for(ii=0; ii<FUNC_SPC-2; ii++) fprintf(outfile," ");
 
-		fprintf(outfile,"%2s","");
+		/* Right Title bar */
+		fprintf(outfile,"%3s","");
 		for(ii=0; ii<60; ii++) fprintf(outfile,"-");
 		if(xxMore) for(ii=0; ii<(SPACE_ONE_UNIT-2)*xxMore; ii++) fprintf(outfile,"-");
 		fprintf(outfile,"\n");
 
 
-
 		for(yy=1; yy<=yyMax; yy++)
 		{
-			//fprintf(outfile,"  <%d-%d> : ", yy,yy+1 ); /* <curGear-tgtGear>*/
+			/* Left Jerk1 average data table */
 			fprintf(outfile,"%5s(%d%d) : ","", yy,yy+1 ); /* <curGear-tgtGear>*/
 			for(xx=0; xx<xxMax; xx++)
 			{
@@ -21319,7 +21365,7 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 
 			for(ii=0; ii<FUNC_SPC; ii++) fprintf(outfile," ");
 
-			//fprintf(outfile,"  <%d-%d> : ", yy,yy+1 ); /* <curGear-tgtGear>*/
+			/* Right Max Ne average data table */
 			fprintf(outfile,"%6s(%d%d) : ", "", yy,yy+1 ); /* <curGear-tgtGear>*/
 			for(xx=0; xx<xxMax; xx++)
 			{
@@ -21331,7 +21377,6 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 					//tblNeMX[ 0 ][ yy ].YvalNum ++;
 				}
 			}
-		
 			fprintf(outfile,"\n");
 		}
 		fprintf(outfile,"\r\n");
@@ -29895,7 +29940,7 @@ int main(int argc, char *argv[])
 
 		fprintf(stderr,"\r\n");
 		fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
-		fprintf(stderr,"Shift Quality Data Sorting --> UPShift...   \n");
+		fprintf(stderr,"Shift Quality Data Sorting -->\033[1;35m UPShift...  \033[0m \n");
 		fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
 
 
@@ -29903,6 +29948,7 @@ int main(int argc, char *argv[])
 		// UPSHIFT >> 1st STEP -----------------------------------------------
 		// input  : key-in~~~~
 		// output : ~~.ECO
+		iPwrOnOff = SHI_PWR_ON;
 		iavgtm = ShiftQualData(iModeID, iPwrOnOff, SHIFT_UP, iSBchoicePnt, &SPoint, &iSBchk, isOriginFileSave);
 
 		// --------------------------------------------------------
@@ -29910,7 +29956,6 @@ int main(int argc, char *argv[])
 		// input  : *.ECO
 		// output : *.bECO if return value ichk==1
 		ignoredCnt = SSnNtPointFix(iModeID, iSBchoicePnt, SHIFT_UP, SPoint, &SRPoint, &iSBchk);
-
 
 
 		// 3rd STEP -----------------------------------------------
@@ -29922,12 +29967,10 @@ int main(int argc, char *argv[])
 		}
 
 
-
 		// 3rd STEP -----------------------------------------------
 		// input  : *.bECO or *.iECO
 		// output : *.gECO -> GMax and Gmin Table 
 		FindGminMaxShiftData(iModeID, SRPoint, SHIFT_UP, ignoredCnt, iavgtm);
-
 
 
 		// --------------------------------------------------------
@@ -29935,7 +29978,6 @@ int main(int argc, char *argv[])
 		// input  : *.mECO 
 		// output : *.dta // *.txt
 		ignoredCnt = ShiftData_Filtering(iModeID, iavgtm, SHIFT_UP, iSBchoicePnt);
-
 
 
 		// 5th STEP -----------------------------------------------
@@ -29978,14 +30020,14 @@ int main(int argc, char *argv[])
 		{
 			fprintf(stderr,"\r\n");
 			fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
-			fprintf(stderr,"Shift Quality Data Sorting --> Sequential DownShift...  \n");
+			fprintf(stderr,"Shift Quality Data Sorting -->\033[1;35m Sequential DownShift...  \033[0m \n");
 			fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
 		}
 		else if(SHIFT_SKIP_DN==isDownShift)
 		{
 			fprintf(stderr,"\r\n");
 			fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
-			fprintf(stderr,"Shift Quality Data Sorting --> Skip DownShift...  \n");
+			fprintf(stderr,"Shift Quality Data Sorting -->\033[1;35m Skip DownShift...  \033[0m \n");
 			fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
 		}
 
@@ -29993,6 +30035,7 @@ int main(int argc, char *argv[])
 		// DOWNSHIFT >> 1st STEP -----------------------------------------------
 		// input  : key-in~~~~
 		// output : ~~.ECO
+		iPwrOnOff = SHI_PWR_ON;
 		iavgtm = ShiftQualData(iModeID, iPwrOnOff, isDownShift /*SHIFT_DN*/, iSBchoicePnt, &SPoint, &iSBchk, isOriginFileSave);
 		
 		// --------------------------------------------------------

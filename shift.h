@@ -43,7 +43,7 @@
 
 
 
-const char AttVersion[] = "1.5.7"; /* ver 1.4.5 : 2023.3.4 : DownShift - Shift Quality Data Sorting */
+const char AttVersion[] = "1.5.9"; /* ver 1.4.5 : 2023.3.4 : DownShift - Shift Quality Data Sorting */
 const char EmailText[]  = "tp.joo@daum.net";
 
 
