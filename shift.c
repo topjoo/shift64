@@ -88,9 +88,11 @@
 void beep (int frequency, int duration)
 {
 #if 0
-#define ESC 	27
+#define ESC 	"\033"
 
-	fprintf(stderr,"%c[10;%d]%c[11;%d]\a", ESC, frequency, ESC, duration);
+	fprintf(stderr,"%c\a", ESC); // , frequency, ESC, duration);
+
+	//fprintf(stderr,"%c[10;%d]%c[11;%d]\a", ESC, frequency, ESC, duration);
 #endif
 }
 
@@ -22835,14 +22837,35 @@ int main(int argc, char *argv[])
 	
 		// License OK~~
 		//fprintf(stderr,"\n");		
-		fprintf(stderr," --->> Acquired the License on the PC... (%#x) \n", iret);
-		fprintf(stderr,"---------------------------------------------------------------\n" );
+		fprintf(stderr,"--->> The authorized PC for which a license has been acquired... (%#x) \n", iret);
+		fprintf(stderr,"-------------------------------------------------------------------------\n" );
 
 		if( !isFileExist( "--upshift", 0) )
 		{
 			if( (wt = fopen( "--upshift", "w")) != NULL )  
 			{
-				fprintf(wt,"--upshift ECO 3 200 50 50 m10 3 2 option by %s %s \n", __DATE__, __TIME__ );
+				fprintf(wt,"--upshift command created by %s %s \n", __DATE__, __TIME__ );
+				fprintf(wt,"--------------------------------------------------------------------------------------------------------------------------\n");
+				fprintf(wt,"  --upshift [ModeID] [Cont#] [Jerk#] [Nt-pos#] [JItime#] [J1Ivalue#] [APS PWR#] [APS Tol#] [APS#1] [APS#2] [APS#3]\n" );
+				fprintf(wt,"              ModeID : ECO, SPT, NOR and you can add option as .last (default: first position) or gear ratio (.sx2, .gn7) \n");
+				fprintf(wt,"          Gear ratio : .SX2(default gear ratio), .GN7 or .file \n");
+				fprintf(wt,"               Cont# : SB/SP point decision continuous count. (default 3 times decision) \n");
+				fprintf(wt,"               Jerk# : Reverse time length at SB point for Jerk1 calcution. (default 200msec, range:100~2000msec) \n");
+				fprintf(wt,"             Nt-pos# : Before or after time position for Nt-Max/Nt-min position (default: +/-50msec, range:50~200msec) \n");
+				fprintf(wt,"             JItime# : Jerk1 ignored time value (default: 50msec under) \n");
+				fprintf(wt,"           J1Ivalue# : Jerk1 ignored value (default: -10G/sec under). NOTE m10 means -10. \n");
+				fprintf(wt,"            APS PWR# : APS Power On low level as 3 or 4.5. -> Power On decision level (default 3%%) \n");
+				fprintf(wt,"            APS Tol# : APS Power tolerance as +/-2%%, or +/-3%% (default: +/-2%%) \n");
+				fprintf(wt,"               APS#1 : APS Power Start value. for example 20 \n");
+				fprintf(wt,"               APS#2 : APS Power End value. for example 100 \n");
+				fprintf(wt,"               APS#3 : APS Power Step. for example 10 \n");
+				fprintf(wt,"\n");
+				fprintf(wt," Ex) shift.exe --input 5ms_16select.tsv --output 5ms_eco.txt --upshift eco.gn7 	    3 200 50 50 m15 3 2	  \n");
+				fprintf(wt,"     shift.exe --input 5ms_16select.tsv --output 5ms_spt.txt --upshift spt.g1.sx2   2 200 50 50 m10 3 1.5 \n");
+				fprintf(wt,"     shift.exe --input 5ms_16select.tsv --output 5ms_nor.txt --upshift NOR.last.SX2 5 100 90              \n");
+				fprintf(wt,"     shift.exe --input 5ms_16select.tsv --output 5ms_nor.txt --upshift spt.g2  \n");
+				fprintf(wt,"     shift.exe --input 5ms_16select.tsv --output 5ms_spt.txt --upshift spt          3 100 70 60 m5 3 2 20 100 10  \n");
+				fprintf(wt,"         -> Sorted result output : 5ms_eco.gil and 5ms_eco.rpt \n");
 				fclose(wt);
 			}
 		}
@@ -22851,7 +22874,33 @@ int main(int argc, char *argv[])
 		{
 			if( (wt = fopen( "--downshift", "w")) != NULL )  
 			{
-				fprintf(wt,"--downshift SPT option by %s %s \n", __DATE__, __TIME__ );
+				fprintf(wt,"--downshift command created by %s %s \n", __DATE__, __TIME__ );
+				fprintf(wt,"--------------------------------------------------------------------------------------------------------------------------\n");
+				fprintf(wt,"  --downshift [ModeID] [Cont#1] [Jerk#2] [Nt-pos#] [JItime#] [J1Ivalue#] [J2Ivalue#] [APS PWR#] [VS Tol#] \n");
+				fprintf(wt,"              ModeID : ECO, SPT, NOR and you can add option as .last (default: first position) or gear ratio (.sx2, .gn7) \n");
+				fprintf(wt,"          Gear ratio : .SX2(default gear ratio), .GN7 or .file \n");
+				fprintf(wt,"      DownShift type : .skip for skip downshift (default: sequential downshift) \n");
+				fprintf(wt,"              Cont#1 : SB/SP point decision continuous count. (default 3 times decision) \n");
+				fprintf(wt,"              Jerk#2 : Reverse time length at SB point for Jerk1, Jerk2 calcution. (range:100~2000ms) \n");
+				fprintf(wt,"                       default: 300msec for Skip downshift, 200msec for Sequential downshift \n");
+				fprintf(wt,"             Nt-pos# : Before or after time position for Nt-Max/Nt-min position (default: +/-50msec, range:50~200msec) \n");
+				fprintf(wt,"             JItime# : Jerk1 and Jerk2 ignored time value (default: 50msec under) \n");
+				fprintf(wt,"           J1Ivalue# : Jerk1 ignored value (default: -10G/sec under). NOTE m10 means -10. \n");
+				fprintf(wt,"           J2Ivalue# : Jerk2 ignored value (default: 20G/sec over).  \n");
+				fprintf(wt,"            APS PWR# : APS Power On low level as 3%% or 4%%. (default 3%%) \n");
+				fprintf(wt,"             VS Tol# : Vehicle Speed tolerance as +/-5kph, (default +/-5kph) \n");
+				fprintf(wt,"\n");
+				fprintf(wt," Ex) shift.exe --input GN7_3.5GDI_PONDOWN_KD.tsv --output gn7_spt.txt --downshift SPT.gn7.g1	 3 150 60 70 m15 20 3 5 \n");
+				fprintf(wt,"     shift.exe --input GN7_3.5GDI_PONDOWN_KD.tsv --output gn7_eco.txt --downshift eco.skip.file  \n");
+				fprintf(wt,"     shift.exe --input GN7_3.5GDI_PONDOWN_KD.tsv --output gn7_eco.txt --downshift eco.gn7.skip  3 250 \033[0m \n");
+				fprintf(wt,"       -> Sorted result output : gn7_spt.gil and gn7_spt.rpt \n");
+				fprintf(wt,"\n");
+				fprintf(wt," [ModeID]: HOT WUP MNL DN2 DN1 UP1 UP2 UP3 NOR ECO ECODN2 ECODN1 ECOUP1 ECOUP2 ECOUP3 CRZ CRZUP1 CRZUP2 BRK1 BRK2 \n" );
+				fprintf(wt,"           HUP1 HUP2 HUP3 SPTDN2 SPTDN1 SPT SPTUP1 SPTUP2 SPTUP3 SS_XECO SS_ECODN2 SS_ECODN1 SS_ECO SS_ECOUP1 \n" );
+				fprintf(wt,"           SS_ECOUP2 SS_ECOUP3 SS_DN2 SS_DN1 SS_NOR SS_UP1 SS_UP2 SS_UP3 SS_SPTDN2 SS_SPTDN1 SS_SPT SS_SPTUP1 \n");
+				fprintf(wt,"           SS_SPTUP2 SS_SPTUP3 SS_XSPTDN2 SS_XSPTDN1 SS_XSPT SS_XSPTUP1 SS_XSPTUP2 SS_XSPTUP3 L4W COLD SNOW SNOWUP1 \n" );
+				fprintf(wt,"           SNOWUP2 SAND SANDUP1 SANDUP2 MUD MUDUP1 MUDUP2 TOWDN2 TOWDN1 TOW TOWUP1 TOWUP2 TOWUP3 \n" );
+
 				fclose(wt);
 			}
 		}
