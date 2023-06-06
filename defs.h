@@ -54,6 +54,7 @@
 
 
 
+#define DOS_COLOR_PRINT 			1 /* 2023-05-28 */
 
 #define SHIFT_QUALITY_DATA_SORTING 	1 /* 2022-11-13 - Shift Quality Data Sorting Program */
 #define QUAL_DATA_MAX_SIZE 	 		(1024)
@@ -96,6 +97,9 @@
 #define QUAL_F_GIL_ITEM_NUM 		33 /* 2023-04-08  */
 
 
+#define SKIP_DOWNSHIFT_KICKDOWN 		1 /* 2023-06-03 */
+
+
 /* ---- Just Debug Message ---- */
 #define DEBUG_MSG_1ST_POINT_TIME 		0
 #define DEBUG_MSG_OVER_TIME 			0
@@ -104,6 +108,7 @@
 #define DEBUG_GMAX_GMIN_LOG2 			0
 
 
+#define CHECK_ERROR 					0 /* 2023-05-28 finding for segmentation error */
 
 #define VEHICLE_TYPE_FILE_REC_LEN 		512		
 #define VEHICLE_TYPE_NUMS 				11

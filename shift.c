@@ -345,7 +345,7 @@ char *commify(double val, char *buf, int round)
 }
 
 
-
+#if DOS_COLOR_PRINT
 void ColorSet(short bold, short blink, short color, short released)
 {
 	
@@ -396,7 +396,12 @@ void ColorSet(short bold, short blink, short color, short released)
 	if(released)
 		fprintf(stderr,"\033[0m"); /* RED Color setting */
 }
-
+#else
+void ColorSet(short bold, short blink, short color, short released)
+{
+	// NONE
+}
+#endif
 
 
 void help_brief(void)
@@ -422,7 +427,11 @@ void help(void)
 {
 #if SHIFT_QUALITY_DATA_SORTING /* 2022-11-13 */
 
+	#if DOS_COLOR_PRINT
 	printf("\n\033[1mUsage: shift.exe [Version %s, Build:%s] by TOP.JOO. \033[0m\r\n"
+	#else
+	printf("\nUsage: shift.exe [Version %s, Build:%s] by TOP.JOO. \r\n"
+	#endif
 
 #else
 
@@ -635,7 +644,7 @@ void help(void)
            "  --upshift [ModeID] [Cont#] [Jerk#] [Nt-pos#] [JItime#] [J1Ivalue#] [APS PWR#] [APS Tol#] [APS#1] [APS#2] [APS#3]\n" 
            "\033[0m" /* Released */
            "             ModeID : ECO, SPT, NOR and you can add option as .last (default: first position) or gear ratio (.sx2, .gn7) \n"
-           "         Gear ratio : .SX2(default table), .GN7 or .file \n"
+           "         Gear ratio : .SX2(default table), .GN7, .VW1 or .file \n"
            "              Cont# : SB/SP point decision continuous count. (default 3 times decision) \n"
            "              Jerk# : Reverse time length at SB point for Jerk1 calcution. (default 200msec, range:100~2000msec) \n"
            "            Nt-pos# : Before or after time position for Nt-Max/Nt-min position (default: +/-50msec, range:50~200msec) \n"
@@ -659,7 +668,7 @@ void help(void)
            "  --downshift [ModeID] [Cont#1] [Jerk#2] [Nt-pos#] [JItime#] [J1Ivalue#] [J2Ivalue#] [APS PWR#] [VS Tol#] \n" 
            "\033[0m" /* Released */
            "             ModeID : ECO, SPT, NOR and you can add option as .last (default: first position) or gear ratio (.sx2, .gn7) \n"
-           "         Gear ratio : .SX2(default table), .GN7 or .file \n"
+           "         Gear ratio : .SX2(default table), .GN7 .VW1 or .file \n"
            "     DownShift type : .skip for skip downshift (default: sequential downshift) \n"
            "             Cont#1 : SB/SP point decision continuous count. (default 3 times decision) \n"
            "             Jerk#2 : Reverse time length at SB point for Jerk1, Jerk2 calcution. (range:100~2000ms) \n"
@@ -849,7 +858,7 @@ void AllFilesClosed(void)
  SF : Shift Finish (변속 종료)
  --------------------------------------------------------- */
 
-#define MAX_TABLE_SIZ 			(1000) //2000
+#define MAX_TABLE_SIZ 			(2000) // ver1.6.1, 2023-05-28, <- 1000
 #define MAX_DOWN_TXTFILE_SIZ 	(5000)
 
 #define SB_DECISION_TIMES 		3
@@ -1001,6 +1010,21 @@ const char ShiftText[4][30] = {
 #define TYPE_MAXLAST_G 	(0x80 | TYPE_MAX_G)
 
 
+/* 2023-06-03,  For isShiftType() */
+enum {
+	STYPE_PWR_ON_NONE = 0,
+	STYPE_PWR_ON_DRIVE = 1,
+	STYPE_PWR_ON_UP_SHIFT,
+	STYPE_PWR_ON_SEQU_DOWN_SHIFT,
+	STYPE_PWR_ON_SKIP_DOWN_SHIFT,
+	STYPE_PWR_ON_SKIP_KICKDOWN_SHIFT,  /* 5 */
+
+	STYPE_PWR_OFF_UP_SHIFT,
+	STYPE_PWR_OFF_SEQU_DOWN_SHIFT,
+	STYPE_PWR_OFF_SKIP_DOWN_SHIFT,
+};
+
+
 #define TIMELEN_POS 	20
 #define LEN_POS 		15
 #define TXT_SSTIME 			"(SS)"  /* Shift Start : Upshift case> tg : 1 -> 2 */
@@ -1027,6 +1051,8 @@ const char ShiftText[4][30] = {
 #define TXT_NtminTIME 		"(Nm)" // "(Nmn)"
 #define TXT_NtminTIMENONE 	"(N*m)" // "(Nmn)"
 #define TXT_NtminSWING0 	"(Nmn0)" /* Ntmin re-point because of Nt min level swing */
+
+#define TXT_UNKNOWN_EXCEP 	"(*e*)"
 
 #define TXT_UNKNOWN 		"(***)"
 #define TXT_UPCASE 			"(*u*)"
@@ -1148,14 +1174,14 @@ const char ShiftText[4][30] = {
 
 //unsigned int iSBnewPoint[500] = {0,};
 short iGearTableIndex = 0;
-char gVehicleTypeinFile[10];
+char gVehicleTypeinFile[11];
 
 const char gVehicleType[10][10] = {
 	"SX2", /* index 0 => default vehicle */
 	"SX2", /* index 1 */
 	"GN7", /* index 2 */
-	"", /* index 3 */
-	"", /* index 4 */
+	"VW1", /* index 3 - 2023.05.23 */
+	"SU2i", /* index 4 - 2023.05. 26 */
 	"", /* index 5 */
 	"", /* index 6 */
 	"", /* index 7 */
@@ -1196,6 +1222,40 @@ const double gearTable_GN7[11] = {  /* index = 2 */
 		3.425f, /* Rear */
 		3.064f, /* 종감속비*/
 };
+
+
+/* VW1 - 2023.05.23 added */
+const double gearTable_VW1[11] = {  /* index = 3 */
+		0.0000f,
+		4.8910f, /* 1-DAN */
+		2.8500f, /* 2-DAN */
+		1.7730f, /* 3-DAN */
+		1.3720f, /* 4-DAN */
+		1.1880f, /* 5-DAN */
+		1.0000f, /* 6-DAN */
+		0.8130f, /* 7-DAN */
+		0.6550f, /* 8-DAN */
+		3.3670f, /* Rear */
+		3.3670f, /* 종감속비*/
+};
+
+#if 0
+/* SU2i - 2023.05.26 added */
+const double gearTable_SU2i[11] = {  /* index = 4 */
+		0.0000f,
+		11.8496f, /* 1-DAN */
+		7.0158f, /* 2-DAN */
+		4.9611f, /* 3-DAN */
+		3.7554f, /* 4-DAN */
+		2.9632f, /* 5-DAN */
+		2.9555f, /* 6-DAN */
+		2.9468f, /* 7-DAN */
+		1.0000f, /* 8-DAN */
+		1.0000f, /* Rear */
+		1.0000f, /* 종감속비*/
+};
+#endif
+
 
 
 /* ------------------------------------------------------ */
@@ -1384,18 +1444,18 @@ static int 	  iVStolerance = DN_VS_TOLERANCE;  /* VS tolerance for DownShift */
 
 typedef struct _sqdata_ {
 	double  Time01;
-	int     OTS02;
+	double  OTS02; /* 2023-05-28 int -> double */
 	double  VSP03;
 	int     TqStnd04;
 	int     iPATs05;
-	int     EngTemp06;
+	double  EngTemp06; /* 2023-05-28 : int -> double */
 	double  NetEng_Acor; /* New items - 2023.02.04 */
 	double  tqi07;
 	int     curGear08;
 	double  APS09;
 	double  No10;
 	int     tgtGear11;
-	int 	MSs_Ntg;     /* New items - 2023.02.04 */
+	double  MSs_Ntg;  /* New items - 2023.02.04, int -> double : 2023-05-28 */
 	int     ShiTy12;
 	double  TqFr13;
 	int     ShiPh14;     /* New items - 2023.02.04 - FORMAT4 */
@@ -1413,14 +1473,14 @@ typedef struct _sqdata_ {
 
 typedef struct _sqdata2nd_ {
 	double  Time01;
-	int     OTS02;
+	double  OTS02; /* 2023-05-28 int -> double */
 	double  VSP03;
 	int     TqStnd04;
 	int     iPATs05;
 	char 	iPATs05S[20];
-	int     EngTemp06; /* 2023-03-04 */
+	double  EngTemp06; /* int -> double : 2023-05-28 */
 	double  NetEng_Acor; /* 2023-03-04 */
-	int 	MSs_Ntg; /* 2023-03-04 */
+	double  MSs_Ntg;  /* New items - 2023.02.04, int -> double : 2023-05-28 */
 	double  tqi07;
 	int     curGear08;
 	double  APS09;
@@ -1451,14 +1511,14 @@ typedef struct _sqdata2nd_ {
 
 typedef struct _sqdata3rd_ {
 	double  Time01;
-	int     OTS02;
+	double  OTS02; /* 2023-05-28 int -> double */
 	double  VSP03;
 	int     TqStnd04;
 	int     iPATs05;
 	char 	iPATs05S[20];
-	int     EngTemp06;
+	double  EngTemp06; /* int -> double : 2023-05-28 */
 	double  NetEng_Acor; /* 2023-03-04 */
-	int 	MSs_Ntg; /* 2023-03-04 */
+	double  MSs_Ntg;  /* New items - 2023.02.04, int -> double : 2023-05-28 */
 	double  tqi07;
 	int     curGear08;
 	double  APS09;
@@ -1497,14 +1557,14 @@ typedef struct _sqdata3rd_ {
 
 typedef struct _sqdataFlt_ {
 	double  Time01;
-	int     OTS02;
+	double  OTS02; /* 2023-05-28 int -> double */
 	double  VSP03;
 	int     TqStnd04;
 	int     iPATs05;
 	char 	iPATs05S[20];
-	int     EngTemp06;
+	double  EngTemp06; /* int -> double : 2023-05-28 */
 	double  NetEng_Acor; /* 2023-03-04 */
-	int 	MSs_Ntg; /* 2023-03-04 */
+	double  MSs_Ntg;  /* New items - 2023.02.04, int -> double : 2023-05-28 */
 	double  tqi07;
 	int     curGear08;
 	double  APS09;
@@ -1544,14 +1604,14 @@ typedef struct _sqdataFlt_ {
 
 typedef struct _sqdataAPS_ {
 	double  Time01;
-	int     OTS02;
+	double  OTS02; /* 2023-05-28 int -> double */
 	double  VSP03;
 	int     TqStnd04;
 	int     iPATs05;
 	char 	iPATs05S[20];
-	int     EngTemp06;
+	double  EngTemp06; /* int -> double : 2023-05-28 */
 	double  NetEng_Acor; /* 2023-03-04 */
-	int 	MSs_Ntg; /* 2023-03-04 */	
+	double  MSs_Ntg;  /* New items - 2023.02.04, int -> double : 2023-05-28 */
 	double  tqi07;
 	int     curGear08;
 	double  APS09;
@@ -1602,14 +1662,14 @@ typedef struct _NoShiftCnt_ {
 
 /* ------- original tsv text file read format ----------------------- */
 #define 	RD_TIME01 		"%lf"
-#define 	RD_OTS02 		"%d"
+#define 	RD_OTS02 		"%lf" // 2023-05-28 "%d"
 #define 	RD_VSP03 		"%lf"
 #define 	RD_TQSTND04 	"%d"
 #define 	RD_iPATS05 		"%d"
 #define 	RD_iPATS05S 	"%s"
-#define 	RD_EngTemp06 	"%d"
+#define 	RD_EngTemp06 	"%lf" // 2023-05-28 "%d"
 #define 	RD_NetEng_Acor 	"%lf" /* New items - 2023.02.04 - SQD_INFMT3 */
-#define 	RD_MSs_Ntg 		"%d"  /* New items - 2023.02.04 - SQD_INFMT3 */
+#define 	RD_MSs_Ntg 		"%lf" // 2023-05-28 "%d"  /* New items - 2023.02.04 - SQD_INFMT3 */
 #define 	RD_acor_Nm 		"%lf" /* New items - 2023.02.04 - SQD_INFMT4 */
 #define 	RD_TQI07 		"%lf"
 #define 	RD_curGear08 	"%d"
@@ -1630,11 +1690,11 @@ enum {
 	USE_IN_CASE0_NONE = 0,
 	USE_IN_CASE1_17 = 1,
 	USE_IN_CASE2_NEW_15,
-	USE_IN_CASE2_15,
-	USE_IN_NEW_CASE_3_15,
-	USE_IN_NEW_CASE_4_15,
+	//USE_IN_CASE2_15,
+	//USE_IN_NEW_CASE_3_15,
+	//USE_IN_NEW_CASE_4_15,
 
-	USE_IN_MAX = 6	
+	USE_IN_MAX = 3	
 }; // eUseCase_type;
 
 /* first format */
@@ -1727,7 +1787,7 @@ iShift, iShiType12, arrGear[iShiType12].sGear, TqFr, ShiftPh, sNe, sNt16, Long_A
 #define 	WR_TQSTND04 	"[=%d"
 #define 	WR_iPATS05 		" %3d"
 #define 	WR_iPATS05S 	" %-10s"
-#define 	WR_EngTemp06 	" %4d"   /* 2023-03-04 */
+#define 	WR_EngTemp06 	" %5.1lf" // 2023-05-28 " %4d"   /* 2023-03-04 */
 #define 	WR_TQI07 		" %7.2lf"
 #define 	WR_curGear08 	" %2d"
 #define 	WR_APS09 		" %8.2lf"
@@ -1767,7 +1827,7 @@ iShift, iShiType12, arrGear[iShiType12].sGear, TqFr, ShiftPh, sNe, sNt16, Long_A
 #define 	WR_SSpointIdx  	" %2d" /* 2023-03-11 */
 
 #define 	WR_Net_Acor 	" %7.2lf" /* 2023-03-04 */
-#define 	WR_MSs_Ntg 		" %7d" /* 2023-03-04 */
+#define 	WR_MSs_Ntg 		" %7.1lf" // 2023-05-28 " %7d" /* 2023-03-04 */
 
 #define 	WR_MSsPos 		" %-6s" /* 2023-03-09 */
 #define 	WR_MSsMax 		" %7d" /* 2023-03-09 */
@@ -1790,6 +1850,13 @@ iShift, iShiType12, arrGear[iShiType12].sGear, TqFr, ShiftPh, sNe, sNt16, Long_A
 
 
 //#define SAVEFMT  "%10.4lf  %3d %-10s %6.1lf %7.2lf  %2d %8.2lf %8.2lf %2d %03d %3d %-8s %7.2lf %2d %8.2lf %8.2lf %6.3lf %-6s %4.2lf %9.2lf %9.2lf %7.2lf %9.2lf %9.2lf"
+/* Original data Title */
+#define SAVE_ORI 	(WR_TIME01 WR_iPATS05 WR_iPATS05S WR_VSP03 WR_TQI07 WR_curGear08 WR_APS09 WR_No10 \
+					WR_tgtGear11 WR_ShiNew12 WR_ShiType12 WR_Shi12S WR_tQFr13 WR_ShiftPh14 WR_Ne15 \
+					WR_EngTemp06 WR_Net_Acor WR_MSs_Ntg \
+					WR_Nt16 \
+					WR_LAcc17 WR_LPFilterAcc WR_TimePos WR_TimeNtPos WR_GearRatio WR_GearSOne WR_GearSTwo)
+
 
 #define SAVEFMT 	(WR_TIME01 WR_iPATS05 WR_iPATS05S WR_VSP03 WR_TQI07 WR_curGear08 WR_APS09 WR_No10 \
 					WR_tgtGear11 WR_ShiNew12 WR_ShiType12 WR_Shi12S WR_tQFr13 WR_ShiftPh14 WR_Ne15 \
@@ -2060,17 +2127,17 @@ iShift, iShiType12, arrGear[iShiType12].sGear, TqFr, ShiftPh, sNe, sNt16, Long_A
 #define VEHICLE_SPEED_MAX 		(256.0f)
 #define VEHICLE_SPEED_MIN 		(0.0f)
 
-#define ENGINE_TEMP_MAX 		(32768)
-#define ENGINE_TEMP_MIN 		(-32768)
+#define ENGINE_TEMP_MAX 		(32768.0f)
+#define ENGINE_TEMP_MIN 		(-32768.0f)
 
-#define OIL_TEMP_MAX 			(255)
-#define OIL_TEMP_MIN 			(-255)
+#define OIL_TEMP_MAX 			(255.0f)
+#define OIL_TEMP_MIN 			(-255.0f)
 
 #define NETENG_ACOR_MAX 		(512.0f)
 #define NETENG_ACOR_MIN 		(-512.0f)
 
-#define MSs_MAX 				(16384)
-#define MSs_MIN 				(-16384)
+#define MSs_MAX 				(16384.0f)
+#define MSs_MIN 				(-16384.0f)
 
 
 /* 2022-12-18, to buffer */
@@ -2091,6 +2158,7 @@ typedef struct _minMax_buf_ {
 typedef struct _tGear_ {
 		int 	iGear;
 		char 	sGear[10];
+		char    sVW1[15]; /* 2023-05-31 */
 } tGear_type;
 
 
@@ -2101,7 +2169,7 @@ typedef struct _MSminMax_buf_ {
 } tMSminMax_type;
 
 
-#define ERROR_NUM_LIMIT 		10
+#define ERROR_NUM_LIMIT 		100  /* 2023-05-28  <- 10 */
 
 #define PWR_ON_12Z 		15
 #define PWR_ON_23Z 		16
@@ -2122,177 +2190,179 @@ typedef struct _MSminMax_buf_ {
 #define GEAR_SHI_NUMS 			162
 
 const tGear_type arrGear[GEAR_SHI_NUMS] = {
-		{  0, 	"(sN)"    },
-		{  1,	"(s1)"    },
-		{  2,	"(s2)"    },
-		{  3,	"(s3)"    },
-		{  4,	"(s4)"    },
-		{  5,	"(s5)"    },
-		{  6,	"(s6)"    },
-		{  7,	"(s7)"    },
-		{  8,	"(s8)"    },
-		{  9,	"(sP)"    },
-		{ 10,	"(sR)"    },
-		{ 11,	"(s1_Y)"  },
-		{ 12,	"(s2_Y)"  },
-		{ 13,	"(s1_J)"  },
-		{ 14,	"(s2_J)"  },
- 
-		{ 15,	"(s12Z)"  }, /* Power On */
-		{ 16,	"(s23Z)"  }, /* Power On */
-		{ 17,	"(s34Z)"  }, /* Power On */
-		{ 18,	"(s45Z)"  }, /* Power On */
-		{ 19,	"(s56Z)"  }, /* Power On */
-		{ 20,	"(s67Z)"  }, /* Power On */
-		{ 21,	"(s78Z)"  }, /* Power On */
+		{  0, 	"(sN)"     	, "(Neut)"  	 },
+		{  1,	"(s1)"    	, "(Gear1)"      },
+		{  2,	"(s2)"    	, "(Gear2)"	     },
+		{  3,	"(s3)"    	, "(Gear3)"	     },
+		{  4,	"(s4)"    	, "(Gear4)"	     },
+		{  5,	"(s5)"    	, "(Gear5)"	     },
+		{  6,	"(s6)"    	, "(Gear6)"	     },
+		{  7,	"(s7)"    	, "(Gear7)"	     },
+		{  8,	"(s8)"    	, "(Gear8)"	     },
+		{  9,	"(sP)"    	, "(Park)"		 },
+		{ 10,	"(sR)"    	, "(Rvs)"		 },
+		{ 11,	"(s1_Y)"  	, "(InGear1Ststp)" },
+		{ 12,	"(s2_Y)"  	, "(InGear2Ststp)" },
+		{ 13,	"(s1_J)"  	, "(InGear1Nidr)"  },
+		{ 14,	"(s2_J)"  	, "(InGear2Nidr)"  },
 
-		{ 22,	"(s12S)"  }, /* Power Off */
-		{ 23,	"(s23S)"  }, /* Power Off */
-		{ 24,	"(s34S)"  }, /* Power Off */
-		{ 25,	"(s45S)"  }, /* Power Off */
-		{ 26,	"(s56S)"  }, /* Power Off */
-		{ 27,	"(s67S)"  }, /* Power Off */
-		{ 28,	"(s78S)"  }, /* Power Off */
+		{ 15,	"(s12Z)"  	, "(Pwr12)"		 }, /* Power On */
+		{ 16,	"(s23Z)"  	, "(Pwr23)"		 }, /* Power On */
+		{ 17,	"(s34Z)"  	, "(Pwr34)"		 }, /* Power On */
+		{ 18,	"(s45Z)"  	, "(Pwr45)"		 }, /* Power On */
+		{ 19,	"(s56Z)"  	, "(Pwr56)"		 }, /* Power On */
+		{ 20,	"(s67Z)"  	, "(Pwr67)"		 }, /* Power On */
+		{ 21,	"(s78Z)"  	, "(Pwr78)"		 }, /* Power On */
 
-		{ 29,	"(s12MZ)" },
-		{ 30,	"(s23MZ)" },
-		{ 31,	"(s34MZ)" },
-		{ 32,	"(s45MZ)" },
-		{ 33,	"(s56MZ)" },
-		{ 34,	"(s67MZ)" },	
-		{ 35,	"(s78MZ)" },	
+		{ 22,	"(s12S)"  	, "(Coast12)"	 }, /* Power Off */
+		{ 23,	"(s23S)"  	, "(Coast23)"	 }, /* Power Off */
+		{ 24,	"(s34S)"  	, "(Coast34)"	 }, /* Power Off */
+		{ 25,	"(s45S)"  	, "(Coast45)"	 }, /* Power Off */
+		{ 26,	"(s56S)"  	, "(Coast56)"	 }, /* Power Off */
+		{ 27,	"(s67S)"  	, "(Coast67)"	 }, /* Power Off */
+		{ 28,	"(s78S)"  	, "(Coast78)"	 }, /* Power Off */
 
-		{ 36,	"(s21Z)"  }, /* Sequential Down Shift */
-		{ 37,	"(s32Z)"  },
-		{ 38,	"(s43Z)"  },
-		{ 39,	"(s54Z)"  },
-		{ 40,	"(s65Z)"  },
-		{ 41,	"(s76Z)"  },
-		{ 42,	"(s87Z)"  }, /* Sequential Down Shift */
- 
-		{ 43,	"(s21S)"  }, 
-		{ 44,	"(s32S)"  },
-		{ 45,	"(s43S)"  },
-		{ 46,	"(s54S)"  },
-		{ 47,	"(s65S)"  },
-		{ 48,	"(s76S)"  },
-		{ 49,	"(s87S)"  }, 
- 
-		{ 50,	"(s21MZ)" },	
-		{ 51,	"(s32MZ)" },
-		{ 52,	"(s43MZ)" },	
-		{ 53,	"(s54MZ)" },	
-		{ 54,	"(s65MZ)" },	
-		{ 55,	"(s76MZ)" },	
-		{ 56,	"(s87MZ)" },	
+		{ 29,	"(s12MZ)" 	, "(Pwr12Man)"	 }, /* VW1, Man means Manual */
+		{ 30,	"(s23MZ)" 	, "(Pwr23Man)"	 }, /* VW1, Man means Manual */
+		{ 31,	"(s34MZ)" 	, "(Pwr34Man)"	 }, /* VW1, Man means Manual */
+		{ 32,	"(s45MZ)" 	, "(Pwr45Man)"	 }, /* VW1, Man means Manual */
+		{ 33,	"(s56MZ)" 	, "(Pwr56Man)"	 }, /* VW1, Man means Manual */
+		{ 34,	"(s67MZ)" 	, "(Pwr67Man)"	 },	/* VW1, Man means Manual */
+		{ 35,	"(s78MZ)" 	, "(Pwr78Man)"	 }, /* VW1, Man means Manual */
 
-		{ 57,	"(s31Z)"  }, /* Skip Down Shift */
-		{ 58,	"(s41Z)"  }, /* Skip Down Shift */
-		{ 59,	"(s42Z)"  }, /* Skip Down Shift */
-		{ 60,	"(s52Z)"  }, /* Skip Down Shift */
-		{ 61,	"(s53Z)"  }, /* Skip Down Shift */
-		{ 62,	"(s62Z)"  }, /* Skip Down Shift */
-		{ 63,	"(s63Z)"  }, /* Skip Down Shift */
-		{ 64,	"(s64Z)"  }, /* Skip Down Shift */
-		{ 65,	"(s72Z)"  }, /* Skip Down Shift */
-		{ 66,	"(s73Z)"  }, /* Skip Down Shift */
-		{ 67,	"(s74Z)"  }, /* Skip Down Shift */
-		{ 68,	"(s75Z)"  }, /* Skip Down Shift */
-		{ 69,	"(s82Z)"  }, /* Skip Down Shift */
-		{ 70,	"(s83Z)"  }, /* Skip Down Shift */
-		{ 71,	"(s84Z)"  }, /* Skip Down Shift */
-		{ 72,	"(s85Z)"  }, /* Skip Down Shift */
-		{ 73,	"(s86Z)"  }, /* Skip Down Shift */
- 
-		{ 74,	"(s31S)"  },
-		{ 75,	"(s42S)"  },
-		{ 76,	"(s53S)"  },
-		{ 77,	"(s64S)"  },
-		{ 78,	"(s75S)"  },
-		{ 79,	"(s86S)"  },
-		{ 80,	"(s31MZ)" },
-		{ 81,	"(s42MZ)" },	
-		{ 82,	"(s53MZ)" },	
-		{ 83,	"(s64MZ)" },	
-		{ 84,	"(s75MZ)" },	
-		{ 85,	"(s86MZ)" },	
-		{ 86,	"(s21R)"  },
-		{ 87,	"(s31R)"  },
-		{ 88,	"(s32R)"  },
-		{ 89,	"(s42R)"  },
-		{ 90,	"(s43R)"  },
-		{ 91,	"(s53R)"  },
-		{ 92,	"(s54R)"  },
-		{ 93,	"(s64R)"  },
-		{ 94,	"(s65R)"  },
-		{ 95,	"(s75R)"  },
-		{ 96,	"(s76R)"  },
-		{ 97,	"(s86R)"  },
-		{ 98,	"(s87R)"  },
-		{ 99,	"(s121)"  },
-		{100,	"(s232)"  },
-		{101,	"(s343)"  },	
-		{102,	"(s454)"  },	
-		{103,	"(s565)"  },	
-		{104,	"(s676)"  },	
-		{105,	"(s787)"  },	
-		{106,	"(s212)"  },	
-		{107,	"(s313)"  },	
-		{108,	"(s414)"  },	
-		{109,	"(s424)"  },	
-		{110,	"(s525)"  },	
-		{111,	"(s535)"  },	
-		{112,	"(s626)"  },	
-		{113,	"(s636)"  },	
-		{114,	"(s646)"  },	
-		{115,	"(s727)"  },	
-		{116,	"(s737)"  },
-		{117,	"(s747)"  },	
-		{118,	"(s757)"  },	
-		{119,	"(s828)"  },	
-		{120,	"(s838)"  },	
-		{121,	"(s848)"  },	
-		{122,	"(s858)"  },	
-		{123,	"(s868)"  },
-		{124,	"(sN1)"   },
-		{125,	"(sN2)"   },
-		{126,	"(sN3)"   },
-		{127,	"(sN4)"   },
-		{128,	"(sN5)"   },
-		{129,	"(sN6)"   },
-		{130,	"(sN7)"   },
-		{131,	"(sN8)"   },
-		{132,	"(sXN)"   },
-		{133,	"(sDN)"   },
-		{134,	"(sD2N)"  },
-		{135,	"(sRN)"   },
-		{136,	"(sY1N)"  },	
-		{137,	"(sY2N)"  },	
-		{138,	"(s1Y)"   },
-		{139,	"(sNY)"   },
-		{140,	"(s1J)"   },
-		{141,	"(s2J)"   },
-		{142,	"(sJ1N)"  },	
-		{143,	"(sJ2N)"  },	
-		{144,	"(sDR)"   },
-		{145,	"(sD2R)"  },	
-		{146,	"(sRDR)"  },
-		{147,	"(sNR)"   },
-		{148,	"(sRD)"   },
-		{149,	"(sRD2)"  },
-		{150,	"(sRRD)"  },
-		{151,	"(sRRD2)" },
-		{152,	"(sND1)"  },
-		{153,	"(sND2)"  },
-		{154,	"(sY1)"   },
-		{155,	"(sYR)"   },
-		{156,	"(sRD2R)" },
-		{157,	"(sJ1)"   },
-		{158,	"(sJ2)"   },
-		{159,	"(sJ1R)"  },
-		{160,	"(sJ2R)"  },
-		{161,   "(UNKNOWN)" },
+		{ 36,	"(s21Z)"  	, "(Pwr21)"		 }, /* Sequential Down Shift */
+		{ 37,	"(s32Z)"  	, "(Pwr32)"		 },
+		{ 38,	"(s43Z)"  	, "(Pwr43)"		 },
+		{ 39,	"(s54Z)"  	, "(Pwr54)"		 },
+		{ 40,	"(s65Z)"  	, "(Pwr65)"		 },
+		{ 41,	"(s76Z)"  	, "(Pwr76)"		 },
+		{ 42,	"(s87Z)"  	, "(Pwr87)"		 }, /* Sequential Down Shift */
+
+		{ 43,	"(s21S)"  	, "(Coast21)"	 }, 
+		{ 44,	"(s32S)"  	, "(Coast32)"	 },
+		{ 45,	"(s43S)"  	, "(Coast43)"	 },
+		{ 46,	"(s54S)"  	, "(Coast54)"	 },
+		{ 47,	"(s65S)"  	, "(Coast65)"	 },
+		{ 48,	"(s76S)"  	, "(Coast76)"	 },
+		{ 49,	"(s87S)"  	, "(Coast87)"	 }, 
+
+		{ 50,	"(s21MZ)" 	, "(Pwr21Man)"	 },	
+		{ 51,	"(s32MZ)" 	, "(Pwr32Man)"	 },
+		{ 52,	"(s43MZ)" 	, "(Pwr43Man)"	 },	
+		{ 53,	"(s54MZ)" 	, "(Pwr54Man)"	 },	
+		{ 54,	"(s65MZ)" 	, "(Pwr65Man)"	 },	
+		{ 55,	"(s76MZ)" 	, "(Pwr76Man)"	 },	
+		{ 56,	"(s87MZ)" 	, "(Pwr87Man)"	 },	
+
+		{ 57,	"(s31Z)"  	, "(Pwr31)"		 }, /* Skip Down Shift */
+		{ 58,	"(s41Z)"  	, "(Pwr41)"		 }, /* Skip Down Shift */
+		{ 59,	"(s42Z)"  	, "(Pwr42)"		 }, /* Skip Down Shift */
+		{ 60,	"(s52Z)"  	, "(Pwr52)"		 }, /* Skip Down Shift */
+		{ 61,	"(s53Z)"  	, "(Pwr53)"		 }, /* Skip Down Shift */
+		{ 62,	"(s62Z)"  	, "(Pwr62)"		 }, /* Skip Down Shift */
+		{ 63,	"(s63Z)"  	, "(Pwr63)"		 }, /* Skip Down Shift */
+		{ 64,	"(s64Z)"  	, "(Pwr64)"		 }, /* Skip Down Shift */
+		{ 65,	"(s72Z)"  	, "(Pwr72)"		 }, /* Skip Down Shift */
+		{ 66,	"(s73Z)"  	, "(Pwr73)"		 }, /* Skip Down Shift */
+		{ 67,	"(s74Z)"  	, "(Pwr74)"		 }, /* Skip Down Shift */
+		{ 68,	"(s75Z)"  	, "(Pwr75)"		 }, /* Skip Down Shift */
+		{ 69,	"(s82Z)"  	, "(Pwr82)"		 }, /* Skip Down Shift */
+		{ 70,	"(s83Z)"  	, "(Pwr83)"		 }, /* Skip Down Shift */
+		{ 71,	"(s84Z)"  	, "(Pwr84)"		 }, /* Skip Down Shift */
+		{ 72,	"(s85Z)"  	, "(Pwr85)"		 }, /* Skip Down Shift */
+		{ 73,	"(s86Z)"  	, "(Pwr86)"		 }, /* Skip Down Shift */
+
+		{ 74,	"(s31S)"  	, "(Coast31)"	 }, /* VW1, Coast means Power-off */
+		{ 75,	"(s42S)"  	, "(Coast42)"	 }, /* VW1, Coast means Power-off */
+		{ 76,	"(s53S)"  	, "(Coast53)"	 }, /* VW1, Coast means Power-off */
+		{ 77,	"(s64S)"  	, "(Coast64)"	 }, /* VW1, Coast means Power-off */
+		{ 78,	"(s75S)"  	, "(Coast75)"	 }, /* VW1, Coast means Power-off */
+		{ 79,	"(s86S)"  	, "(Coast86)"	 }, /* VW1, Coast means Power-off */
+		{ 80,	"(s31MZ)" 	, "(Pwr31Man)"	 },
+		{ 81,	"(s42MZ)" 	, "(Pwr42Man)"	 },	
+		{ 82,	"(s53MZ)" 	, "(Pwr53Man)"	 },	
+		{ 83,	"(s64MZ)" 	, "(Pwr64Man)"	 },	
+		{ 84,	"(s75MZ)" 	, "(Pwr75Man)"	 },	
+		{ 85,	"(s86MZ)" 	, "(Pwr86Man)"	 },	
+		{ 86,	"(s21R)"  	, "(Roll21)"	 },
+		{ 87,	"(s31R)"  	, "(Roll31)"	 },
+		{ 88,	"(s32R)"  	, "(Roll32)"	 },
+		{ 89,	"(s42R)"  	, "(Roll42)"	 },
+		{ 90,	"(s43R)"  	, "(Roll43)"	 },
+		{ 91,	"(s53R)"  	, "(Roll53)"	 },
+		{ 92,	"(s54R)"  	, "(Roll54)"	 },
+		{ 93,	"(s64R)"  	, "(Roll64)"	 },
+		{ 94,	"(s65R)"  	, "(Roll65)"	 },
+		{ 95,	"(s75R)"  	, "(Roll75)"	 },
+		{ 96,	"(s76R)"  	, "(Roll76)"	 },
+		{ 97,	"(s86R)"  	, "(Roll86)"	 },
+		{ 98,	"(s87R)"  	, "(Roll87)"	 },
+		{ 99,	"(s121)"  	, "(Chg12)"		 },
+		{100,	"(s232)"  	, "(Chg23)"		 },
+		{101,	"(s343)"  	, "(Chg34)"		 },	
+		{102,	"(s454)"  	, "(Chg45)"		 },	
+		{103,	"(s565)"  	, "(Chg56)"		 },	
+		{104,	"(s676)"  	, "(Chg67)"		 },	
+		{105,	"(s787)"  	, "(Chg78)"		 },	
+		{106,	"(s212)"  	, "(Chg21)"		 },	
+		{107,	"(s313)"  	, "(Chg31)"		 },	
+		{108,	"(s414)"  	, "(Chg41)"		 },	
+		{109,	"(s424)"  	, "(Chg42)"		 },	
+		{110,	"(s525)"  	, "(Chg52)"		 },	
+		{111,	"(s535)"  	, "(Chg53)"		 },	
+		{112,	"(s626)"  	, "(Chg62)"		 },	
+		{113,	"(s636)"  	, "(Chg63)"		 },	
+		{114,	"(s646)"  	, "(Chg64)"		 },	
+		{115,	"(s727)"  	, "(Chg72)"		 },	
+		{116,	"(s737)"  	, "(Chg73)"		 },
+		{117,	"(s747)"  	, "(Chg74)"		 },	
+		{118,	"(s757)"  	, "(Chg75)"		 },	
+		{119,	"(s828)"  	, "(Chg82)"		 },	
+		{120,	"(s838)"  	, "(Chg83)"		 },	
+		{121,	"(s848)"  	, "(Chg84)"		 },	
+		{122,	"(s858)"  	, "(Chg85)"		 },	
+		{123,	"(s868)"  	, "(Chg86)"		 },
+		{124,	"(sN1)"   	, "(Neut1)"		 },
+		{125,	"(sN2)"   	, "(Neut2)"		 },
+		{126,	"(sN3)"   	, "(Neut3)"		 },
+		{127,	"(sN4)"   	, "(Neut4)"		 },
+		{128,	"(sN5)"   	, "(Neut5)"		 },
+		{129,	"(sN6)"   	, "(Neut6)"		 },
+		{130,	"(sN7)"   	, "(Neut7)"		 },
+		{131,	"(sN8)"   	, "(Neut8)"		 },
+		{132,	"(sXN)"   	, "(GearNeut)"	 },
+		{133,	"(sDN)"   	, "(DrvNeut)"	 },
+		{134,	"(sD2N)"  	, "(Drv2Neut)"	 },
+		{135,	"(sRN)"   	, "(RvsNeut)"	 },
+		{136,	"(sY1N)"  	, "(Ststp1Neut)" },	
+		{137,	"(sY2N)"  	, "(Ststp2Neut)"  },	
+		{138,	"(s1Y)"   	, "(Gear1Ststp)"  },
+		{139,	"(sNY)"   	, "(NeutToStstp)" },
+		{140,	"(s1J)"   	, "(Gear1Nidr)"   },
+		{141,	"(s2J)"   	, "(Gear2Nidr)"   },
+		{142,	"(sJ1N)"  	, "(Nidr1Neut)"	  },	
+		{143,	"(sJ2N)"  	, "(Nidr2Neut)"	  },	
+		{144,	"(sDR)"   	, "(DrvRvs)"	 },
+		{145,	"(sD2R)"  	, "(Drv2Rvs)"	 },	
+		{146,	"(sRDR)"  	, "(ChgDrvRvs)"	 },
+		{147,	"(sNR)"   	, "(NeutRvs)"	 },
+		{148,	"(sRD)"   	, "(RvsDrv)"	 },
+		{149,	"(sRD2)"  	, "(RvsDrv2)"	 },
+		{150,	"(sRRD)"  	, "(ChgRvsDrv)"	 },
+		{151,	"(sRRD2)" 	, "(ChgRvsDrv2)" },
+		{152,	"(sND1)"  	, "(NeutDrv1)"	 },
+		{153,	"(sND2)"  	, "(NeutDrv2)"	 },
+		{154,	"(sY1)"   	, "(Ststp1)"	 },
+		{155,	"(sYR)"   	, "(StstpRvs)"	 },
+		{156,	"(sRD2R)" 	, "(ChgDrv2Rvs)" },
+		{157,	"(sJ1)"   	, "(Nidr1)"		 },
+		{158,	"(sJ2)"   	, "(Nidr2)"		 },
+		{159,	"(sJ1R)"  	, "(Nidr1Rvs)"	 },
+		{160,	"(sJ2R)"  	, "(Nidr2Rvs)"	 },
+		{161,   "(UNKNOWN)" , "(Unknown)"    },
 	};	
+
+
 
 #define MODE_ID_NUMS 			72
 
@@ -2301,6 +2371,7 @@ typedef struct _tPATs_ {
 		char	ModeID[20];
 		char 	ModeNm[20];
 		char    FileNm[20];
+		char    VW1Nm[20];  /* 2023-05-31 */
 } tPATs_ModeType;
 
 /* File Extension */
@@ -2310,79 +2381,80 @@ typedef struct _tPATs_ {
 //#define FILE_EXT_CHK 		"chk" /* g_Min FIle extenstion */
 
 const tPATs_ModeType arrPATs_ModeID[MODE_ID_NUMS] = {
-		{  0,   "(md_HOT)"       ,  "HOT"       ,  "zHOT"       },
-		{  1,   "(md_WUP)"       ,  "WUP"       ,  "zWUP"       },
-		{  2,   "(md_MNL)"       ,  "MNL"       ,  "zMNL"       },
-		{  3,   "(md_DN2)"       ,  "DN2"       ,  "zDN2"       },
-		{  4,   "(md_DN1)"       ,  "DN1"       ,  "zDN1"       },
-		{  5,   "(md_UP1)"       ,  "UP1"       ,  "zUP1"       },
-		{  6,   "(md_UP2)"       ,  "UP2"       ,  "zUP2"       },
-		{  7,   "(md_UP3)"       ,  "UP3"       ,  "zUP3"       },
-		{  8,	"(md_NOR)"       ,  "NOR"       ,  "zNOR"       }, /* use case */
-		{  9,	"(md_ECO)"       ,  "ECO"       ,  "zECO"       }, /* use case */
-		{ 10,	"(md_ECODN2)"    ,  "ECODN2"    ,  "zECODN2"    },		
-		{ 11,	"(md_ECODN1)"    ,  "ECODN1"    ,  "zECODN1"    },		
-		{ 12,	"(md_ECOUP1)"    ,  "ECOUP1"    ,  "zECOUP1"    },
-		{ 13,	"(md_ECOUP2)"    ,  "ECOUP2"    ,  "zECOUP2"    },
-		{ 14,	"(md_ECOUP3)"    ,  "ECOUP3"    ,  "zECOUP3"    },
-		{ 15,	"(md_CRZ)"       ,  "CRZ"       ,  "zCRZ"       },
-		{ 16,	"(md_CRZUP1)"    ,  "CRZUP1"    ,  "zCRZUP1"    },  
-		{ 17,	"(md_CRZUP2)"    ,  "CRZUP2"    ,  "zCRZUP2"    },  
-		{ 18,	"(md_BRK1)"	     ,  "BRK1"      ,  "zBRK1"      },
-		{ 19,	"(md_BRK2)"	     ,  "BRK2"      ,  "zBRK2"      },
-		{ 20,	"(md_HUP1)"	     ,  "HUP1"      ,  "zHUP1"      },
-		{ 21,	"(md_HUP2)"	     ,  "HUP2"      ,  "zHUP2"      },
-		{ 22,	"(md_HUP3)"	     ,  "HUP3"      ,  "zHUP3"      },
- 		{ 23,	"(md_SPTDN2)"    ,  "SPTDN2"    ,  "zSPTDN2"    },		
- 		{ 24,	"(md_SPTDN1)"    ,  "SPTDN1"    ,  "zSPTDN1"    },
-		{ 25,	"(md_SPT)"       ,  "SPT"       ,  "zSPT"       }, /* use case */
-		{ 26,	"(md_SPTUP1)"    ,  "SPTUP1"    ,  "zSPTUP1"    },
-		{ 27,	"(md_SPTUP2)"    ,  "SPTUP2"    ,  "zSPTUP2"    },
-		{ 28,	"(md_SPTUP3)"    ,  "SPTUP3"    ,  "zSPTUP3"    },
-		{ 29,	"(md_SS_XECO)"   ,  "SS_XECO"   ,  "zSS_XECO"   },
-		{ 30,	"(md_SS_ECODN2)" ,  "SS_ECODN2" ,  "zSS_ECODN2" },
-		{ 31,	"(md_SS_ECODN1)" ,  "SS_ECODN1" ,  "zSS_ECODN1" },
-		{ 32,	"(md_SS_ECO)"    ,  "SS_ECO"    ,  "zSS_ECO"    },
-		{ 33,	"(md_SS_ECOUP1)" ,  "SS_ECOUP1" ,  "zSS_ECOUP1" },
-		{ 34,	"(md_SS_ECOUP2)" ,  "SS_ECOUP2" ,  "zSS_ECOUP2" },
-		{ 35,	"(md_SS_ECOUP3)" ,  "SS_ECOUP3" ,  "zSS_ECOUP3" },
-		{ 36,	"(md_SS_DN2)"    ,  "SS_DN2"    ,  "zSS_DN2"    },
-		{ 37,	"(md_SS_DN1)"    ,  "SS_DN1"    ,  "zSS_DN1"    },
-		{ 38,	"(md_SS_NOR)"    ,  "SS_NOR"    ,  "zSS_NOR"    },
-		{ 39,	"(md_SS_UP1)"    ,  "SS_UP1"    ,  "zSS_UP1"    },
-		{ 40,	"(md_SS_UP2)"    ,  "SS_UP2"    ,  "zSS_UP2"    },
-		{ 41,	"(md_SS_UP3)"    ,  "SS_UP3"    ,  "zSS_UP3"    },
-		{ 42,	"(md_SS_SPTDN2)" ,  "SS_SPTDN2" ,  "zSS_SPTDN2" },
-		{ 43,	"(md_SS_SPTDN1)" ,  "SS_SPTDN1" ,  "zSS_SPTDN1" },
-		{ 44,	"(md_SS_SPT)"    ,  "SS_SPT"    ,  "zSS_SPT"    },
-		{ 45,	"(md_SS_SPTUP1)" ,  "SS_SPTUP1" ,  "zSS_SPTUP1" },
-		{ 46,	"(md_SS_SPTUP2)" ,  "SS_SPTUP2" ,  "zSS_SPTUP2" },
-		{ 47,	"(md_SS_SPTUP3)" ,  "SS_SPTUP3" ,  "zSS_SPTUP3" },
-		{ 48,	"(md_SS_XSPTDN2)",  "SS_XSPTDN2",  "zSS_XSPTDN2"},
-		{ 49,	"(md_SS_XSPTDN1)",  "SS_XSPTDN1",  "zSS_XSPTDN1"},
-		{ 50,	"(md_SS_XSPT)"   ,  "SS_XSPT"   ,  "zSS_XSPT"   },
-		{ 51,	"(md_SS_XSPTUP1)",  "SS_XSPTUP1",  "zSS_XSPTUP1"},
-		{ 52,	"(md_SS_XSPTUP2)",  "SS_XSPTUP2",  "zSS_XSPTUP2"},
-		{ 53,	"(md_SS_XSPTUP3)",  "SS_XSPTUP3",  "zSS_XSPTUP3"},
-		{ 54,	"(md_L4W)"       ,  "L4W"       ,  "zL4W"       },
-		{ 55,	"(md_COLD)"      ,  "COLD"      ,  "zCOLD"      },
-		{ 56,	"(md_SNOW)"      ,  "SNOW"      ,  "zSNOW"      },
-		{ 57,	"(md_SNOWUP1)"   ,  "SNOWUP1"   ,  "zSNOWUP1"   },	
-		{ 58,	"(md_SNOWUP2)"   ,  "SNOWUP2"   ,  "zSNOWUP2"   },	
-		{ 59,	"(md_SAND)"      ,  "SAND"      ,  "zSAND"      },
-		{ 60,	"(md_SANDUP1)"   ,  "SANDUP1"   ,  "zSANDUP1"   },
-		{ 61,	"(md_SANDUP2)"   ,  "SANDUP2"   ,  "zSANDUP2"   },
-		{ 62,	"(md_MUD)"       ,  "MUD"       ,  "zMUD"       },
-		{ 63,	"(md_MUDUP1)"    ,  "MUDUP1"    ,  "zMUDUP1"    },
-		{ 64,	"(md_MUDUP2)"    ,  "MUDUP2"    ,  "zMUDUP2"    },
-		{ 65,	"(md_TOWDN2)"    ,  "TOWDN2"    ,  "zTOWDN2"    },
-		{ 66,	"(md_TOWDN1)"    ,  "TOWDN1"    ,  "zTOWDN1"    },
-		{ 67,	"(md_TOW)"       ,  "TOW"       ,  "zTOW"       },
-		{ 68,	"(md_TOWUP1)"    ,  "TOWUP1"    ,  "zTOWUP1"    },
-		{ 69,	"(md_TOWUP2)"    ,  "TOWUP2"    ,  "zTOWUP2"    },
-		{ 70,	"(md_TOWUP3)"    ,  "TOWUP3"    ,  "zTOWUP3"    },
-		{ 71,   "(md_UNKNOWN)"   ,  "Unknown"   ,  "Unknown"    },
+		{  0,   "(md_HOT)"       ,  "HOT"       ,  "zHOT"       ,  "Hot"             },
+		{  1,   "(md_WUP)"       ,  "WUP"       ,  "zWUP"       ,  "Wrmp"            },
+		{  2,   "(md_MNL)"       ,  "MNL"       ,  "zMNL"       ,  "Man"             },
+		{  3,   "(md_DN2)"       ,  "DN2"       ,  "zDN2"       ,  "Dwn2"            },
+		{  4,   "(md_DN1)"       ,  "DN1"       ,  "zDN1"       ,  "Dwn1"            },
+		{  5,   "(md_UP1)"       ,  "UP1"       ,  "zUP1"       ,  "Up1"             },
+		{  6,   "(md_UP2)"       ,  "UP2"       ,  "zUP2"       ,  "Up2"             },
+		{  7,   "(md_UP3)"       ,  "UP3"       ,  "zUP3"       ,  "Up3"             },
+		{  8,	"(md_NOR)"       ,  "NOR"       ,  "zNOR"       ,  "Norm"            }, /* NORmal : use case */
+		{  9,	"(md_ECO)"       ,  "ECO"       ,  "zECO"       ,  "Eco"             }, /* ECO    : use case */
+		{ 10,	"(md_ECODN2)"    ,  "ECODN2"    ,  "zECODN2"    ,  "EcoDwn2"         },		
+		{ 11,	"(md_ECODN1)"    ,  "ECODN1"    ,  "zECODN1"    ,  "EcoDwn1"         },		
+		{ 12,	"(md_ECOUP1)"    ,  "ECOUP1"    ,  "zECOUP1"    ,  "EcoUp1"          },
+		{ 13,	"(md_ECOUP2)"    ,  "ECOUP2"    ,  "zECOUP2"    ,  "EcoUp2"          },
+		{ 14,	"(md_ECOUP3)"    ,  "ECOUP3"    ,  "zECOUP3"    ,  "EcoUp3"          },
+		{ 15,	"(md_CRZ)"       ,  "CRZ"       ,  "zCRZ"       ,  "Crs"             },
+		{ 16,	"(md_CRZUP1)"    ,  "CRZUP1"    ,  "zCRZUP1"    ,  "CrsUp1"          },  
+		{ 17,	"(md_CRZUP2)"    ,  "CRZUP2"    ,  "zCRZUP2"    ,  "CrsUp2"          },  
+		{ 18,	"(md_BRK1)"	     ,  "BRK1"      ,  "zBRK1"      ,  "Brk1"            },
+		{ 19,	"(md_BRK2)"	     ,  "BRK2"      ,  "zBRK2"      ,  "Brk2"            },
+		{ 20,	"(md_HUP1)"	     ,  "HUP1"      ,  "zHUP1"      ,  "HotUp1"          },
+		{ 21,	"(md_HUP2)"	     ,  "HUP2"      ,  "zHUP2"      ,  "HotUp2"          },
+		{ 22,	"(md_HUP3)"	     ,  "HUP3"      ,  "zHUP3"      ,  "HotUp3"          },
+ 		{ 23,	"(md_SPTDN2)"    ,  "SPTDN2"    ,  "zSPTDN2"    ,  "SptDwn2"         },
+ 		{ 24,	"(md_SPTDN1)"    ,  "SPTDN1"    ,  "zSPTDN1"    ,  "SptDwn1"         },
+		{ 25,	"(md_SPT)"       ,  "SPT"       ,  "zSPT"       ,  "Spt"             }, /* SPT : use case */
+		{ 26,	"(md_SPTUP1)"    ,  "SPTUP1"    ,  "zSPTUP1"    ,  "SptUp1"          },
+		{ 27,	"(md_SPTUP2)"    ,  "SPTUP2"    ,  "zSPTUP2"    ,  "SptUp2"          },
+		{ 28,	"(md_SPTUP3)"    ,  "SPTUP3"    ,  "zSPTUP3"    ,  "SptUp3"          },
+		{ 29,	"(md_SS_XECO)"   ,  "SS_XECO"   ,  "zSS_XECO"   ,  "CrssEcoSmt"      },
+		{ 30,	"(md_SS_ECODN2)" ,  "SS_ECODN2" ,  "zSS_ECODN2" ,  "EcoDwn2Smt"      },
+		{ 31,	"(md_SS_ECODN1)" ,  "SS_ECODN1" ,  "zSS_ECODN1" ,  "EcoDwn1Smt"      },
+		{ 32,	"(md_SS_ECO)"    ,  "SS_ECO"    ,  "zSS_ECO"    ,  "EcoSmt"          },
+		{ 33,	"(md_SS_ECOUP1)" ,  "SS_ECOUP1" ,  "zSS_ECOUP1" ,  "EcoUp1Smt"       },
+		{ 34,	"(md_SS_ECOUP2)" ,  "SS_ECOUP2" ,  "zSS_ECOUP2" ,  "EcoUp2Smt"       },
+		{ 35,	"(md_SS_ECOUP3)" ,  "SS_ECOUP3" ,  "zSS_ECOUP3" ,  "EcoUp3Smt"       },
+		{ 36,	"(md_SS_DN2)"    ,  "SS_DN2"    ,  "zSS_DN2"    ,  "Dwn2Smt"         },
+		{ 37,	"(md_SS_DN1)"    ,  "SS_DN1"    ,  "zSS_DN1"    ,  "Dwn1Smt"         },
+		{ 38,	"(md_SS_NOR)"    ,  "SS_NOR"    ,  "zSS_NOR"    ,  "NormSmt"         },
+		{ 39,	"(md_SS_UP1)"    ,  "SS_UP1"    ,  "zSS_UP1"    ,  "Up1Smt"          },
+		{ 40,	"(md_SS_UP2)"    ,  "SS_UP2"    ,  "zSS_UP2"    ,  "Up2Smt"          },
+		{ 41,	"(md_SS_UP3)"    ,  "SS_UP3"    ,  "zSS_UP3"    ,  "Up3Smt"          },
+		{ 42,	"(md_SS_SPTDN2)" ,  "SS_SPTDN2" ,  "zSS_SPTDN2" ,  "SptDwn2Smt"      },
+		{ 43,	"(md_SS_SPTDN1)" ,  "SS_SPTDN1" ,  "zSS_SPTDN1" ,  "SptDwn1Smt"      },
+		{ 44,	"(md_SS_SPT)"    ,  "SS_SPT"    ,  "zSS_SPT"    ,  "SptSmt"          },
+		{ 45,	"(md_SS_SPTUP1)" ,  "SS_SPTUP1" ,  "zSS_SPTUP1" ,  "SptUp1Smt"       },
+		{ 46,	"(md_SS_SPTUP2)" ,  "SS_SPTUP2" ,  "zSS_SPTUP2" ,  "SptUp2Smt"       },
+		{ 47,	"(md_SS_SPTUP3)" ,  "SS_SPTUP3" ,  "zSS_SPTUP3" ,  "SptUp3Smt"       },
+		{ 48,	"(md_SS_XSPTDN2)",  "SS_XSPTDN2",  "zSS_XSPTDN2",  "CrssSptDwn2Smt"  },
+		{ 49,	"(md_SS_XSPTDN1)",  "SS_XSPTDN1",  "zSS_XSPTDN1",  "CrssSptDwn1Smt"  },
+		{ 50,	"(md_SS_XSPT)"   ,  "SS_XSPT"   ,  "zSS_XSPT"   ,  "CrssSptSmt"      },
+		{ 51,	"(md_SS_XSPTUP1)",  "SS_XSPTUP1",  "zSS_XSPTUP1",  "CrssSptUp1Smt"   },
+		{ 52,	"(md_SS_XSPTUP2)",  "SS_XSPTUP2",  "zSS_XSPTUP2",  "CrssSptUp2Smt"   },
+		{ 53,	"(md_SS_XSPTUP3)",  "SS_XSPTUP3",  "zSS_XSPTUP3",  "CrssSptUp3Smt"   },
+		{ 54,	"(md_L4W)"       ,  "L4W"       ,  "zL4W"       ,  "LoInAwd"         },
+		{ 55,	"(md_COLD)"      ,  "COLD"      ,  "zCOLD"      ,  "Cold"            },
+		{ 56,	"(md_SNOW)"      ,  "SNOW"      ,  "zSNOW"      ,  "Snw"             },
+		{ 57,	"(md_SNOWUP1)"   ,  "SNOWUP1"   ,  "zSNOWUP1"   ,  "SnwUp1"          },	
+		{ 58,	"(md_SNOWUP2)"   ,  "SNOWUP2"   ,  "zSNOWUP2"   ,  "SnwUp2"          },	
+		{ 59,	"(md_SAND)"      ,  "SAND"      ,  "zSAND"      ,  "Snd"             },
+		{ 60,	"(md_SANDUP1)"   ,  "SANDUP1"   ,  "zSANDUP1"   ,  "Sndup1"          },
+		{ 61,	"(md_SANDUP2)"   ,  "SANDUP2"   ,  "zSANDUP2"   ,  "Sndup2"          },
+		{ 62,	"(md_MUD)"       ,  "MUD"       ,  "zMUD"       ,  "Mud"             },
+		{ 63,	"(md_MUDUP1)"    ,  "MUDUP1"    ,  "zMUDUP1"    ,  "MudUp1"          },
+		{ 64,	"(md_MUDUP2)"    ,  "MUDUP2"    ,  "zMUDUP2"    ,  "MudUp2"          },
+		{ 65,	"(md_TOWDN2)"    ,  "TOWDN2"    ,  "zTOWDN2"    ,  "Tw"              },
+		{ 66,	"(md_TOWDN1)"    ,  "TOWDN1"    ,  "zTOWDN1"    ,  "TwUp1"           },
+		{ 67,	"(md_TOW)"       ,  "TOW"       ,  "zTOW"       ,  "TwUp2"           },
+		{ 68,	"(md_TOWUP1)"    ,  "TOWUP1"    ,  "zTOWUP1"    ,  "TwUp3"           },
+		{ 69,	"(md_TOWUP2)"    ,  "TOWUP2"    ,  "zTOWUP2"    ,  ""                },
+		{ 70,	"(md_TOWUP3)"    ,  "TOWUP3"    ,  "zTOWUP3"    ,  ""                },
+		{ 71,   "(md_UNKNOWN)"   ,  "Unknown"   ,  "Unknown"    ,  ""                },
 	}; 
+
 
 
 #define FILTER_EXT_DTA 		"dta"
@@ -2392,6 +2464,8 @@ const tPATs_ModeType arrPATs_ModeID[MODE_ID_NUMS] = {
 
 
 /* .ECO, .SPT file title */
+#define TITLE_ORI   "     time   iPAT  ModeID     vsp    tqi    cg   Aps      No    tg ct iShi txt        TqFr ShiPh Ne    EngTemp NetAcor MSs_Ntg  Nt      LAccel  LPFAcc TimPos       TimNtPos  Ratio     Shi1Cur  Shi2Tgt "
+
 #define TITLE_SHI0	"    time    iPAT  ModeID     vsp    tqi    cg   Aps      No    tg ct iShi txt        TqFr ShiPh Ne    EngTemp NetAcor MSs_Ntg Nt      LAccel  LPFAcc TimPos       TimNtPos  Ratio     Shi1Cur  Shi2Tgt    Jerk0  g_Max   g_min"
 
 #define TITLE_SHI1	"    time    iPAT  ModeID     vsp    tqi    cg   Aps      No    tg ct iShi txt        TqFr ShiPh Ne    EngTemp NetAcor MSs_Ntg Nt      LAccel  LPFAcc TimPos       PosNum     Gsum   TimNtPos Ratio    Shi1Cur  Shi2Tgt   Jerk0  g_Max   g_min"
@@ -2648,13 +2722,22 @@ short apsTableIndex(void)
 		}
 	}
 
+#if DOS_COLOR_PRINT
 	fprintf(stderr,">>APS Table Nums   :\033[32m %2d (", aps_index );
 	for(kk=0; kk<aps_index-1; kk++)
 	{
 		fprintf(stderr,"%d, ", (int)ApsTble[kk] );
 	}
 	fprintf(stderr,"%d) \033[0m\n", (int)ApsTble[kk] );
-	
+#else
+	fprintf(stderr,">>APS Table Nums   : %2d (", aps_index );
+	for(kk=0; kk<aps_index-1; kk++)
+	{
+		fprintf(stderr,"%d, ", (int)ApsTble[kk] );
+	}
+	fprintf(stderr,"%d) \n", (int)ApsTble[kk] );
+#endif
+
 	return aps_index;
 }
 
@@ -2673,13 +2756,22 @@ short vsKPHTableIndex(void)
 		}
 	}
 
+#if DOS_COLOR_PRINT
 	fprintf(stderr,">>VS Table Nums    :\033[32m %2d (", vs_index );
 	for(kk=0; kk<vs_index-1; kk++)
 	{
 		fprintf(stderr,"%d, ", VSkphTblDN[kk] );
 	}
 	fprintf(stderr,"%d) kph \033[0m\n", VSkphTblDN[kk]);	
-	
+#else
+	fprintf(stderr,">>VS Table Nums    : %2d (", vs_index );
+	for(kk=0; kk<vs_index-1; kk++)
+	{
+		fprintf(stderr,"%d, ", VSkphTblDN[kk] );
+	}
+	fprintf(stderr,"%d) kph \n", VSkphTblDN[kk]);	
+#endif
+
 	return vs_index;
 }
 
@@ -2987,6 +3079,8 @@ unsigned long long Find_GearMode( unsigned long long *gShift, short iChoice, uns
 	unsigned int lGearRNums = 0;
 	unsigned int lGearDNums = 0;
 	unsigned int lotherNums = 0;
+	double dLine2Time = 0.0f;
+
 	
 	lTotalNums = 0U;
 	for(ii=0; ii<GEAR_SHI_NUMS; ii++) lTotalNums += gShift[ii];
@@ -3089,69 +3183,147 @@ unsigned long long Find_GearMode( unsigned long long *gShift, short iChoice, uns
 	fprintf(stderr,"    Others Gear -- %-8s    : %9llu lines, %6.1f min \n", gShiftMode[GEAR_OTHER].szModeTxt, gShiftMode[GEAR_OTHER].lSum, (double)(gShiftMode[GEAR_OTHER].lSum*iavgTime)/TIME_SCALE/60 );
 	fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
 #else
-	fprintf(stderr,"  Total Quality Shift Records -: %9u lines, %6.1f min \n", lTotalNums, (double)(lTotalNums*iavgTime)/TIME_SCALE/60 );
+	fprintf(stderr,"  Total Quality Shift Records -: %9u lines, %6.2f min \n", lTotalNums, (double)(lTotalNums*iavgTime)/TIME_SCALE/60 );
 	if( gShiftMode[PWR_ON_UP_SHIFT].lSum )
-		fprintf(stderr,"    Pwr On UpShift--%-8s   : %9llu lines, %6.1f min \n", gShiftMode[PWR_ON_UP_SHIFT].szModeTxt, gShiftMode[PWR_ON_UP_SHIFT].lSum, (double)(gShiftMode[PWR_ON_UP_SHIFT].lSum*iavgTime)/TIME_SCALE/60 );
+	{
+		dLine2Time = (double)(gShiftMode[PWR_ON_UP_SHIFT].lSum*iavgTime)/TIME_SCALE/60.0;
+		if( (int)dLine2Time )
+			fprintf(stderr,"    Pwr On UpShift--%-8s   : %9llu lines, %6.2f min \n", gShiftMode[PWR_ON_UP_SHIFT].szModeTxt, gShiftMode[PWR_ON_UP_SHIFT].lSum, dLine2Time );
+		else
+			fprintf(stderr,"    Pwr On UpShift--%-8s   : %9llu lines, %6.2f min (%.1lf sec) \n", gShiftMode[PWR_ON_UP_SHIFT].szModeTxt, gShiftMode[PWR_ON_UP_SHIFT].lSum, dLine2Time, (dLine2Time*60) );
+	}
 	else
 		fprintf(stderr,"    Pwr On UpShift--%-8s   : %9llu lines \n", gShiftMode[PWR_ON_UP_SHIFT].szModeTxt, gShiftMode[PWR_ON_UP_SHIFT].lSum  );
 
 	if( gShiftMode[PWR_ON_SEQ_DOWN_SHIFT].lSum )
-		fprintf(stderr,"    Pwr On Sequen Down--%-6s : %9llu lines, %6.1f min \n", gShiftMode[PWR_ON_SEQ_DOWN_SHIFT].szModeTxt, gShiftMode[PWR_ON_SEQ_DOWN_SHIFT].lSum, (double)(gShiftMode[PWR_ON_SEQ_DOWN_SHIFT].lSum*iavgTime)/TIME_SCALE/60 );
+	{
+		dLine2Time = (double)(gShiftMode[PWR_ON_SEQ_DOWN_SHIFT].lSum*iavgTime)/TIME_SCALE/60.0;
+		if( (int)dLine2Time )
+			fprintf(stderr,"    Pwr On Sequen Down--%-6s : %9llu lines, %6.2f min \n", gShiftMode[PWR_ON_SEQ_DOWN_SHIFT].szModeTxt, gShiftMode[PWR_ON_SEQ_DOWN_SHIFT].lSum, dLine2Time );
+		else
+			fprintf(stderr,"    Pwr On Sequen Down--%-6s : %9llu lines, %6.2f min (%.1lf sec) \n", gShiftMode[PWR_ON_SEQ_DOWN_SHIFT].szModeTxt, gShiftMode[PWR_ON_SEQ_DOWN_SHIFT].lSum, dLine2Time, (dLine2Time*60) );
+	}
 	else
 		fprintf(stderr,"    Pwr On Sequen Down--%-6s : %9llu lines \n", gShiftMode[PWR_ON_SEQ_DOWN_SHIFT].szModeTxt, gShiftMode[PWR_ON_SEQ_DOWN_SHIFT].lSum );
 
 	if( gShiftMode[PWR_ON_SKIP_DOWN_SHIFT].lSum )
-		fprintf(stderr,"    Pwr On Skip Down--%-8s : %9llu lines, %6.1f min \n", gShiftMode[PWR_ON_SKIP_DOWN_SHIFT].szModeTxt, gShiftMode[PWR_ON_SKIP_DOWN_SHIFT].lSum, (double)(gShiftMode[PWR_ON_SKIP_DOWN_SHIFT].lSum*iavgTime)/TIME_SCALE/60 );
+	{
+		dLine2Time = (double)(double)(gShiftMode[PWR_ON_SKIP_DOWN_SHIFT].lSum*iavgTime)/TIME_SCALE/60.0;
+		if( (int)dLine2Time )
+			fprintf(stderr,"    Pwr On Skip Down--%-8s : %9llu lines, %6.2f min \n", gShiftMode[PWR_ON_SKIP_DOWN_SHIFT].szModeTxt, gShiftMode[PWR_ON_SKIP_DOWN_SHIFT].lSum, dLine2Time );
+		else
+			fprintf(stderr,"    Pwr On Skip Down--%-8s : %9llu lines, %6.2f min (%.1lf sec) \n", gShiftMode[PWR_ON_SKIP_DOWN_SHIFT].szModeTxt, gShiftMode[PWR_ON_SKIP_DOWN_SHIFT].lSum, dLine2Time, dLine2Time*60 );
+	}
 	else
 		fprintf(stderr,"    Pwr On Skip Down--%-8s : %9llu lines \n", gShiftMode[PWR_ON_SKIP_DOWN_SHIFT].szModeTxt, gShiftMode[PWR_ON_SKIP_DOWN_SHIFT].lSum );
 
 	if( gShiftMode[POWER_OFF_UP_SHIFT].lSum )
-		fprintf(stderr,"    Pwr Off UpShift--%-8s  : %9llu lines, %6.1f min \n", gShiftMode[POWER_OFF_UP_SHIFT].szModeTxt, gShiftMode[POWER_OFF_UP_SHIFT].lSum, (double)(gShiftMode[POWER_OFF_UP_SHIFT].lSum*iavgTime)/TIME_SCALE/60 );
+	{
+		dLine2Time = (double)(gShiftMode[POWER_OFF_UP_SHIFT].lSum*iavgTime)/TIME_SCALE/60.0;
+		if( (int)dLine2Time )
+			fprintf(stderr,"    Pwr Off UpShift--%-8s  : %9llu lines, %6.2f min \n", gShiftMode[POWER_OFF_UP_SHIFT].szModeTxt, gShiftMode[POWER_OFF_UP_SHIFT].lSum, dLine2Time  );
+		else
+			fprintf(stderr,"    Pwr Off UpShift--%-8s  : %9llu lines, %6.2f min (%.1lf sec) \n", gShiftMode[POWER_OFF_UP_SHIFT].szModeTxt, gShiftMode[POWER_OFF_UP_SHIFT].lSum, dLine2Time, dLine2Time*60 );
+	}
 	else
 		fprintf(stderr,"    Pwr Off UpShift--%-8s  : %9llu lines \n", gShiftMode[POWER_OFF_UP_SHIFT].szModeTxt, gShiftMode[POWER_OFF_UP_SHIFT].lSum );
 		
 	if( gShiftMode[POWER_OFF_DOWN_SHIFT].lSum )
-		fprintf(stderr,"    Pwr Off DownShift--%-8s: %9llu lines, %6.1f min \n", gShiftMode[POWER_OFF_DOWN_SHIFT].szModeTxt, gShiftMode[POWER_OFF_DOWN_SHIFT].lSum, (double)(gShiftMode[POWER_OFF_DOWN_SHIFT].lSum*iavgTime)/TIME_SCALE/60 );
+	{
+		dLine2Time = (double)(gShiftMode[POWER_OFF_DOWN_SHIFT].lSum*iavgTime)/TIME_SCALE/60.0;
+		if( (int)dLine2Time )
+			fprintf(stderr,"    Pwr Off DownShift--%-8s: %9llu lines, %6.2f min \n", gShiftMode[POWER_OFF_DOWN_SHIFT].szModeTxt, gShiftMode[POWER_OFF_DOWN_SHIFT].lSum, dLine2Time );
+		else
+			fprintf(stderr,"    Pwr Off DownShift--%-8s: %9llu lines, %6.2f min (%.1lf sec) \n", gShiftMode[POWER_OFF_DOWN_SHIFT].szModeTxt, gShiftMode[POWER_OFF_DOWN_SHIFT].lSum, dLine2Time, dLine2Time*60.0 );			
+	}
 	else
 		fprintf(stderr,"    Pwr Off DownShift--%-8s: %9llu lines \n", gShiftMode[POWER_OFF_DOWN_SHIFT].szModeTxt, gShiftMode[POWER_OFF_DOWN_SHIFT].lSum );
 		
 	if( gShiftMode[GEAR_PWRON_MAN].lSum )
-		fprintf(stderr,"    Power On Manual--%-8s  : %9llu lines, %6.1f min \n", gShiftMode[GEAR_PWRON_MAN].szModeTxt, gShiftMode[GEAR_PWRON_MAN].lSum, (double)(gShiftMode[GEAR_PWRON_MAN].lSum*iavgTime)/TIME_SCALE/60 );
+	{
+		dLine2Time = (double)(gShiftMode[GEAR_PWRON_MAN].lSum*iavgTime)/TIME_SCALE/60.0;
+		if( (int)dLine2Time )
+			fprintf(stderr,"    Power On Manual--%-8s  : %9llu lines, %6.2f min \n", gShiftMode[GEAR_PWRON_MAN].szModeTxt, gShiftMode[GEAR_PWRON_MAN].lSum, dLine2Time );
+		else
+			fprintf(stderr,"    Power On Manual--%-8s  : %9llu lines, %6.2f min (%.1lf sec) \n", gShiftMode[GEAR_PWRON_MAN].szModeTxt, gShiftMode[GEAR_PWRON_MAN].lSum, dLine2Time, dLine2Time*60 );
+	}
 	else
 		fprintf(stderr,"    Power On Manual--%-8s  : %9llu lines  \n", gShiftMode[GEAR_PWRON_MAN].szModeTxt, gShiftMode[GEAR_PWRON_MAN].lSum );
 		
 	if( gShiftMode[GEAR_NEAR2STOP].lSum )
-		fprintf(stderr,"    Near2Stop Shift--%-8s  : %9llu lines, %6.1f min \n", gShiftMode[GEAR_NEAR2STOP].szModeTxt, gShiftMode[GEAR_NEAR2STOP].lSum, (double)(gShiftMode[GEAR_NEAR2STOP].lSum*iavgTime)/TIME_SCALE/60 );
+	{
+		dLine2Time = (double)(gShiftMode[GEAR_NEAR2STOP].lSum*iavgTime)/TIME_SCALE/60.0;
+		if( (int)dLine2Time )
+			fprintf(stderr,"    Near2Stop Shift--%-8s  : %9llu lines, %6.2f min \n", gShiftMode[GEAR_NEAR2STOP].szModeTxt, gShiftMode[GEAR_NEAR2STOP].lSum, dLine2Time );
+		else
+			fprintf(stderr,"    Near2Stop Shift--%-8s  : %9llu lines, %6.2f min (%.1lf sec) \n", gShiftMode[GEAR_NEAR2STOP].szModeTxt, gShiftMode[GEAR_NEAR2STOP].lSum, dLine2Time, dLine2Time*60.0 );
+	}
 	else
 		fprintf(stderr,"    Near2Stop Shift--%-8s  : %9llu lines \n", gShiftMode[GEAR_NEAR2STOP].szModeTxt, gShiftMode[GEAR_NEAR2STOP].lSum );
 
 	if( gShiftMode[GEAR_RETURN_SHI].lSum )
-		fprintf(stderr,"    Return Shift--%-12s : %9llu lines, %6.1f min \n", gShiftMode[GEAR_RETURN_SHI].szModeTxt, gShiftMode[GEAR_RETURN_SHI].lSum, (double)(gShiftMode[GEAR_RETURN_SHI].lSum*iavgTime)/TIME_SCALE/60 );
+	{
+		dLine2Time = (double)(gShiftMode[GEAR_RETURN_SHI].lSum*iavgTime)/TIME_SCALE/60.0;
+		if( (int)dLine2Time )
+			fprintf(stderr,"    Return Shift--%-12s : %9llu lines, %6.2f min \n", gShiftMode[GEAR_RETURN_SHI].szModeTxt, gShiftMode[GEAR_RETURN_SHI].lSum, dLine2Time );
+		else
+			fprintf(stderr,"    Return Shift--%-12s : %9llu lines, %6.2f min (%.1lf sec) \n", gShiftMode[GEAR_RETURN_SHI].szModeTxt, gShiftMode[GEAR_RETURN_SHI].lSum, dLine2Time, dLine2Time*60.0 );
+	}
 	else
 		fprintf(stderr,"    Return Shift--%-12s : %9llu lines  \n", gShiftMode[GEAR_RETURN_SHI].szModeTxt, gShiftMode[GEAR_RETURN_SHI].lSum  );
 
 	if( gShiftMode[GEAR_P].lSum )
-		fprintf(stderr,"    P Gear status--%-11s : %9llu lines, %6.1f min \n", gShiftMode[GEAR_P].szModeTxt, gShiftMode[GEAR_P].lSum, (double)(gShiftMode[GEAR_P].lSum*iavgTime)/TIME_SCALE/60 );
+	{
+		dLine2Time = (double)(gShiftMode[GEAR_P].lSum*iavgTime)/TIME_SCALE/60.0;
+		if( (int)dLine2Time )
+			fprintf(stderr,"    P Gear status--%-11s : %9llu lines, %6.2f min \n", gShiftMode[GEAR_P].szModeTxt, gShiftMode[GEAR_P].lSum, dLine2Time );
+		else
+			fprintf(stderr,"    P Gear status--%-11s : %9llu lines, %6.2f min (%.1lf sec) \n", gShiftMode[GEAR_P].szModeTxt, gShiftMode[GEAR_P].lSum, dLine2Time, dLine2Time*60.0 );
+	}
 	else
 		fprintf(stderr,"    P Gear status--%-11s : %9llu lines \n", gShiftMode[GEAR_P].szModeTxt, gShiftMode[GEAR_P].lSum );
 		
 	if( gShiftMode[GEAR_N].lSum )
-		fprintf(stderr,"    N Gear status--%-11s : %9llu lines, %6.1f min \n", gShiftMode[GEAR_N].szModeTxt, gShiftMode[GEAR_N].lSum, (double)(gShiftMode[GEAR_N].lSum*iavgTime)/TIME_SCALE/60 );
+	{
+		dLine2Time = (double)(gShiftMode[GEAR_N].lSum*iavgTime)/TIME_SCALE/60.0;
+		if( (int)dLine2Time )
+			fprintf(stderr,"    N Gear status--%-11s : %9llu lines, %6.2f min \n", gShiftMode[GEAR_N].szModeTxt, gShiftMode[GEAR_N].lSum, dLine2Time );
+		else
+			fprintf(stderr,"    N Gear status--%-11s : %9llu lines, %6.2f min (%.1lf sec) \n", gShiftMode[GEAR_N].szModeTxt, gShiftMode[GEAR_N].lSum, dLine2Time, dLine2Time*60.0 );
+	}
 	else
 		fprintf(stderr,"    N Gear status--%-11s : %9llu lines \n", gShiftMode[GEAR_N].szModeTxt, gShiftMode[GEAR_N].lSum );
 		
 	if( gShiftMode[GEAR_R].lSum )
-		fprintf(stderr,"    R Gear status--%-11s : %9llu lines, %6.1f min \n", gShiftMode[GEAR_R].szModeTxt, gShiftMode[GEAR_R].lSum, (double)(gShiftMode[GEAR_R].lSum*iavgTime)/TIME_SCALE/60 );
+	{
+		dLine2Time = (double)(gShiftMode[GEAR_R].lSum*iavgTime)/TIME_SCALE/60.0;
+		if( (int)dLine2Time )
+			fprintf(stderr,"    R Gear status--%-11s : %9llu lines, %6.2f min \n", gShiftMode[GEAR_R].szModeTxt, gShiftMode[GEAR_R].lSum, dLine2Time );
+		else
+			fprintf(stderr,"    R Gear status--%-11s : %9llu lines, %6.2f min (%.1lf sec) \n", gShiftMode[GEAR_R].szModeTxt, gShiftMode[GEAR_R].lSum, dLine2Time, dLine2Time*60.0 );
+	}
 	else
 		fprintf(stderr,"    R Gear status--%-11s : %9llu lines \n", gShiftMode[GEAR_R].szModeTxt, gShiftMode[GEAR_R].lSum  );
 
 	if( gShiftMode[GEAR_D].lSum )
-		fprintf(stderr,"    D Gear status--%-11s : %9llu lines, %6.1f min \n", gShiftMode[GEAR_D].szModeTxt, gShiftMode[GEAR_D].lSum, (double)(gShiftMode[GEAR_D].lSum*iavgTime)/TIME_SCALE/60 );
+	{
+		dLine2Time = (double)(gShiftMode[GEAR_D].lSum*iavgTime)/TIME_SCALE/60.0;
+		if( (int)dLine2Time )
+			fprintf(stderr,"    D Gear status--%-11s : %9llu lines, %6.2f min \n", gShiftMode[GEAR_D].szModeTxt, gShiftMode[GEAR_D].lSum, dLine2Time );
+		else
+			fprintf(stderr,"    D Gear status--%-11s : %9llu lines, %6.2f min (%.1lf sec) \n", gShiftMode[GEAR_D].szModeTxt, gShiftMode[GEAR_D].lSum, dLine2Time, dLine2Time*60.0 );
+	}
 	else		
 		fprintf(stderr,"    D Gear status--%-11s : %9llu lines \n", gShiftMode[GEAR_D].szModeTxt, gShiftMode[GEAR_D].lSum );
 
 	if( gShiftMode[GEAR_OTHER].lSum )
-		fprintf(stderr,"    Others Gear -- %-11s : %9llu lines, %6.1f min \n", gShiftMode[GEAR_OTHER].szModeTxt, gShiftMode[GEAR_OTHER].lSum, (double)(gShiftMode[GEAR_OTHER].lSum*iavgTime)/TIME_SCALE/60 );
+	{
+		dLine2Time = (double)(gShiftMode[GEAR_OTHER].lSum*iavgTime)/TIME_SCALE/60.0;
+		if( (int)dLine2Time )
+			fprintf(stderr,"    Others Gear -- %-11s : %9llu lines, %6.2f min \n", gShiftMode[GEAR_OTHER].szModeTxt, gShiftMode[GEAR_OTHER].lSum, dLine2Time );
+		else
+			fprintf(stderr,"    Others Gear -- %-11s : %9llu lines, %6.2f min (%.1lf sec) \n", gShiftMode[GEAR_OTHER].szModeTxt, gShiftMode[GEAR_OTHER].lSum, dLine2Time, dLine2Time*60.0 );
+	}
 	else
 		fprintf(stderr,"    Others Gear -- %-11s : %9llu lines \n", gShiftMode[GEAR_OTHER].szModeTxt, gShiftMode[GEAR_OTHER].lSum );
 		
@@ -3203,7 +3375,7 @@ int isShiftType(int iPwrOnOff, int shiDir03, int sq_ShiTy12)
 	/* sN:0, s1:1, s2:2, s3:3, s4:4, s5:5, s6:6, s7:7, s8:8, sP:9, 
 	   SR:10, s1_Y:11, s2_Y:12, s1_J:13, s2_J:14 */
 	if( sq_ShiTy12>0 && sq_ShiTy12<=14 )
-		return 1;
+		return STYPE_PWR_ON_DRIVE; // 1;
 
 	/* ----------------------------- */
 	/* ----------------------------- */
@@ -3216,13 +3388,17 @@ int isShiftType(int iPwrOnOff, int shiDir03, int sq_ShiTy12)
 		{
 			/* s12Z: 15, s23Z:16, s34Z:17, s45Z:18, s56Z:19, s67Z:20, s78Z:21 */	
 			if( sq_ShiTy12>=15 && sq_ShiTy12<=21 )
-				return 2;
+			{
+				return STYPE_PWR_ON_UP_SHIFT; // 2;
+			}
 		}
 		else if(SHIFT_DN==shiDir03)
 		{
 			/* s21Z: 36, s32Z:37, s43Z:38, s54Z:39, s65Z:40, s76Z:41, s87Z:42 */	
 			if( sq_ShiTy12>=36 && sq_ShiTy12<=42 )
-				return 3;
+			{
+				return STYPE_PWR_ON_SEQU_DOWN_SHIFT; // 3; /* sequential down */
+			}
 		}
 		else if(SHIFT_SKIP_DN==shiDir03)
 		{
@@ -3233,12 +3409,23 @@ int isShiftType(int iPwrOnOff, int shiDir03, int sq_ShiTy12)
 			/* s62Z,s63Z,s64Z           : 62,63,64 ------- */	
 			/* s72Z,s73Z,s74Z,s75Z      : 65,66,67,68 ---- */	
 			/* s82Z,s83Z,s84Z,s85Z,s86Z : 69,70,71,72,73 - */	
-			if( sq_ShiTy12>=57 && sq_ShiTy12<=73 )
+			if( (sq_ShiTy12>=57 && sq_ShiTy12<=73) )
 			{
-				return 4;
+				return STYPE_PWR_ON_SKIP_DOWN_SHIFT; // 4; /* skip down */
 			}
+
+	#if SKIP_DOWNSHIFT_KICKDOWN /* 2023-06-03 */
+			/* Added 2023-06-02 */
+			/* For Skip downshift */
+			/* s21Z: 36, s32Z:37, s43Z:38, s54Z:39, s65Z:40, s76Z:41, s87Z:42 */	
+			else if( sq_ShiTy12>=36 && sq_ShiTy12<=42 )
+			{
+				return STYPE_PWR_ON_SKIP_KICKDOWN_SHIFT; // 5; /* For Kick Down */
+			}
+	#endif
 		}
 	}
+
 
 	/* ----------------------------- */
 	/* ----------------------------- */
@@ -3251,13 +3438,13 @@ int isShiftType(int iPwrOnOff, int shiDir03, int sq_ShiTy12)
 		{
 			/* s12S: 22, s23S:23, s34S:24, s45S:25, s56S:26, s67S:27, s78S:28 */	
 			if( sq_ShiTy12>=22 && sq_ShiTy12<=28 )
-				return 5;
+				return STYPE_PWR_OFF_UP_SHIFT; 
 		}
 		else if(SHIFT_DN==shiDir03)
 		{
 			/* s21S: 43, s32S:44, s43S:45, s54S:46, s65S:47, s76S:48, s87S:49 */	
 			if( sq_ShiTy12>=43 && sq_ShiTy12<=49 )
-				return 6;
+				return STYPE_PWR_OFF_SEQU_DOWN_SHIFT;
 		}
 		else if(SHIFT_SKIP_DN==shiDir03)
 		{
@@ -3270,41 +3457,55 @@ int isShiftType(int iPwrOnOff, int shiDir03, int sq_ShiTy12)
 			/* s86S : 79 ---- */	
 			if( sq_ShiTy12>=74 && sq_ShiTy12<=79 )
 			{
-				return 7;
+				return STYPE_PWR_OFF_SKIP_DOWN_SHIFT;
 			}
 		}
 	}
 
-	return 0;
+	return STYPE_PWR_ON_NONE; /* zero 0 = FALSE */
 }
 
 
 
 void	MODEColorPrint(short aiPATs05)
 {
+#if DOS_COLOR_PRINT
 	fprintf(stderr,"\033[1m"); /* BOLD */
 	fprintf(stderr,"\033[32m");
+#endif
 
 	fprintf(stderr," %s ", arrPATs_ModeID[aiPATs05].ModeID  );
 
+#if DOS_COLOR_PRINT
 	fprintf(stderr,"\033[0m"); /* color released */
+#endif
 }
 
 
 void	ShiftTypePrint(int shiDir03)
 {
+#if DOS_COLOR_PRINT
 	if( SHIFT_SKIP_DN==shiDir03 ) { fprintf(stderr,"\033[32m"); fprintf(stderr,"/ Skip DownShift "); }
 	else if( SHIFT_DN==shiDir03 ) { fprintf(stderr,"\033[34m"); fprintf(stderr,"/ Sequential DownShift "); }
 	else if( SHIFT_UP==shiDir03 ) { fprintf(stderr,"\033[35m"); fprintf(stderr,"/ UpShift "); }
 
 	fprintf(stderr,"\033[0m \r\n"); /* color released */
+#else
+	if( SHIFT_SKIP_DN==shiDir03 ) { fprintf(stderr,"/ Skip DownShift "); }
+	else if( SHIFT_DN==shiDir03 ) { fprintf(stderr,"/ Sequential DownShift "); }
+	else if( SHIFT_UP==shiDir03 ) { fprintf(stderr,"/ UpShift "); }
+#endif
 }
 
 void	AbnormalRedPrint(void)
 {
+#if DOS_COLOR_PRINT
 	fprintf(stderr,"\033[31m"); /* RED color */
 	fprintf(stderr," << Abnormal \n");
 	fprintf(stderr,"\033[0m"); /* color released */
+#else
+	fprintf(stderr," << Abnormal \n");
+#endif
 }
 
 
@@ -3528,6 +3729,7 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 	unsigned int iErrorAPS = 0;
 	unsigned int iErrorLAcc = 0;
 	unsigned int iErrorRPM = 0;
+	unsigned int iErrorRPMNo = 0, iErrorRPMNt = 0, iErrorRPMNe = 0; /* 2023-05-28 */
 	unsigned int iErrorTemp = 0;
 	unsigned int iErrorOTS = 0;
 	unsigned int iErrorTqStnd = 0;
@@ -3586,7 +3788,7 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 	unsigned int iSPcount = 0U;
 	unsigned int iSFcount = 0U;
 
-	unsigned int iSxIgnCnt = 0;
+	unsigned int iSxIgnCnt1 = 0, iSxIgnCnt2 = 0, iSxIgnCnt3 = 0;
 	
 	unsigned int iNtMaxcount = 0U;
 	unsigned int iNtmincount = 0U;
@@ -3648,12 +3850,23 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 
 	int iPreShiftType = 0;
 	static int iFIX_GEAR=1; /* 1: UP shift, -1: sequential Down Shift , -2~-6: skip downshift */
+#if SKIP_DOWNSHIFT_KICKDOWN /* 2023-06-03 */
+	static int iKickDown = -1;
+#else
+	static int iKickDown = -90;
+#endif
+
 	static int iFIX_G6 = -90, iFIX_G5 = -90, iFIX_G4 = -90, iFIX_G3 = -90;//, iFIX_G2 = -10;
 	short ctSameGearStatus = 1;
 
+	double gKickDownBeginTime = -1.0;
+
+ 	short iOnce_NSHStart = 0; /* added 2023-05-29 */
+ 	short iOnce_NSHEnd = 0; /* added 2023-05-29 */
+
 	/* gear.gil file read */
 	double gRatioFile[VEHICLE_TYPE_NUMS];
-	char geartype[10];
+	char geartype[11];
 	short isGearFileOK = 0;
 	unsigned int rdlines = 0;
 	
@@ -3721,7 +3934,11 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 		if( fAPSpwrLvl < 0.0f ) 
 		{
 			fAPSpwrLvl = UP_APS_PWR_ON_VAL; /* default value setting */
-			fprintf(stderr,">>APS default lvl  :\033[32m %.2lf%% -- UpShift - default(3%%) \n", fAPSpwrLvl );
+	#if DOS_COLOR_PRINT
+			fprintf(stderr,">>APS default lvl  :\033[32m %.2lf%% -- UpShift - default(3%%) \033[0m \n", fAPSpwrLvl );
+	#else
+			fprintf(stderr,">>APS default lvl  : %.2lf%% -- UpShift - default(3%%) \n", fAPSpwrLvl );
+	#endif
 		}
 		
 		iAPSNum = apsTableIndex();
@@ -3733,13 +3950,22 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 			fAPSpwrLvl = DN_APS_PWR_ON_VAL; /* default value setting */
 		}
 
+	#if DOS_COLOR_PRINT
 		if(SHIFT_SKIP_DN==shiDir03) 
 			fprintf(stderr,">>APS default lvl  :\033[32m %.1lf%% -- Skip DownShift - default(3%%) \033[0m\n", fAPSpwrLvl );
 		else if( SHIFT_DN==shiDir03 ) 
 			fprintf(stderr,">>APS default lvl  :\033[32m %.1lf%% -- Sequential DownShift - default(3%%) \033[0m\n", fAPSpwrLvl );
 		else
 			fprintf(stderr,">>APS default lvl  :\033[31m %.1lf%% -- ++Check Error++ DownShift - default(3%%) \033[0m\n", fAPSpwrLvl );
-		
+	#else
+		if(SHIFT_SKIP_DN==shiDir03) 
+			fprintf(stderr,">>APS default lvl  : %.1lf%% -- Skip DownShift - default(3%%) \n", fAPSpwrLvl );
+		else if( SHIFT_DN==shiDir03 ) 
+			fprintf(stderr,">>APS default lvl  : %.1lf%% -- Sequential DownShift - default(3%%) \n", fAPSpwrLvl );
+		else
+			fprintf(stderr,">>APS default lvl  : %.1lf%% -- ++Check Error++ DownShift - default(3%%) \n", fAPSpwrLvl );
+	#endif
+	
 		ivsKPHNum = vsKPHTableIndex();
 	}
 
@@ -3749,8 +3975,14 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 	//fprintf(stderr,"\n");
 	//fprintf(stderr,">>ModeID %s Sorting... \n", arrPATs_ModeID[aiPATs05].ModeID );
 	fprintf(stderr,">>Shift Type       : %s \n", (iPwrOnOff==SHI_PWR_ON?"PWR On":(iPwrOnOff==SHI_PWR_OFF?"PWR Off":(iPwrOnOff==SHI_STATIC?"Static":(iPwrOnOff==SHI_N_STOP_DN?"Stop Dn":"Unknown")))) );
+
+#if DOS_COLOR_PRINT
 	fprintf(stderr,">>Shift Direction  :\033[1;35m %sShift \033[0m\n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Sequential Down": \
 		(shiDir03==SHIFT_SKIP_DN?"Skip Down":(shiDir03==SHIFT_SKIP_UP?"SkipUp":"Unknown"))) ));			
+#else
+	fprintf(stderr,">>Shift Direction  : %sShift \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Sequential Down": \
+		(shiDir03==SHIFT_SKIP_DN?"Skip Down":(shiDir03==SHIFT_SKIP_UP?"SkipUp":"Unknown"))) )); 		
+#endif
 
 
 	/* ------------------------------------------------ */
@@ -3775,7 +4007,7 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 			{
 				fprintf(gfwr,";%s", gVehicleType[0]);
 				for(ii=1; ii<VEHICLE_TYPE_NUMS; ii++)
-					fprintf(gfwr,"  %.4lf", gearTable_SX2[ii]);
+					fprintf(gfwr,"  %.4lf", gearTable_SX2[ii]); /* default table */
 				fprintf(gfwr,"\r\n");
 
 				fprintf(gfwr,"%s", gVehicleType[0]);				
@@ -3783,7 +4015,12 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					fprintf(gfwr,"  %.4lf", gearTable_SX2[ii]);
 				fprintf(gfwr,"\r\n");
 
-				fprintf(stderr,">>Shift GearRatio  :\033[1;32m gear.gil file is created.. default vehicle SX2 \033[0m \n");
+			#if DOS_COLOR_PRINT
+				fprintf(stderr,">>Shift GearRatio  :\033[1;32m gear.gil file is created.. default vehicle:SX2 \033[0m \n");
+			#else
+				fprintf(stderr,">>Shift GearRatio  : gear.gil file is created.. default vehicle:SX2 \n");
+			#endif
+			
 				isGearFileOK = 1;
 			}
 			fclose(gfwr);
@@ -3805,6 +4042,9 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 
 				/* Read a line from input file. */
 				memset( GearData, 0x00, sizeof(GearData) );
+				memset( geartype, 0x00, sizeof(geartype) );
+				memset( gRatioFile, 0x00, sizeof(gRatioFile) );
+
 
 				if( NULL == fgets( GearData, VEHICLE_TYPE_FILE_REC_LEN, gfrd ) )
 				{
@@ -3831,27 +4071,35 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 
 					if(VEHICLE_TYPE_NUMS == result) 
 					{
-						if( GearData[0]==';' || GearData[0]==':' ) continue; /* comment */
+						if( GearData[0]==';' || GearData[0]==':' || GearData[1]==';' || GearData[1]==':') 
+							continue; /* skip comment */
+
 
 						memset(gVehicleTypeinFile, 0x00, sizeof(gVehicleTypeinFile) );
-						
-						/* OK */
-						fprintf(stderr,">>Gear Ratio type  :\033[1;32m %s - in gear.gil file \033[0m \n", geartype ); 
 
+						/* OK */
+						geartype[10] = '\0';
+
+					#if DOS_COLOR_PRINT
+						fprintf(stderr,">>Gear Ratio type  :\033[1;32m %s - in gear.gil file \033[0m \n", geartype ); 
+					#else
+						fprintf(stderr,">>Gear Ratio type  : %s - in gear.gil file \n", geartype ); 
+					#endif
+					
 						fprintf(stderr,"                     " );
 						ColorSet(0, 0, PINK, 0); /* PINK color setting */
 
-						fprintf(stderr,"(%d):%.4lf", 1,gRatioFile[1] );
+						fprintf(stderr,"(%d):%.4lf", 1, gRatioFile[1] );
 						for(ii=2; ii<=5; ii++)
-							fprintf(stderr,", (%d):%.4lf", ii,gRatioFile[ii] );
+							fprintf(stderr,", (%d):%.4lf", ii, gRatioFile[ii] );
 						//ColorSet(0, 0, 0, COLOR_RELEASED); /* Color setting */
 						fprintf(stderr,",\n");
 
 						fprintf(stderr,"                     " );
 						//ColorSet(0, 0, PINK, 0); /* PINK color setting */
-						fprintf(stderr,"(%d):%.4lf", 6,gRatioFile[6] );
+						fprintf(stderr,"(%d):%.4lf", 6, gRatioFile[6] );
 						for(ii=7; ii<9; ii++)
-							fprintf(stderr,", (%d):%.4lf", ii,gRatioFile[ii] );
+							fprintf(stderr,", (%d):%.4lf", ii, gRatioFile[ii] );
 
 						fprintf(stderr,", (%s):%.4lf", "R", gRatioFile[9] );
 						fprintf(stderr,", (%s):%.4lf", "F", gRatioFile[10] );
@@ -3907,11 +4155,20 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 	{
 		memcpy( gearTable, gearTable_SX2, sizeof(gearTable_SX2) );
 
+	#if DOS_COLOR_PRINT
 		fprintf(stderr,">>Gear Ratio type  :\033[32m %s (default index:%d) \033[0m\n", "SX2", iGearTableIndex ); 
+	#else
+		fprintf(stderr,">>Gear Ratio type  : %s (default index:%d) \n", "SX2", iGearTableIndex ); 
+	#endif
+	
 	}
 	else
 	{
+	#if DOS_COLOR_PRINT
 		fprintf(stderr,">>Gear Ratio type  :\033[32m %s (Index:%d) \033[0m\n", gVehicleType[iGearTableIndex], iGearTableIndex ); 
+	#else
+		fprintf(stderr,">>Gear Ratio type  : %s (Index:%d) \n", gVehicleType[iGearTableIndex], iGearTableIndex ); 
+	#endif
 	}
 
 
@@ -3977,6 +4234,14 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 				AllFilesClosed();
 				exit(0);
 			}
+
+		#if SAVEMODE
+			if(oriFile)
+			{
+				fprintf(oriFile, TITLE_ORI "\n");
+			}
+		#endif
+			
 		}
 	#endif
 
@@ -4075,7 +4340,7 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 	}
 
 
-	fprintf(stderr,">>Sorting and analyzing SQ Data... Format...  (%d) \n", useInputCase);
+	fprintf(stderr,">>Sorting and analyzing SQ Data... Format...  (cFORAMT:%d) \n", useInputCase);
 
 
 
@@ -4176,6 +4441,7 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 			else if( (iINPUT_NUMS != result) && (result!=-1 && i>0) )  /* QUAL_TSV_DATA_ITEM_NUM */
 			{
 				iNGcount ++;
+				//fprintf(stderr,"[%s]: ++ERROR++ result = %d, iINPUT_NUMS(%d) NGcount = %u  \n",__FUNCTION__, result, iINPUT_NUMS, iNGcount );
 				continue; /* reading Next item because of FAIL item */
 			}
 			else
@@ -4207,6 +4473,10 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
 					memset(gShiftType, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
 
+					useInputCase ++;  /* Next Input Format... */
+
+					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.1.  (cFORAMT:%d)(%d) \n", useInputCase, NGformatMODECnt );
+
 					NGformatMODECnt = 0; 
 					NGformatGEARCnt = 0;
 					NGformatCG = 0;
@@ -4214,16 +4484,14 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					iErrorVSP = 0;
 					iErrorAPS = 0;
 					iErrorLAcc = 0;
-					iErrorRPM = 0;
+					iErrorRPMNo = 0;
+					iErrorRPMNt = 0;
+					iErrorRPMNe = 0;
 					iErrorTemp = 0;
 					iErrorOTS = 0;
 					iErrorTqStnd = 0;
 					iErrorNetEng_Acor = 0;
 					iErrorMSs_Ntg = 0;
-
-					useInputCase ++;  /* Next Input Format... */
-
-					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.1.  (%d) \n", useInputCase );
 
 					rewind(inpfile);
 					continue;
@@ -4250,6 +4518,10 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
 					memset(gShiftType, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
 
+					useInputCase ++;  /* Next Input Format... */
+
+					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.2.  (cFORAMT:%d)(%d) \n", useInputCase, NGformatGEARCnt );
+
 					NGformatMODECnt = 0; 
 					NGformatGEARCnt = 0;
 					NGformatCG = 0;
@@ -4257,16 +4529,14 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					iErrorVSP = 0;
 					iErrorAPS = 0;
 					iErrorLAcc = 0;
-					iErrorRPM = 0;
+					iErrorRPMNo = 0;
+					iErrorRPMNt = 0;
+					iErrorRPMNe = 0;
 					iErrorTemp = 0;
 					iErrorOTS = 0;
 					iErrorTqStnd = 0;
 					iErrorNetEng_Acor = 0;
 					iErrorMSs_Ntg = 0;
-
-					useInputCase ++;  /* Next Input Format... */
-
-					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.2.  (%d) \n", useInputCase );
 
 					rewind(inpfile);
 					continue;
@@ -4275,6 +4545,7 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 			}
 
 
+	#if 0 /* Deleted at 2023-05-28. Because of 7-DAN data invalid... */
 			/* ------------------------------------------------------------ */
 			/* N(0), D(1~8), P(9), R(10) ---------------------------------  */
 			/* 11, 12 : s1_Y, s2_Y       ---------------------------------  */
@@ -4294,6 +4565,10 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
 					memset(gShiftType, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
 
+					useInputCase ++;  /* Next Input Format... */
+
+					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.3.  (%d)(%d) \n", useInputCase, NGformatCG );
+
 					NGformatMODECnt = 0; 
 					NGformatGEARCnt = 0;
 					NGformatCG = 0;
@@ -4301,16 +4576,14 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					iErrorVSP = 0;
 					iErrorAPS = 0;
 					iErrorLAcc = 0;
-					iErrorRPM = 0;
+					iErrorRPMNo = 0;
+					iErrorRPMNt = 0;
+					iErrorRPMNe = 0;
 					iErrorTemp = 0;
 					iErrorOTS = 0;
 					iErrorTqStnd = 0;
 					iErrorNetEng_Acor = 0;
 					iErrorMSs_Ntg = 0;
-
-					useInputCase ++;  /* Next Input Format... */
-
-					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.3.  (%d) \n", useInputCase );
 
 					rewind(inpfile);
 					continue;
@@ -4332,6 +4605,10 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
 					memset(gShiftType, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
 
+					useInputCase ++;  /* Next Input Format... */
+
+					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.4.  (%d)(%d) \n", useInputCase, NGformatTG );
+
 					NGformatMODECnt = 0; 
 					NGformatGEARCnt = 0;
 					NGformatCG = 0;
@@ -4339,23 +4616,24 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					iErrorVSP = 0;
 					iErrorAPS = 0;
 					iErrorLAcc = 0;
-					iErrorRPM = 0;
+					iErrorRPMNo = 0;
+					iErrorRPMNt = 0;
+					iErrorRPMNe = 0;
 					iErrorTemp = 0;
 					iErrorOTS = 0;
 					iErrorTqStnd = 0;
 					iErrorNetEng_Acor = 0;
 					iErrorMSs_Ntg = 0;
 
-					useInputCase ++;  /* Next Input Format... */
-
-					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.4.  (%d) \n", useInputCase );
-
 					rewind(inpfile);
 					continue;
 				}
 
 			}
+	#endif
 
+
+	#if 0 /* Deleted at 2023-05-28. Because of 7-DAN data invalid... */
 			if( (sq[0].VSP03 < VEHICLE_SPEED_MIN) || (sq[0].VSP03 > VEHICLE_SPEED_MAX) )
 			{
 				/* OK: 0 <= VS <= 256 */
@@ -4368,6 +4646,10 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
 					memset(gShiftType, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
 
+					useInputCase ++;  /* Next Input Format... */
+
+					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.5.  (%d)(%d) \n", useInputCase, iErrorVSP );
+
 					NGformatMODECnt = 0; 
 					NGformatGEARCnt = 0;
 					NGformatCG = 0;
@@ -4375,16 +4657,14 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					iErrorVSP = 0;
 					iErrorAPS = 0;
 					iErrorLAcc = 0;
-					iErrorRPM = 0;
+					iErrorRPMNo = 0;
+					iErrorRPMNt = 0;
+					iErrorRPMNe = 0;
 					iErrorTemp = 0;
 					iErrorOTS = 0;
 					iErrorTqStnd = 0;
 					iErrorNetEng_Acor = 0;
 					iErrorMSs_Ntg = 0;
-
-					useInputCase ++;  /* Next Input Format... */
-
-					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.5.  (%d) \n", useInputCase );
 
 					rewind(inpfile);
 					continue;
@@ -4404,6 +4684,10 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
 					memset(gShiftType, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
 			
+					useInputCase ++;  /* Next Input Format... */
+			
+					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.6.  (%d)(%d) \n", useInputCase, iErrorAPS );
+
 					NGformatMODECnt = 0; 
 					NGformatGEARCnt = 0;
 					NGformatCG = 0;
@@ -4411,16 +4695,14 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					iErrorVSP = 0;
 					iErrorAPS = 0;
 					iErrorLAcc = 0;
-					iErrorRPM = 0;
+					iErrorRPMNo = 0;
+					iErrorRPMNt = 0;
+					iErrorRPMNe = 0;
 					iErrorTemp = 0;
 					iErrorOTS = 0;
 					iErrorTqStnd = 0;
 					iErrorNetEng_Acor = 0;
 					iErrorMSs_Ntg = 0;
-
-					useInputCase ++;  /* Next Input Format... */
-			
-					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.6.  (%d) \n", useInputCase );
 			
 					rewind(inpfile);
 					continue;
@@ -4440,6 +4722,10 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
 					memset(gShiftType, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
 			
+					useInputCase ++;  /* Next Input Format... */
+			
+					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.7.  (%d)(%d) \n", useInputCase, iErrorLAcc );
+
 					NGformatMODECnt = 0; 
 					NGformatGEARCnt = 0;
 					NGformatCG = 0;
@@ -4447,33 +4733,29 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					iErrorVSP = 0;
 					iErrorAPS = 0;
 					iErrorLAcc = 0;
-					iErrorRPM = 0;
+					iErrorRPMNo = 0;
+					iErrorRPMNt = 0;
+					iErrorRPMNe = 0;
 					iErrorTemp = 0;
 					iErrorOTS = 0;
 					iErrorTqStnd = 0;
 					iErrorNetEng_Acor = 0;
 					iErrorMSs_Ntg = 0;
 
-					useInputCase ++;  /* Next Input Format... */
-			
-					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.7.  (%d) \n", useInputCase );
-			
 					rewind(inpfile);
 					continue;
 				}
 			}
 
 
-			if( (sq[0].No10 < 0.0f) || (sq[0].No10 > No_RMP_MAX) ||
-				(sq[0].Nt16 < 0.0f) || (sq[0].Nt16 > Nt_RMP_MAX) ||
-				(sq[0].Ne15 < 0.0f) || (sq[0].Ne15 > Ne_RMP_MAX) )
+			if( (sq[0].No10 < 0.0f) || (sq[0].No10 > No_RMP_MAX) )
 			{
 				/* OK: 0 <= No10 <= 16384 */
 				/* OK: 0 <= Nt16 <= 16384 */
 				/* OK: 0 <= Ne15 <= 16384 */
 
-				iErrorRPM ++;
-				if( (iErrorRPM > ERROR_NUM_LIMIT) && (useInputCase>USE_IN_CASE0_NONE) && (useInputCase < USE_IN_MAX) )
+				iErrorRPMNo ++;
+				if( (iErrorRPMNo > ERROR_NUM_LIMIT) && (useInputCase>USE_IN_CASE0_NONE) && (useInputCase < USE_IN_MAX) )
 				{
 					RecordCnt = 0LL;
 					iOKcount = 0;
@@ -4481,6 +4763,10 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
 					memset(gShiftType, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
 			
+					useInputCase ++;  /* Next Input Format... */
+			
+					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.8.  (%d)(%d) \n", useInputCase, iErrorRPMNo );
+
 					NGformatMODECnt = 0; 
 					NGformatGEARCnt = 0;
 					NGformatCG = 0;
@@ -4488,23 +4774,104 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					iErrorVSP = 0;
 					iErrorAPS = 0;
 					iErrorLAcc = 0;
-					iErrorRPM = 0;
+					iErrorRPMNo = 0;
+					iErrorRPMNt = 0;
+					iErrorRPMNe = 0;
 					iErrorTemp = 0;
 					iErrorOTS = 0;
 					iErrorTqStnd = 0;
 					iErrorNetEng_Acor = 0;
 					iErrorMSs_Ntg = 0;
-
-					useInputCase ++;  /* Next Input Format... */
-			
-					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.8.  (%d) \n", useInputCase );
 			
 					rewind(inpfile);
 					continue;
 				}
 			}
 
+
+			if( (sq[0].Nt16 < 0.0f) || (sq[0].Nt16 > Nt_RMP_MAX) )
+			{
+				/* OK: 0 <= No10 <= 16384 */
+				/* OK: 0 <= Nt16 <= 16384 */
+				/* OK: 0 <= Ne15 <= 16384 */
+
+				iErrorRPMNt ++;
+				if( (iErrorRPMNt > ERROR_NUM_LIMIT) && (useInputCase>USE_IN_CASE0_NONE) && (useInputCase < USE_IN_MAX) )
+				{
+					RecordCnt = 0LL;
+					iOKcount = 0;
+					iNGcount = 0;
+					memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
+					memset(gShiftType, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
 			
+					useInputCase ++;  /* Next Input Format... */
+			
+					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.81.  (%d)(%d) \n", useInputCase, iErrorRPMNt );
+
+					NGformatMODECnt = 0; 
+					NGformatGEARCnt = 0;
+					NGformatCG = 0;
+					NGformatTG = 0;
+					iErrorVSP = 0;
+					iErrorAPS = 0;
+					iErrorLAcc = 0;
+					iErrorRPMNo = 0;
+					iErrorRPMNt = 0;
+					iErrorRPMNe = 0;
+					iErrorTemp = 0;
+					iErrorOTS = 0;
+					iErrorTqStnd = 0;
+					iErrorNetEng_Acor = 0;
+					iErrorMSs_Ntg = 0;
+			
+					rewind(inpfile);
+					continue;
+				}
+			}
+
+
+			if( (sq[0].Ne15 < 0.0f) || (sq[0].Ne15 > Ne_RMP_MAX) )
+			{
+				/* OK: 0 <= No10 <= 16384 */
+				/* OK: 0 <= Nt16 <= 16384 */
+				/* OK: 0 <= Ne15 <= 16384 */
+
+				iErrorRPMNe ++;
+				if( (iErrorRPMNe > ERROR_NUM_LIMIT) && (useInputCase>USE_IN_CASE0_NONE) && (useInputCase < USE_IN_MAX) )
+				{
+					RecordCnt = 0LL;
+					iOKcount = 0;
+					iNGcount = 0;
+					memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
+					memset(gShiftType, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
+			
+					useInputCase ++;  /* Next Input Format... */
+			
+					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.82.  (%d)(%d) \n", useInputCase, iErrorRPMNe );
+
+					NGformatMODECnt = 0; 
+					NGformatGEARCnt = 0;
+					NGformatCG = 0;
+					NGformatTG = 0;
+					iErrorVSP = 0;
+					iErrorAPS = 0;
+					iErrorLAcc = 0;
+					iErrorRPMNo = 0;
+					iErrorRPMNt = 0;
+					iErrorRPMNe = 0;
+					iErrorTemp = 0;
+					iErrorOTS = 0;
+					iErrorTqStnd = 0;
+					iErrorNetEng_Acor = 0;
+					iErrorMSs_Ntg = 0;
+			
+					rewind(inpfile);
+					continue;
+				}
+			}
+
+
+
 			if( (sq[0].EngTemp06 < ENGINE_TEMP_MIN) || (sq[0].EngTemp06 > ENGINE_TEMP_MAX) )
 			{
 				/* OK: -32768 <= EngTemp06 (수온) <= 32768 */
@@ -4518,6 +4885,10 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
 					memset(gShiftType, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
 			
+					useInputCase ++;  /* Next Input Format... */
+			
+					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.9.  (%d)(%d) \n", useInputCase, iErrorTemp );
+
 					NGformatMODECnt = 0; 
 					NGformatGEARCnt = 0;
 					NGformatCG = 0;
@@ -4525,16 +4896,14 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					iErrorVSP = 0;
 					iErrorAPS = 0;
 					iErrorLAcc = 0;
-					iErrorRPM = 0;
+					iErrorRPMNo = 0;
+					iErrorRPMNt = 0;
+					iErrorRPMNe = 0;
 					iErrorTemp = 0;
 					iErrorOTS = 0;
 					iErrorTqStnd = 0;
 					iErrorNetEng_Acor = 0;
 					iErrorMSs_Ntg = 0;
-
-					useInputCase ++;  /* Next Input Format... */
-			
-					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.9.  (%d) \n", useInputCase );
 			
 					rewind(inpfile);
 					continue;
@@ -4554,6 +4923,10 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
 					memset(gShiftType, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
 			
+					useInputCase ++;  /* Next Input Format... */
+			
+					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.10  (%d)(%d) \n", useInputCase, iErrorOTS );
+
 					NGformatMODECnt = 0; 
 					NGformatGEARCnt = 0;
 					NGformatCG = 0;
@@ -4561,16 +4934,14 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					iErrorVSP = 0;
 					iErrorAPS = 0;
 					iErrorLAcc = 0;
-					iErrorRPM = 0;
+					iErrorRPMNo = 0;
+					iErrorRPMNt = 0;
+					iErrorRPMNe = 0;
 					iErrorTemp = 0;
 					iErrorOTS = 0;
 					iErrorTqStnd = 0;
 					iErrorNetEng_Acor = 0;
 					iErrorMSs_Ntg = 0;
-
-					useInputCase ++;  /* Next Input Format... */
-			
-					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.10  (%d) \n", useInputCase );
 			
 					rewind(inpfile);
 					continue;
@@ -4591,6 +4962,10 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
 					memset(gShiftType, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
 			
+					useInputCase ++;  /* Next Input Format... */
+			
+					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.11  (%d)(%d) \n", useInputCase, iErrorTqStnd );
+
 					NGformatMODECnt = 0; 
 					NGformatGEARCnt = 0;
 					NGformatCG = 0;
@@ -4598,16 +4973,14 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					iErrorVSP = 0;
 					iErrorAPS = 0;
 					iErrorLAcc = 0;
-					iErrorRPM = 0;
+					iErrorRPMNo = 0;
+					iErrorRPMNt = 0;
+					iErrorRPMNe = 0;
 					iErrorTemp = 0;
 					iErrorOTS = 0;
 					iErrorTqStnd = 0;
 					iErrorNetEng_Acor = 0;
 					iErrorMSs_Ntg = 0;
-
-					useInputCase ++;  /* Next Input Format... */
-			
-					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.11  (%d) \n", useInputCase );
 			
 					rewind(inpfile);
 					continue;
@@ -4627,6 +5000,10 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
 					memset(gShiftType, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
 			
+					useInputCase ++;  /* Next Input Format... */
+			
+					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.12  (%d)(%d) \n", useInputCase, iErrorNetEng_Acor );
+
 					NGformatMODECnt = 0; 
 					NGformatGEARCnt = 0;
 					NGformatCG = 0;
@@ -4634,16 +5011,14 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					iErrorVSP = 0;
 					iErrorAPS = 0;
 					iErrorLAcc = 0;
-					iErrorRPM = 0;
+					iErrorRPMNo = 0;
+					iErrorRPMNt = 0;
+					iErrorRPMNe = 0;
 					iErrorTemp = 0;
 					iErrorOTS = 0;
 					iErrorTqStnd = 0;
 					iErrorNetEng_Acor = 0;
 					iErrorMSs_Ntg = 0;
-					
-					useInputCase ++;  /* Next Input Format... */
-			
-					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.12  (%d) \n", useInputCase );
 			
 					rewind(inpfile);
 					continue;
@@ -4662,6 +5037,10 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
 					memset(gShiftType, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
 			
+					useInputCase ++;  /* Next Input Format... */
+			
+					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.13  (%d)(%d) \n", useInputCase, iErrorMSs_Ntg );
+
 					NGformatMODECnt = 0; 
 					NGformatGEARCnt = 0;
 					NGformatCG = 0;
@@ -4669,22 +5048,20 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					iErrorVSP = 0;
 					iErrorAPS = 0;
 					iErrorLAcc = 0;
-					iErrorRPM = 0;
+					iErrorRPMNo = 0;
+					iErrorRPMNt = 0;
+					iErrorRPMNe = 0;
 					iErrorTemp = 0;
 					iErrorOTS = 0;
 					iErrorTqStnd = 0;
 					iErrorNetEng_Acor = 0;
 					iErrorMSs_Ntg = 0;
-					
-					useInputCase ++;  /* Next Input Format... */
-			
-					fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE.13  (%d) \n", useInputCase );
 			
 					rewind(inpfile);
 					continue;
 				}
 			}
-
+	#endif /* Deleted at 2023-05-28 */
 
 
 			/* === 2 STEP : SKIP record check ===================== */
@@ -4779,7 +5156,9 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 				iErrorVSP = 0;
 				iErrorAPS = 0;
 				iErrorLAcc = 0;
-				iErrorRPM = 0;
+				iErrorRPMNo = 0;
+				iErrorRPMNt = 0;
+				iErrorRPMNe = 0;
 				iErrorTemp = 0;
 				iErrorOTS = 0;
 				iErrorTqStnd = 0;
@@ -4788,7 +5167,7 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 
 				useInputCase ++;  /* Next Input Format... */
 
-				fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE...  (%d) \n", useInputCase );
+				fprintf(stderr,">>Checking Input file FORMAT and SEQUENCE...  (cFORAMT:%d) \n", useInputCase );
 
 				rewind(inpfile);
 			}
@@ -4806,11 +5185,13 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 	/* --------------------------------------------------------------------------- */
 	/* INPUT File *.tsv FORMAT --------------------------------------------------- */
 	/* --------------------------------------------------------------------------- */
-
+#if 0 /* Deleted at 2023.05.23 -- VW1 model */
 	if( chkPATs_ModeID[aiPATs05] < 1 )
 	{
 		fprintf(stderr,"  Total Quality Shift Records  : %9llu lines \n", RecordCnt );
+		if(iNGcount)
 		fprintf(stderr,"  Error Shift Records (NG) ----: %9u lines <- invalid shift data record \n", iNGcount );
+
 		fprintf(stderr,"  Quality Shift Records (OK) --: %9u lines, %6.1lf min \n", iOKcount, (iOKcount*iavgTime)/TIME_SCALE/60 );
 		fprintf(stderr,"\n");
 		
@@ -4850,7 +5231,7 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 		exit(0);
 		return 0;
 	}
-
+#endif
 
 
 	/* --------------------------------------------------------------------------- */
@@ -4875,6 +5256,9 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 	iErrorAPS = 0;
 	iErrorLAcc = 0;
 	iErrorRPM = 0;
+	iErrorRPMNo = 0;
+	iErrorRPMNt = 0;
+	iErrorRPMNe = 0;
 	iErrorTemp = 0;
 	iErrorOTS = 0;
 	iErrorTqStnd = 0;
@@ -5061,15 +5445,19 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 			/* === 1 STEP : record (17 items check) =============== */
 
 
+	#if CHECK_ERROR
+	fprintf(stderr, " CHECK_ERROR++1++ sscanf, result = %d, iOKcount = %u  \n", result, iOKcount );
+	#endif
 
+		
 			if( (sq[0].iPATs05 < MODE_ID_NUMS) && (sq[0].iPATs05 >= 0) )
 			{
 				chkPATs_ModeID[ sq[0].iPATs05 ] ++; /* ModeID Counts */
 			}
 			else
 			{
-				fprintf(stderr,"++ERROR++ ModeID errors = %d, line:%u ... check quality sorting data... \n", sq[0].iPATs05, iOKcount );
 				NGformatMODECnt ++; 
+				fprintf(stderr,"++DATA RANGE ERROR++ Time:%11.5lf >> ModeID(%d) Errors:%u ... \n", sq[0].Time01, sq[0].iPATs05, NGformatMODECnt );
 			}
 
 
@@ -5079,8 +5467,8 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 			}
 			else
 			{
-				fprintf(stderr,"++ERROR++ ShiftType errors = %u, line:%u ... check quality sorting data... \n", sq[0].ShiTy12, iOKcount );
 				NGformatGEARCnt ++;				
+				fprintf(stderr,"++DATA RANGE ERROR++ Time:%11.5lf >> ShiftType(%u), Errors:%u .... \n", sq[0].Time01, sq[0].ShiTy12, NGformatGEARCnt );
 			}
 
 		
@@ -5092,20 +5480,20 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 			if( sq[0].curGear08 > 14 || sq[0].curGear08 < 0 )
 			{
 				NGformatCG++;
-				fprintf(stderr,"++ERROR++ curGear(%d) errors > %u ... check quality sorting data... \n", sq[0].curGear08, NGformatCG );
+				fprintf(stderr,"++DATA RANGE ERROR++ Time:%11.5lf >> curGear(%d) Errors:%u ... \n", sq[0].Time01, sq[0].curGear08, NGformatCG );
 			}
 		
 			if( sq[0].tgtGear11 > 14 || sq[0].tgtGear11 < 0 )
 			{
 				NGformatTG++;
-				fprintf(stderr,"++ERROR++ tgtGear(%d) errors > %u ... check quality sorting data... \n", sq[0].tgtGear11, NGformatTG );		
+				fprintf(stderr,"++DATA RANGE ERROR++ Time:%11.5lf >> tgtGear(%d) Errors:%u ... \n", sq[0].Time01, sq[0].tgtGear11, NGformatTG );		
 			}
 		
 			if( (sq[0].VSP03 < VEHICLE_SPEED_MIN) || (sq[0].VSP03 > VEHICLE_SPEED_MAX) )
 			{
 				/* OK: 0 <= VS <= 256 */
 				iErrorVSP ++;
-				fprintf(stderr,"++ERROR++ VSP(%lf) errors > %u \n", sq[0].VSP03, iErrorVSP );		
+				fprintf(stderr,"++DATA RANGE ERROR++ Time:%11.5lf >> VSP(%lf) Errors:%u \n", sq[0].Time01, sq[0].VSP03, iErrorVSP );		
 			}
 		
 		
@@ -5113,7 +5501,7 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 			{
 				/* OK: 0 <= APS <= 128 */
 				iErrorAPS ++;
-				fprintf(stderr,"++ERROR++ ASP(%lf) errors > %u \n", sq[0].APS09, iErrorAPS );		
+				fprintf(stderr,"++DATA RANGE ERROR++ Time:%11.5lf >> ASP(%lf) Errors:%u \n", sq[0].Time01, sq[0].APS09, iErrorAPS );		
 			}
 		
 		
@@ -5121,48 +5509,67 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 			{
 				/* OK: -16 <= LAcc17 <= 16 */
 				iErrorLAcc ++;
-				fprintf(stderr,"++ERROR++ LAcc(%lf) errors > %u \n", sq[0].LAcc17, iErrorLAcc );		
+				fprintf(stderr,"++DATA RANGE ERROR++ Time:%11.5lf >> LAcc(%lf) Errors:%u \n", sq[0].Time01, sq[0].LAcc17, iErrorLAcc );		
 			}
 		
-			if( (sq[0].No10 < 0.0f) || (sq[0].No10 > No_RMP_MAX) ||
-				(sq[0].Nt16 < 0.0f) || (sq[0].Nt16 > Nt_RMP_MAX) ||
-				(sq[0].Ne15 < 0.0f) || (sq[0].Ne15 > Ne_RMP_MAX) )
+			if( (sq[0].No10 < 0.0f) || (sq[0].No10 > No_RMP_MAX) )
 			{
 				/* OK: 0 <= No10 <= 16384 */
 				/* OK: 0 <= Nt16 <= 16384 */
 				/* OK: 0 <= Ne15 <= 16384 */
 		
-				iErrorRPM ++;
-				fprintf(stderr,"++ERROR++ rpm(No:%.2lf, Nt:%.2lf, Ne:%.2lf) errors > %u \n", sq[0].No10, sq[0].Nt16, sq[0].Ne15, iErrorRPM );						
+				iErrorRPMNo ++;
+				fprintf(stderr,"++DATA RANGE ERROR++ Time:%11.5lf >> rpm(No:%.2lf) Errors:%u \n", sq[0].Time01, sq[0].No10, iErrorRPMNo );						
 			}
+
+			if( (sq[0].Nt16 < 0.0f) || (sq[0].Nt16 > Nt_RMP_MAX) )
+			{
+				/* OK: 0 <= No10 <= 16384 */
+				/* OK: 0 <= Nt16 <= 16384 */
+				/* OK: 0 <= Ne15 <= 16384 */
+		
+				iErrorRPMNt ++;
+				fprintf(stderr,"++DATA RANGE ERROR++ Time:%11.5lf >> rpm(Nt:%.2lf) Errors:%u \n", sq[0].Time01, sq[0].Nt16, iErrorRPMNt );						
+			}
+
+			if( (sq[0].Ne15 < 0.0f) || (sq[0].Ne15 > Ne_RMP_MAX) )
+			{
+				/* OK: 0 <= No10 <= 16384 */
+				/* OK: 0 <= Nt16 <= 16384 */
+				/* OK: 0 <= Ne15 <= 16384 */
+		
+				iErrorRPMNe ++;
+				fprintf(stderr,"++DATA RANGE ERROR++ Time:%11.5lf >> rpm(Ne:%.2lf) Errors:%u \n", sq[0].Time01, sq[0].Ne15, iErrorRPMNe );						
+			}
+
 
 			if( (sq[0].EngTemp06 < ENGINE_TEMP_MIN) || (sq[0].EngTemp06 > ENGINE_TEMP_MAX) )
 			{
 				/* OK: -32768 <= Temp <= 32768 */
 				/* OK: -32768 <= EngTemp06 (수온) <= 32768 */
 				iErrorTemp ++;
-				fprintf(stderr,"++ERROR++ Temp(%d) errors > %u \n", sq[0].EngTemp06, iErrorTemp );		
+				fprintf(stderr,"++DATA RANGE ERROR++ Time:%11.5lf >> Temp(%lf) Errors:%u \n", sq[0].Time01, sq[0].EngTemp06, iErrorTemp );		
 			}
 
 			if( (sq[0].OTS02 < OIL_TEMP_MIN) || (sq[0].OTS02 > OIL_TEMP_MAX) )
 			{
 				/* OTS(Oil Temperature Sonsor)는 유온 : -255 ~ 255 */			
 				iErrorOTS ++;
-				fprintf(stderr,"++ERROR++ OTS(%d) errors > %u \n", sq[0].OTS02, iErrorOTS );
+				fprintf(stderr,"++DATA RANGE ERROR++ Time:%11.5lf >> OTS(%lf) Errors:%u \n", sq[0].Time01, sq[0].OTS02, iErrorOTS );
 			}
 
 			if( (sq[0].TqStnd04 < 0) || (sq[0].TqStnd04 > 2550) )
 			{
 				/*	0 ~ 2550 */			
 				iErrorTqStnd ++;
-				fprintf(stderr,"++ERROR++ TqStnd(%d) errors > %u \n", sq[0].TqStnd04, iErrorTqStnd );
+				fprintf(stderr,"++DATA RANGE ERROR++ Time:%11.5lf >> TqStnd(%d) Errors:%u \n", sq[0].Time01, sq[0].TqStnd04, iErrorTqStnd );
 			}
 
 			if( (sq[0].NetEng_Acor < NETENG_ACOR_MIN) || (sq[0].NetEng_Acor > NETENG_ACOR_MAX) )
 			{
 				/*	0 ~ 2550 */			
 				iErrorNetEng_Acor ++;
-				fprintf(stderr,"++ERROR++ NetEng_Acor(%lf) errors > %u \n", sq[0].NetEng_Acor, iErrorNetEng_Acor );
+				fprintf(stderr,"++DATA RANGE ERROR++ Time:%11.5lf >> NetEng_Acor(%lf) Errors:%u \n", sq[0].Time01, sq[0].NetEng_Acor, iErrorNetEng_Acor );
 			}
 
 
@@ -5170,7 +5577,7 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 			{
 				/* MSs_Ntg [-16384 ~ 16384] */
 				iErrorMSs_Ntg ++;
-				fprintf(stderr,"++ERROR++ MSs_Ntg(%d) errors > %u \n", sq[0].MSs_Ntg, iErrorMSs_Ntg );
+				fprintf(stderr,"++DATA RANGE ERROR++ Time:%11.5lf >> MSs_Ntg(%lf) Errors:%u \n", sq[0].Time01, sq[0].MSs_Ntg, iErrorMSs_Ntg );
 			}
 
 
@@ -5247,13 +5654,13 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 			#if SAVEMODE
 				if( oriFile )
 				{
-				fprintf(oriFile, SAVEFMT,
+				fprintf(oriFile, SAVE_ORI,
 						sq[0].Time01,	 sq[0].iPATs05,   arrPATs_ModeID[sq[0].iPATs05].ModeID, sq[0].VSP03, sq[0].tqi07, 
 						sq[0].curGear08, sq[0].APS09,	  sq[0].No10,                           sq[0].tgtGear11, 
 						iShift, 		 sq[0].ShiTy12,   arrGear[sq[0].ShiTy12].sGear,         sq[0].TqFr13, sq[0].ShiPh14, 
 						sq[0].Ne15, 	 sq[0].EngTemp06, sq[0].NetEng_Acor,                    sq[0].MSs_Ntg,
 						sq[0].Nt16,	     sq[0].LAcc17,    LPFilteredLAcc,
-						sTmp,        sTmp, gearRatio, gearShift1cur, gearShift2tgt, 0.0f /*fJerk0*/, MaxAcc, minAcc );
+						sTmp,        sTmp, gearRatio, gearShift1cur, gearShift2tgt  );
 
 				fprintf(oriFile, "\n");
 				}
@@ -5314,6 +5721,8 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 				iFIX_G4 = -90;
 				iFIX_G3 = -90;
 
+				ctSameGearStatus = 0;
+				iKickDown = -90; /* NOT used for upshift */
 			}
 			else if( SHIFT_DN == shiDir03 )
 			{
@@ -5324,6 +5733,8 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 				iFIX_G5 = -90;
 				iFIX_G4 = -90;
 				iFIX_G3 = -90;
+
+				iKickDown = -90; /* NOT used for Sequential Downshift */
 			}
 			else if( SHIFT_SKIP_DN == shiDir03 )
 			{
@@ -5334,9 +5745,14 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 				iFIX_G4 = -4; /* 8-4 case, 7-3 case, 6-2 case, 5-1 case */
 				iFIX_G3 = -3; /* 8-5 case, 7-4 case, 6-3 case, 5-2 case */
 				//iFIX_G2 = -2; /* 8-6 case, 7-5 case, 6-4 case, 5-3 case, 4-2 case, 3-1 caae */
+
+				//iKickDown = -1; /* Used for Skip Downshift : s43Z -> 50msec (10 times) under -> s42Z */
 			}
 
 
+		#if CHECK_ERROR
+			fprintf(stderr, " CHECK_ERROR++2++ (SS/SB/SP/SF = (%u/ %u/ %u/ %u) \n", iSScount, iSBcount, iSPcount, iSFcount );
+		#endif
 
 			/* ------------------------------------------------------------------- */
 			/* ------------------------------------------------------------------- */
@@ -5352,12 +5768,14 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 				/* There are SB, SP point. exist!!! */
 				if( iExistSBpoint && iExistSPpoint ) 
 				{
-					if( (curSmPreGear + iFIX_GEAR == sq[0].curGear08 ||
+					/* 2023-05-28, added  iSScount AND condition because of segmentation falut while skip */
+					if( iSScount && (curSmPreGear + iFIX_GEAR == sq[0].curGear08 ||
 						 curSmPreGear + iFIX_G6 == sq[0].curGear08 || curSmPreGear + iFIX_G5 == sq[0].curGear08 ||
 						 curSmPreGear + iFIX_G4 == sq[0].curGear08 || curSmPreGear + iFIX_G3 == sq[0].curGear08) ) /* preview curGr == curr curGr */
 					{
 
 						strcpy(sTimePos, TXT_SFTIME);
+
 
 						gMaxTbl[iSScount-1].SFTime = (unsigned int)( (sq[0].Time01) * TIME_SCALE * JERK_TIME_SCALE );
 
@@ -5378,7 +5796,9 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 
 					}
 				}
-				else if( (tgtSmPreGear == sq[0].tgtGear11) &&
+
+				/* 2023-05-28, added  iSScount AND condition because of segmentation falut while skip */
+				else if( iSScount && (tgtSmPreGear == sq[0].tgtGear11) &&
 						 (curSmPreGear + iFIX_GEAR == sq[0].curGear08 ||
 						 curSmPreGear + iFIX_G6 == sq[0].curGear08 || curSmPreGear + iFIX_G5 == sq[0].curGear08 ||
 						 curSmPreGear + iFIX_G4 == sq[0].curGear08 || curSmPreGear + iFIX_G3 == sq[0].curGear08) )
@@ -5422,7 +5842,8 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 			else if( isShiftType(iPwrOnOff, shiDir03, sq[0].ShiTy12) && (sq[0].iPATs05 == aiPATs05) && 
 				(sq[0].curGear08 + iFIX_GEAR == sq[0].tgtGear11 ||
 				 sq[0].curGear08 + iFIX_G6 == sq[0].tgtGear11 || sq[0].curGear08 + iFIX_G5 == sq[0].tgtGear11 ||
-				 sq[0].curGear08 + iFIX_G4 == sq[0].tgtGear11 || sq[0].curGear08 + iFIX_G3 == sq[0].tgtGear11) )
+				 sq[0].curGear08 + iFIX_G4 == sq[0].tgtGear11 || sq[0].curGear08 + iFIX_G3 == sq[0].tgtGear11 ||
+				 sq[0].curGear08 + iKickDown == sq[0].tgtGear11 ) )
 			{
 				#if 0
 				printf(" DIFF -> cg=%d, tg=%d   local: cg(%d), tg (%d) global : cg (%d) tg (%d) \n", 
@@ -5524,6 +5945,15 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 								isFindSS = 7; /* case 7 */
 							}
 
+					#if SKIP_DOWNSHIFT_KICKDOWN /* 2023-06-03 */
+							else if( sq[0].curGear08 + iKickDown == sq[0].tgtGear11 )
+							{
+								isFindSS = 8; /* case 8 */
+
+								gKickDownBeginTime = sq[0].Time01;
+							}
+					#endif
+					
 						}
 
 					#if 0
@@ -5548,6 +5978,8 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					g_SPtime	= -1.0f;
 					g_SFtime	= -1.0f;
 
+
+					iKickDown = -90; /* 2023-06-03 */
 
 					isFindSS = 0;
 					strcpy(sTimePos, TXT_SSTIME);
@@ -6029,7 +6461,7 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					}
 					else
 					{
-						strcpy(sTimePos, TXT_UNKNOWN);
+						strcpy(sTimePos, TXT_UNKNOWN_EXCEP); // TXT_UNKNOWN);
 					}
 				}
 				/* ----------------------------------------------------- */
@@ -6069,6 +6501,44 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 
 			}
 
+		#if SKIP_DOWNSHIFT_KICKDOWN /* 2023-06-04 */
+			else if( /*isShiftType(iPwrOnOff, shiDir03, sq[0].ShiTy12) &&*/ (sq[0].iPATs05 == aiPATs05) && (sq[0].curGear08 == sq[0].tgtGear11) && 
+				ctSameGearStatus )
+			{
+
+				if( 1==ctSameGearStatus )
+				{
+				//	strcpy(sTimePos, TXT_NO_SHIFT_TIME);
+				//	strcpy(sTimeNtPos, TXT_NO_SHIFT_TIME);
+
+					iOnce_NSHStart = 1; /* downshift case, iOnce_NSHStart=1 added 2023-05-29 */
+				}
+				else if( 2==ctSameGearStatus )
+				{
+				//	strcpy(sTimePos, TXT_NO_SHIFT_END);
+				//	strcpy(sTimeNtPos, TXT_NO_SHIFT_END);
+
+					iOnce_NSHEnd = 1;  /* downshift case, iOnce_NSHEnd=1 added 2023-05-29 */
+
+					iKickDown = -1;
+				}
+
+
+				is2File = 1; /* 1 means File saved!! */
+				ctSameGearStatus = 2;
+
+				iShift = sq[0].curGear08*10 + sq[0].tgtGear11; /* 12..23..34..45..56..67..78.. */ 
+
+			}
+
+			else if( /*isShiftType(iPwrOnOff, shiDir03, sq[0].ShiTy12) && (sq[0].iPATs05 == aiPATs05) &&*/ (sq[0].curGear08 != sq[0].tgtGear11) )
+			{
+				ctSameGearStatus = 1;
+				is2File = 0; /* 0 means File NOT saved!! */
+			}
+		#endif /* SKIP_DOWNSHIFT_KICKDOWN */
+		
+
 
 			curSmPreGear = sq[0].curGear08;
 			tgtSmPreGear = sq[0].tgtGear11;
@@ -6094,6 +6564,12 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 		}
 	}
 	while (!feof (inpfile));
+
+
+	#if CHECK_ERROR
+	fprintf(stderr, " CHECK_ERROR++4++ sscanf, result = %d, iOKcount = %u  (SS/SB/SP/SF = (%u/ %u/ %u/ %u) \n", result, iOKcount, iSScount, iSBcount, iSPcount, iSFcount );
+	#endif
+
 
 
 #if ORIGINAL_FILE_SAVED
@@ -6122,6 +6598,7 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 	memset(chkPATs_ModeID, 0x00, sizeof(chkPATs_ModeID) );
 	memset(gShiftType, 0x00, GEAR_SHI_NUMS*sizeof(unsigned long long) );
 
+
 	NGformatMODECnt = 0; 
 	NGformatGEARCnt = 0;
 	NGformatCG = 0;
@@ -6130,6 +6607,9 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 	iErrorAPS = 0;
 	iErrorLAcc = 0;
 	iErrorRPM = 0;
+	iErrorRPMNo = 0;
+	iErrorRPMNt = 0;
+	iErrorRPMNe = 0;
 
 	iSBdecCnt  = 0;
 	iSBstart   = 0;
@@ -6196,6 +6676,8 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 	iPreShTime = 0;
 	iPreShiftType = 0;
 	iSFarea    = 0;
+	ctSameGearStatus = 1;
+
 
 	do
 	{
@@ -6349,6 +6831,9 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 			#if SAVEMODE
 				if(shiFile)
 				{
+					if( sq[0].iPATs05 < 0 || sq[0].iPATs05 > MODE_ID_NUMS-1 )
+						fprintf(stderr,"++ERROR+1+ %s arrPATs_ModeID (%d) arrange over!!!  \r\n\n", __FUNCTION__, sq[0].iPATs05 );
+
 					fprintf(shiFile, SAVEFMT,
 							sq[0].Time01,    sq[0].iPATs05,                 arrPATs_ModeID[sq[0].iPATs05].ModeID, sq[0].VSP03,      sq[0].tqi07, 
 							sq[0].curGear08, sq[0].APS09,                   sq[0].No10,                           sq[0].tgtGear11,  iShift,
@@ -6373,6 +6858,12 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 				avgCount ++;
 			}
 			iPreShTime = (unsigned int)(sq[0].Time01 * TIME_SCALE);
+
+
+			if( (0==avgCount) && (iPreShTime <= 0) )
+				fprintf(stderr,"Time Error =====> sq[0].Time01: %11.5lf  Count:%llu / %u  \r\n", sq[0].Time01, avgCount, iPreShTime );
+
+			
 			/* ----------------------------------------------------- */
 			/* Find Time Period     								 */
 			/* ----------------------------------------------------- */
@@ -6444,6 +6935,7 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 				iFIX_G3 = -90;
 				//iFIX_G2 = -90;
 
+				iKickDown = -90; /* NOT used for upshift */
 			}
 			else if( SHIFT_DN == shiDir03 )
 			{
@@ -6454,6 +6946,8 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 				iFIX_G4 = -90;
 				iFIX_G3 = -90;
 				//iFIX_G2 = -90;				
+
+				iKickDown = -90; /* NOT used for Sequential Downshift */
 			}
 			else if( SHIFT_SKIP_DN == shiDir03 )
 			{
@@ -6464,8 +6958,9 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 				iFIX_G4 = -4; /* 8-4 case, 7-3 case, 6-2 case, 5-1 case */
 				iFIX_G3 = -3; /* 8-5 case, 7-4 case, 6-3 case, 5-2 case */
 				//iFIX_G2 = -2; /* 8-6 case, 7-5 case, 6-4 case, 5-3 case, 4-2 case, 3-1 caae */
-			}
 
+				//iKickDown = -1; /* Used for Skip Downshift : s43Z -> 50msec (10 times) under -> s42Z */
+			}
 
 
 			/* ------------------------------------------------------------------- */
@@ -6548,13 +7043,16 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 			else if( isShiftType(iPwrOnOff, shiDir03, sq[0].ShiTy12) && (sq[0].iPATs05 == aiPATs05) && 
 				(sq[0].curGear08 + iFIX_GEAR == sq[0].tgtGear11 ||
 				 sq[0].curGear08 + iFIX_G6 == sq[0].tgtGear11 || sq[0].curGear08 + iFIX_G5 == sq[0].tgtGear11 ||
-				 sq[0].curGear08 + iFIX_G4 == sq[0].tgtGear11 || sq[0].curGear08 + iFIX_G3 == sq[0].tgtGear11) )
+				 sq[0].curGear08 + iFIX_G4 == sq[0].tgtGear11 || sq[0].curGear08 + iFIX_G3 == sq[0].tgtGear11 ||
+				 sq[0].curGear08 + iKickDown == sq[0].tgtGear11 ) )
 			{
 			#if 0
 				printf(" DIFF -> cg=%d, tg=%d   local: cg(%d), tg (%d) global : cg (%d) tg (%d) \n", 
 						sq[0].curGear08, sq[0].tgtGear11, curPreGear, tgtPreGear , curSmPreGear, tgtSmPreGear );
 			#endif
-			
+
+
+				
 				is2File = 1;
 				ctSameGearStatus = 1;
 
@@ -6657,15 +7155,29 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 						if( (sq[0].curGear08 + iFIX_GEAR == sq[0].tgtGear11) && (curSmPreGear==sq[0].curGear08) && (curSmPreGear==tgtSmPreGear) )
 						{
 							isFindSS = 1; /* case 1 */
+							//fprintf(stderr, "+++++ isFindSS == %d ++1++ \n", isFindSS );
 						}
 						else if( iOnce_SF && (curPreGear == sq[0].curGear08) && (tgtPreGear == sq[0].tgtGear11) )
 						{
 							isFindSS = 2; /* case 2 */
+							//fprintf(stderr, "+++++ isFindSS == %d ++2++++ \n", isFindSS );
 						}
 						else if( iOnce_SF && (curPreGear != sq[0].curGear08) && (tgtPreGear != sq[0].tgtGear11) )
 						{ 
 							isFindSS = 3; /* case 3 */
+							//fprintf(stderr, "+++++ isFindSS == %d ++3++++++ \n", isFindSS );
 						}
+
+						//else if( (1==iOnce_NSHStart && 1==iOnce_NSHEnd) && (sq[0].curGear08 + iFIX_GEAR == sq[0].tgtGear11) ) /* Power On, Power Off case */
+						//{ 
+						//	isFindSS = 4; /* case 3 */
+						//	fprintf(stderr, "+++++ isFindSS == %d ++4++++++++++ \n", isFindSS );
+						//}
+
+
+
+					//	fprintf(stderr," =======> %10.5lf cur:%d (%d %d) tgt:%d %d %d %d %d =========== \n", sq[0].Time01, sq[0].curGear08, iOnce_NSHE, isFindSS, sq[0].tgtGear11, curSmPreGear, tgtSmPreGear, curPreGear, tgtPreGear );
+
 
 						if( SHIFT_SKIP_DN == shiDir03 )
 						{
@@ -6685,7 +7197,16 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 							{
 								isFindSS = 7; /* case 7 */
 							}
-						
+
+					#if SKIP_DOWNSHIFT_KICKDOWN /* 2023-06-03 */
+							else if( sq[0].curGear08 + iKickDown == sq[0].tgtGear11 )
+							{
+								isFindSS = 8; /* case 8 */
+
+								gKickDownBeginTime = sq[0].Time01;
+							}
+					#endif
+
 						}
 
 					#if 0
@@ -6716,7 +7237,9 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					LPFilteredLAcc = sq[0].LAcc17;
 			#endif
 
-			
+
+					iKickDown = -90;
+
 					isFindSS = 0;
 					strcpy(sTimePos, TXT_SSTIME);
 					ctSameGearStatus = 1;
@@ -6754,6 +7277,9 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 
 					iExistSBpoint = 0;
 					iExistSPpoint = 0;
+
+					iOnce_NSHStart = 0; /* downshift case, initial params added 2023-05-29 */
+					iOnce_NSHEnd = 0;  /* downshift case, initial params added 2023-05-29 */
 
 					iOnce_NtMax = 0; /* NtMax */
 					iOnce_Ntmin = 0; /* Ntmin */
@@ -7183,10 +7709,12 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 					}
 
 
-					/* ------------------------------------- */
-					/* DownShift */
-					/* ------------------------------------- */
-					else if( iSScount && (SHIFT_DN==shiDir03 || SHIFT_SKIP_DN==shiDir03) ) /* Power On, Power Off case */
+					/* --------------------------------------------------------------------- */
+					/* Sequential DownShift and Skip DownShift  ---------------------------- */
+					/* --------------------------------------------------------------------- */
+
+					/* downshift case, (0==iOnce_NSHStart && 0==iOnce_NSHEnd) added 2023-05-29 */
+					else if( iSScount && (SHIFT_DN==shiDir03 || SHIFT_SKIP_DN==shiDir03) && (0==iOnce_NSHStart && 0==iOnce_NSHEnd) ) /* Power On, Power Off case */
 					{
 
 						/* -------------------------------------------------------------------------------
@@ -7554,11 +8082,15 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 							P/N-D/R : Shift Begin  (SB) 점 판단식 : Nt - Nt_max ≤ -30RPM 되는 싯점 
 						              Shift Finish (FF) 점 판단식 : Nt ≤ 30RPM 되는 싯점	 
 					      ---------------------------------------------------------------------------------- */
-
 					}
 					else
 					{
-						strcpy(sTimePos, TXT_UNKNOWN);
+						strcpy(sTimePos, TXT_UNKNOWN_EXCEP); // TXT_UNKNOWN);
+
+					#if CHECK_ERROR
+						fprintf(stderr, "+++++++ iSScount(%d) iOnce_NSHStart(%d) iOnce_NSHEnd(%d)  \n", iSScount, iOnce_NSHStart, iOnce_NSHEnd );
+					#endif	
+
 					}
 				}
 				/* ----------------------------------------------------- */
@@ -7626,15 +8158,24 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 				{
 					strcpy(sTimePos, TXT_NO_SHIFT_TIME);
 					strcpy(sTimeNtPos, TXT_NO_SHIFT_TIME);
+
+					iOnce_NSHStart = 1; /* downshift case, iOnce_NSHStart=1 added 2023-05-29 */
 				}
 				else if( 2==ctSameGearStatus )
 				{
 					strcpy(sTimePos, TXT_NO_SHIFT_END);
 					strcpy(sTimeNtPos, TXT_NO_SHIFT_END);
+
+					iOnce_NSHEnd = 1;  /* downshift case, iOnce_NSHEnd=1 added 2023-05-29 */
+
+			#if SKIP_DOWNSHIFT_KICKDOWN /* 2023-06-03 */
+					iKickDown = -1;
+			#endif
+
 				}
 
 
-				is2File = 1;
+				is2File = 1; /* 1 means File saved!! */
 				ctSameGearStatus = 2;
 
 				iShift = sq[0].curGear08*10 + sq[0].tgtGear11; /* 12..23..34..45..56..67..78.. */ 
@@ -7656,7 +8197,7 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 			else if( /*isShiftType(iPwrOnOff, shiDir03, sq[0].ShiTy12) && (sq[0].iPATs05 == aiPATs05) &&*/ (sq[0].curGear08 != sq[0].tgtGear11) )
 			{
 				ctSameGearStatus = 1;
-				is2File = 0;
+				is2File = 0; /* 0 means File NOT saved!! */
 			}
 
 
@@ -7669,6 +8210,10 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 	#if SAVEMODE
 			if(shiFile && is2File)
 			{
+
+			if( sq[0].iPATs05 < 0 || sq[0].iPATs05 > MODE_ID_NUMS-1 )
+				fprintf(stderr,"++ERROR+2+ %s arrPATs_ModeID (%d) arrange over!!! \r\n\n", __FUNCTION__, sq[0].iPATs05 );
+
 			fprintf(shiFile, SAVEFMT,
 					sq[0].Time01,	 sq[0].iPATs05, 				arrPATs_ModeID[sq[0].iPATs05].ModeID, sq[0].VSP03,		  sq[0].tqi07, 
 					sq[0].curGear08, sq[0].APS09,					sq[0].No10, 						  sq[0].tgtGear11,	  iShift,
@@ -7693,21 +8238,53 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 	avg_t1 = 0L;
 	avg_t2 = 0L;
 	avg_t3 = 0L;
-	iSxIgnCnt = 0;
+	iSxIgnCnt1 = 0;
+	iSxIgnCnt2 = 0;
+	iSxIgnCnt3 = 0;
 
 	//fprintf(stderr, "%d %d %d \n", iSScount, iSBcount, iSPcount );
 	for(ii=0; ii<iSScount; ii++)
 	{
-		if( gMaxTbl[ii].SSTime && gMaxTbl[ii].SBTime && gMaxTbl[ii].SPTime && gMaxTbl[ii].SFTime )
+		if( gMaxTbl[ii].SSTime && gMaxTbl[ii].SBTime ) 
 		{
-		dif_t1 = (gMaxTbl[ii].SBTime - gMaxTbl[ii].SSTime)/JERK_TIME_SCALE;
-		dif_t2 = (gMaxTbl[ii].SPTime - gMaxTbl[ii].SBTime)/JERK_TIME_SCALE;
-
-		dif_t3 = (gMaxTbl[ii].SFTime - gMaxTbl[ii].SPTime)/JERK_TIME_SCALE;
+			dif_t1 = (gMaxTbl[ii].SBTime - gMaxTbl[ii].SSTime)/JERK_TIME_SCALE;
 		}
 		else
 		{
-			iSxIgnCnt ++;
+			dif_t1 = 0;
+			iSxIgnCnt1 ++;
+			gMaxTbl[ii].ignored = IGN_BECAUSE_NOPAIR;
+	#if DEBUG_MSG_1ST_POINT_TIME
+			fprintf(stderr," NONE [%3d]: SS(%11ld) -SB(%11ld) -SP(%11ld) -SF(%11ld) \n", 
+							ii, gMaxTbl[ii].SSTime, gMaxTbl[ii].SBTime, gMaxTbl[ii].SPTime, gMaxTbl[ii].SFTime );
+	#endif
+		}
+
+
+		if( gMaxTbl[ii].SBTime && gMaxTbl[ii].SPTime )
+		{
+			dif_t2 = (gMaxTbl[ii].SPTime - gMaxTbl[ii].SBTime)/JERK_TIME_SCALE;
+		}
+		else
+		{
+			dif_t2 = 0;
+			iSxIgnCnt2 ++;
+			gMaxTbl[ii].ignored = IGN_BECAUSE_NOPAIR;
+	#if DEBUG_MSG_1ST_POINT_TIME
+			fprintf(stderr," NONE [%3d]: SS(%11ld) -SB(%11ld) -SP(%11ld) -SF(%11ld) \n", 
+							ii, gMaxTbl[ii].SSTime, gMaxTbl[ii].SBTime, gMaxTbl[ii].SPTime, gMaxTbl[ii].SFTime );
+	#endif
+		}
+
+	
+		if( gMaxTbl[ii].SPTime && gMaxTbl[ii].SFTime )
+		{
+			dif_t3 = (gMaxTbl[ii].SFTime - gMaxTbl[ii].SPTime)/JERK_TIME_SCALE;
+		}
+		else
+		{
+			dif_t3 = 0;
+			iSxIgnCnt3 ++;
 			gMaxTbl[ii].ignored = IGN_BECAUSE_NOPAIR;
 	#if DEBUG_MSG_1ST_POINT_TIME
 			fprintf(stderr," NONE [%3d]: SS(%11ld) -SB(%11ld) -SP(%11ld) -SF(%11ld) \n", 
@@ -7723,11 +8300,19 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
  	}
 
 
-	if(iSScount+1-iSxIgnCnt)
+	if(iSScount+1-iSxIgnCnt1)
 	{
-		avg_t1 /= (iSScount+1-iSxIgnCnt);
-		avg_t2 /= (iSScount+1-iSxIgnCnt);
-		avg_t3 /= (iSScount+1-iSxIgnCnt);
+		avg_t1 /= (iSScount+1-iSxIgnCnt1);
+	}
+
+	if(iSScount+1-iSxIgnCnt2)
+	{
+		avg_t2 /= (iSScount+1-iSxIgnCnt2);
+	}
+
+	if(iSScount+1-iSxIgnCnt3)
+	{
+		avg_t3 /= (iSScount+1-iSxIgnCnt3);
 	}
 	
 	if(avgCount)
@@ -7738,6 +8323,10 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 	
 	//fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
 	//fprintf(stderr,">>ModeID %s files are saved. \n", arrPATs_ModeID[aiPATs05].ModeID);
+
+	if( aiPATs05 < 0 || aiPATs05 > MODE_ID_NUMS-1 )
+		fprintf(stderr,"++ERROR+3+ %s arrPATs_ModeID (%d) arrange over!!! \r\n\n", __FUNCTION__, sq[0].iPATs05 );
+	
 	fprintf(stderr,"  ModeID %s, 1st step sorting file: %s  \n", arrPATs_ModeID[aiPATs05].ModeID, shift_out );
 
 	//fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
@@ -7751,15 +8340,22 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 	ColorSet(0, 0, 0, COLOR_RELEASED); /* Color setting */
 #endif
 
+
+#if DOS_COLOR_PRINT
 	fprintf(stderr,"  Shift type Direction         :\033[32m %sShift \033[0m\n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Sequential Down": \
 		(shiDir03==SHIFT_SKIP_DN?"Skip Down":(shiDir03==SHIFT_SKIP_UP?"SkipUp":"Unknown"))) ));
+#else
+	fprintf(stderr,"  Shift type Direction         : %sShift \n", (shiDir03==SHIFT_UP?"Up":(shiDir03==SHIFT_DN?"Sequential Down": \
+		(shiDir03==SHIFT_SKIP_DN?"Skip Down":(shiDir03==SHIFT_SKIP_UP?"SkipUp":"Unknown"))) ));
+#endif
+
 
 	if(iSBdecision>=3)
 	{
 		if(0==SBposDecision)
-			fprintf(stderr,"  cont. SB/SP decision Number  :\033[32m %d times, such as %s \033[0m", iSBdecision, PRINT_TXT_SB_SEQ_FIRST );
+			fprintf(stderr,"  cont. SB/SP decision Number  : %d times, such as %s ", iSBdecision, PRINT_TXT_SB_SEQ_FIRST );
 		else
-			fprintf(stderr,"  cont. SB/SP decision Number  :\033[32m %d times, such as %s \033[0m", iSBdecision, PRINT_TXT_SB_SEQ_LAST );
+			fprintf(stderr,"  cont. SB/SP decision Number  : %d times, such as %s ", iSBdecision, PRINT_TXT_SB_SEQ_LAST );
 
 		if(SBposDecision) fprintf(stderr,"- last position \n"); 
 		else fprintf(stderr,"- first position \n"); 
@@ -7767,9 +8363,9 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 	else if(iSBdecision==2)
 	{
 		if(0==SBposDecision)
-			fprintf(stderr,"  cont. SB/SP decision Number  :\033[32m %d times, such as %s.%s \033[0m", iSBdecision, TXT_SBTIME, TXT_SBSWING0 );
+			fprintf(stderr,"  cont. SB/SP decision Number  : %d times, such as %s.%s ", iSBdecision, TXT_SBTIME, TXT_SBSWING0 );
 		else
-			fprintf(stderr,"  cont. SB/SP decision Number  :\033[32m %d times, such as %s.%s \033[0m", iSBdecision, TXT_SBSWING0, TXT_SBTIME );
+			fprintf(stderr,"  cont. SB/SP decision Number  : %d times, such as %s.%s ", iSBdecision, TXT_SBSWING0, TXT_SBTIME );
 
 		if(SBposDecision) fprintf(stderr,"- last position \n"); 
 		else fprintf(stderr,"- first position \n"); 
@@ -7779,17 +8375,17 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 
 	if( SHIFT_UP==shiDir03 )
 	{
-		fprintf(stderr,"  Jerk Time length (gMax/gmin) :\033[32m -%dmsec ~ (SB point) ~ %dmsec \033[0m\n", iJerkTimeLen, iavgTime*gMax_Before_SB_POINT );
-		fprintf(stderr,"  Nt-Max/Nt-min Time length    :\033[32m -%dmsec ~ (SB point) / (SP point) ~ +%dmsec \033[0m\n", iNtTimeLen, iNtTimeLen );
-		fprintf(stderr,"  APS Power percent level      :\033[32m %3.1lf%% \033[0m\n", fAPSpwrLvl );
+		fprintf(stderr,"  Jerk Time length (gMax/gmin) : -%dmsec ~ (SB point) ~ %dmsec \n", iJerkTimeLen, iavgTime*gMax_Before_SB_POINT );
+		fprintf(stderr,"  Nt-Max/Nt-min Time length    : -%dmsec ~ (SB point) / (SP point) ~ +%dmsec \n", iNtTimeLen, iNtTimeLen );
+		fprintf(stderr,"  APS Power percent level      : %3.1lf%% \n", fAPSpwrLvl );
 	}
 	else if( SHIFT_DN==shiDir03 || SHIFT_SKIP_DN==shiDir03 )
 	{
-		fprintf(stderr,"  Jerk Time length (gMax/gmin) :\033[32m (SB/SP point) ~ %dmsec \033[0m\n", iJerkTimeLen); //, iavgTime*gMax_Before_SB_POINT );
-		fprintf(stderr,"  Nt-Max/Nt-min Time length    :\033[32m -%dmsec ~ (SB point) / (SP point) ~ +%dmsec \033[0m\n", iNtTimeLen, iNtTimeLen );
-		fprintf(stderr,"  APS Power percent level      :\033[32m %3.1lf%% \033[0m\n", fAPSpwrLvl );
+		fprintf(stderr,"  Jerk Time length (gMax/gmin) : (SB/SP point) ~ %dmsec \n", iJerkTimeLen); //, iavgTime*gMax_Before_SB_POINT );
+		fprintf(stderr,"  Nt-Max/Nt-min Time length    : -%dmsec ~ (SB point) / (SP point) ~ +%dmsec \n", iNtTimeLen, iNtTimeLen );
+		fprintf(stderr,"  APS Power percent level      : %3.1lf%% \n", fAPSpwrLvl );
 
-		fprintf(stderr,"  Vehicle Speed Tolerance(kph) :\033[32m -/+%dkph -- default(-/+%dkph) \033[0m\n", iVStolerance, DN_VS_TOLERANCE );
+		fprintf(stderr,"  Vehicle Speed Tolerance(kph) : -/+%dkph -- default(-/+%dkph) \n", iVStolerance, DN_VS_TOLERANCE );
 	}
 
 	fprintf(stderr,"  Shift Data Time Period ------: %9u msec \n", iavgTime );
@@ -7797,8 +8393,16 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 	fprintf(stderr,"  Shift Average Time(t2:SB~SP) : %9ld msec <- 1st average time \n", avg_t2 );
 	fprintf(stderr,"  Shift Average Time(t3:SP~SF) : %9ld msec <- 1st average time \n", avg_t3 );
 	fprintf(stderr,"  Total Quality Shift Records  : %9llu lines \n", RecordCnt );
+
+#if DOS_COLOR_PRINT
+	if(iNGcount)
 	fprintf(stderr,"  Error Shift Records (NG) ----: %9u lines \033[31m<- invalid shift data record \033[0m\n", iNGcount );
 	fprintf(stderr,"  Quality Shift Records (OK) --:\033[32m %9u lines, %6.1lf min \033[0m \n", iOKcount, (double)(iOKcount*iavgTime)/TIME_SCALE/60.0 );
+#else
+	if(iNGcount)
+	fprintf(stderr,"  Error Shift Records (NG) ----: %9u lines <- invalid shift data record \n", iNGcount );
+	fprintf(stderr,"  Quality Shift Records (OK) --: %9u lines, %6.1lf min \n", iOKcount, (double)(iOKcount*iavgTime)/TIME_SCALE/60.0 );
+#endif
 
 
 	totChkModeID = 0;
@@ -7808,9 +8412,15 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 		{
 			if(aiPATs05==ii) /* because of Color setting */
 			{
+		#if DOS_COLOR_PRINT
 				fprintf(stderr,"    %3u:\033[1;32m%-22s\033[0m :\033[32m %9llu lines, %6.1lf min  %s \033[0m\n", 
 					ii, arrPATs_ModeID[ii].ModeID, chkPATs_ModeID[ii], (double)(chkPATs_ModeID[ii]*iavgTime)/TIME_SCALE/60, (aiPATs05==ii?"* Sorting":" ") );
 				totChkModeID += chkPATs_ModeID[ii];
+		#else
+				fprintf(stderr,"    %3u:%-22s : %9llu lines, %6.1lf min  %s \n", 
+					ii, arrPATs_ModeID[ii].ModeID, chkPATs_ModeID[ii], (double)(chkPATs_ModeID[ii]*iavgTime)/TIME_SCALE/60, (aiPATs05==ii?"* Sorting":" ") );
+				totChkModeID += chkPATs_ModeID[ii];
+		#endif
 			}
 			else
 			{
@@ -7848,7 +8458,7 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 	*SBswingcnt = iSBdecCnt; /* One checking */
 
 
-	if( 0==iSScount && 0==iSBcount && 0==iSPcount && 0==iSFcount )
+	if( (0==iSScount && 0==iSBcount && 0==iSPcount && 0==iSFcount) || chkPATs_ModeID[aiPATs05] < 1 )
 	{
 		fprintf(stderr,">>Shift Quality Data is NONE in this option %s ", arrPATs_ModeID[aiPATs05].ModeID );
 
@@ -7888,9 +8498,24 @@ unsigned int ShiftQualData(short aiPATs05, int iPwrOnOff, int shiDir03, short SB
 				fprintf(stderr,"  Deleted temp file [%s] -> Failed(%d) \n", shift_file, ii );
 		}
 
+		
+#if 0 // ORIGINAL_FILE_SAVED
+		if(oriFile) fclose(oriFile);
+		oriFile = NULL;
+
+		if( isFileExist(shift_ori, 0) )
+		{
+			ii = remove( shift_ori );
+			if( 0 != ii )
+				fprintf(stderr,"  Deleted temp file [%s] -> Failed(%d) \n", shift_ori, ii );
+		}
+#endif
+
 		exit(0);
 		return 0;
 	}
+
+
 
 	return iavgTime;
 }
@@ -8840,7 +9465,10 @@ int SSnNtPointFix(short aiPATs05, short SBposDecision, int shiDir03, tSQData_Pai
 
 				if( 0==strcmp(Pre[0].sTimePos, TXT_NO_SHIFT_END) )
 				{
-					if( 0==strcmp(sq2[0].sTimePos, TXT_SSTIME) || 0==strcmp(sq2[0].sTimePos, TXT_NO_SHIFT_TIME) ) 
+					if( 0==strcmp(sq2[0].sTimePos, TXT_SSTIME) || 0==strcmp(sq2[0].sTimePos, TXT_NO_SHIFT_TIME) || 
+						0==strcmp(sq2[0].sTimePos, TXT_UPCASE) || 0==strcmp(sq2[0].sTimePos, TXT_DNCASE) ||  /* VW1 bug fix, 2023-05-29 */
+						0==strcmp(sq2[0].sTimePos, TXT_UNKNOWN) ||  0==strcmp(sq2[0].sTimePos, TXT_UNKNOWN_EXCEP) ||  /* VW1 bug fix, 2023-05-29 */
+						0==strcmp(sq2[0].sTimePos, TXT_KICK_DOWN) || 0==strcmp(sq2[0].sTimePos, TXT_KICK_UP) ) /* VW1 bug fix, 2023-05-24 */
 					{
 						// saveing pre
 				#if SAVEMODE
@@ -10222,7 +10850,7 @@ int FindGminMaxShiftData(short aiPATs05, tSQData_PairCheck_type SPoint, int shiD
 							iloop++;
 						}
 						else if( iloop >= MAX_TABLE_SIZ )
-							fprintf(stderr,"++ERROR++(%s):%u G-min/Max array over in SSarea!!! (%d/%d) \r\n\n", __FUNCTION__, __LINE__, iloop, MAX_TABLE_SIZ);
+							fprintf(stderr,"++ERROR++(%s):%u G-min/Max array over in SSarea!!! (%d/%d) \r\n", __FUNCTION__, __LINE__, iloop, MAX_TABLE_SIZ);
 
 					}
 					else if( (SHIFT_DN==shiDir03) || (SHIFT_SKIP_DN==shiDir03) )
@@ -10309,7 +10937,7 @@ int FindGminMaxShiftData(short aiPATs05, tSQData_PairCheck_type SPoint, int shiD
 	#else
 		fprintf(stderr,">>Searched Jerk1 G-Max/G-min"); 
 		MODEColorPrint( aiPATs05 );
-		fprintf(stderr,"before SB point --- SS(%d), SB(%d), SP(%d), SF(%d) \r\n", iSScount, iSBcount, iSPcount, iSFcount );
+		fprintf(stderr,"before SB point --- SS(%d), SB(%d), SP(%d), SF(%d)       \r\n", iSScount, iSBcount, iSPcount, iSFcount );
 						/* SPoint.SStot, SPoint.SBtot, SPoint.SPtot, SPoint.SFtot ); */
 	#endif
 	}
@@ -10321,7 +10949,7 @@ int FindGminMaxShiftData(short aiPATs05, tSQData_PairCheck_type SPoint, int shiD
 	#else
 		fprintf(stderr,">>Searched Jerk1 G-Max/G-min");
 		MODEColorPrint( aiPATs05 );
-		fprintf(stderr,"after SB point --- SS(%d), SB(%d), SP(%d), SF(%d) \r\n", iSScount, iSBcount, iSPcount, iSFcount );
+		fprintf(stderr,"after SB point --- SS(%d), SB(%d), SP(%d), SF(%d)       \r\n", iSScount, iSBcount, iSPcount, iSFcount );
 						/* SPoint.SStot, SPoint.SBtot, SPoint.SPtot, SPoint.SFtot ); */
 	#endif
 	}
@@ -10677,7 +11305,7 @@ int FindGminMaxShiftData(short aiPATs05, tSQData_PairCheck_type SPoint, int shiD
 							iloop++;
 						}
 						else if( iloop >= MAX_TABLE_SIZ )
-							fprintf(stderr,"++ERROR++(%s):%u G-min/Max array over in SSarea!! (%d/%d) \r\n\n", __FUNCTION__, __LINE__, iloop, MAX_TABLE_SIZ);
+							fprintf(stderr,"++ERROR++(%s):%u G-min/Max array over in SSarea!! (%d/%d) \r\n", __FUNCTION__, __LINE__, iloop, MAX_TABLE_SIZ);
 
 						//fprintf(stderr,"==== %3d -> Time:%10.1lf, gMax: %9.4lf  gmin: %9.4lf \n", iloop, gMax1Vals[iloop].msTime, gMax1Vals[iloop].mValue, gmin1Vals[iloop].mValue );
 					}				
@@ -12414,10 +13042,10 @@ int FindGminMax2ShiftData(short aiPATs05, tSQData_PairCheck_type SPoint, int shi
 
 			if( isSParea && (SHIFT_DN==shiDir03 || SHIFT_SKIP_DN==shiDir03) )
 			{
-				if( MaxMSs <= sq6[0].MSs_Ntg ) MaxMSs = sq6[0].MSs_Ntg; /* Find Max MSs_Ntg */
-				if( minMSs >= sq6[0].MSs_Ntg ) minMSs = sq6[0].MSs_Ntg; /* Find min MSs_Ntg */
+				if( MaxMSs <= (int)(sq6[0].MSs_Ntg) ) MaxMSs = (int)(sq6[0].MSs_Ntg); /* Find Max MSs_Ntg */
+				if( minMSs >= (int)(sq6[0].MSs_Ntg) ) minMSs = (int)(sq6[0].MSs_Ntg); /* Find min MSs_Ntg */
 				
-				if( sq6[0].MSs_Ntg==MaxMSs && MSMaxFinVals[iSPcount].MSvalue==MaxMSs )
+				if( (int)(sq6[0].MSs_Ntg)==MaxMSs && MSMaxFinVals[iSPcount].MSvalue==MaxMSs )
 				{
 					iMSMaxTime = (unsigned int)( (sq6[0].Time01)*TIME_SCALE*JERK_TIME_SCALE );
 					if( iMSMaxchecked )
@@ -14138,9 +14766,9 @@ unsigned int ShiftData_Filtering(short aiPATs05, int avgTime, int shiDir03, shor
 					fprintf(stderr," %5d (SS time: %12.4lf) : 1st G-Max and G-min overlaps ", 
 						iSScount-1, gMaxTbl[iSScount-1].SSTime/TIME_SCALE/JERK_TIME_SCALE );
 
-					fprintf(stderr,"\033[31m"); /* RED color */
+					ColorSet(0, 0, RED, 0);
 					fprintf(stderr," << Abnormal \n");
-					fprintf(stderr,"\033[0m"); /* color released */
+					ColorSet(0, 0, 0, COLOR_RELEASED);
 				#endif
 				}
 
@@ -14337,9 +14965,9 @@ unsigned int ShiftData_Filtering(short aiPATs05, int avgTime, int shiDir03, shor
 						fprintf(stderr," %5d (SS time: %12.4lf) : 2nd G2-min and G2-Max overlaps ", 
 							iSScount-1, gMaxTbl[iSScount-1].SSTime/TIME_SCALE/JERK_TIME_SCALE );
 
-						fprintf(stderr,"\033[31m"); /* RED color */
+						ColorSet(0, 0, RED, 0);
 						fprintf(stderr," << Abnormal \n");
-						fprintf(stderr,"\033[0m"); /* color released */
+						ColorSet(0, 0, 0, COLOR_RELEASED);
 
 					}
 				}
@@ -16122,9 +16750,10 @@ unsigned int APSData_Filtering(short aiPATs05, int avgTime, int shiDir03, short 
 		fprintf(stderr,"   SP Point Counts--%-10s : %3u / %3u points \n", (shiDir03==SHIFT_UP?"UpShift":(shiDir03==SHIFT_DN?"DownShift":(shiDir03==SHIFT_SKIP_DN?"Skip DownShift":"Unknown"))), SPoint->SPtot, SPoint->SPnum );
 		fprintf(stderr,"   SF Point Counts--%-10s : %3u / %3u points \n", (shiDir03==SHIFT_UP?"UpShift":(shiDir03==SHIFT_DN?"DownShift":(shiDir03==SHIFT_SKIP_DN?"Skip DownShift":"Unknown"))), SPoint->SFtot, SPoint->SFnum );
 		fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
-		fprintf(stderr,"\033[31m"); /* RED color */
+
+		ColorSet(0, 0, RED, 0); /* RED color setting */
 		fprintf(stderr,"   Stopped because of reasons as above!!!\n\n");
-		fprintf(stderr,"\033[0m"); /* color released */
+		ColorSet(0, 0, 0, COLOR_RELEASED); /* Color setting */
 	}
 	return iignoredCnt;
 
@@ -19833,8 +20462,9 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 	unsigned short idxMSMX = 0;
 	unsigned short idxMSmn = 0;
 
-	unsigned short idxkickDown = 0, iKickDown=0;
-	unsigned short idxkickUp = 0, iKickUp = 0;
+	short idxkickDown = 0, iKickDown=0;
+	short idxkickUp = 0, iKickUp = 0;
+	int iKickDownTotalCount = 0, iKickDownCount= 0;
 
 	short isSSarea = 0;
 	short isSBarea = 0;
@@ -20051,6 +20681,8 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 	ShiftTypePrint(shiDir03);
 	#endif
 
+	iKickDownCount = 0; /* Skip downshift kickdown counter */
+	iKickDownTotalCount = 0;
 
 	do
 	{
@@ -20178,6 +20810,17 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 
 			}
 
+			if( 0==strcmp( sq4[index].sTimePos, TXT_KICK_DOWN) ) /* Kick Down check */
+			{
+				idxkickDown = index;
+				if(isSSarea) iKickDown=1;
+			}
+			else if( 0==strcmp( sq4[index].sTimePos, TXT_KICK_UP) ) /* Kick Up check */
+			{
+				idxkickUp = index;
+			}
+
+
 			if( 0==strcmp( sq4[index].sTimeGpos, TXT_gmin) ) /* 2 */
 			{
 				idxJerk = index;
@@ -20266,16 +20909,6 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 				diffTimeMSmn = round( (sq4[index].Time01)*TIME_SCALE*JERK_TIME_SCALE );
 			}
 
-			if( 0==strcmp( sq4[index].sTimePos, TXT_KICK_DOWN) ) /* Kick Down check */
-			{
-				idxkickDown = index;
-				if(isSSarea) iKickDown=1;
-			}
-			else if( 0==strcmp( sq4[index].sTimePos, TXT_KICK_UP) ) /* Kick Up check */
-			{
-				idxkickUp = index;
-			}
-
 
 			/* ======================================== */
 			/* UpShift Case Point */
@@ -20317,9 +20950,9 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 						fprintf(stderr,"  *Out of APS Power Table      : SSTime %12.5lf, SS(%.1lf),SB(%.1lf),SP(%.1lf),SF(%.1lf) ", 
 									sq4[idxSS].Time01, sq4[idxSS].APS09, sq4[idxSB].APS09, sq4[idxSP].APS09, sq4[idxSF].APS09 );
 
-						fprintf(stderr,"\033[31m"); /* RED color */
+						ColorSet(0, 0, RED, 0);
 						fprintf(stderr," << Abnormal \r\n");
-						fprintf(stderr,"\033[0m"); /* color released */
+						ColorSet(0, 0, 0, COLOR_RELEASED);
 
 						is2File = 0; /* File NOT Saved!! */
 					}
@@ -20337,18 +20970,19 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 							fprintf(stderr,"  *Jerk1, Jerk1-Time range err : SSTime %12.5lf, 1st G- same point(SB-%dms) ", 
 										sq4[idxSS].Time01, (int)(sq4[idxgSame].DiffTime*TIME_SCALE) );	
 
-							fprintf(stderr,"\033[31m"); /* RED color */
-							fprintf(stderr," << Abnormal \r\n");
-							fprintf(stderr,"\033[0m"); /* color released */
+							ColorSet(0, 0, RED, 0);
+							fprintf(stderr," << Abnormal \n");
+							ColorSet(0, 0, 0, COLOR_RELEASED);
+
 						}
 						else
 						{
 							fprintf(stderr,"  *Jerk1, Jerk1-Time range err : SSTime %12.5lf, %6.3lfG/s, %3dms ", 
 										sq4[idxSS].Time01, sq4[idxJerk].fJerk1, sq4[idxJerk].deltams );
 
-							fprintf(stderr,"\033[31m"); /* RED color */
-							fprintf(stderr," << Abnormal \r\n");
-							fprintf(stderr,"\033[0m"); /* color released */
+							ColorSet(0, 0, RED, 0);
+							fprintf(stderr," << Abnormal \n");
+							ColorSet(0, 0, 0, COLOR_RELEASED);
 						}
 						//memset( (void*)&sq4[idxJerk], 0x00, sizeof(sqdAps_type) );
 						is2File = 0; /* DO NOT Saved to File !! */
@@ -20666,9 +21300,10 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 						fprintf(stderr,"  *Out of Vehicle Speed Table  : SSTime %12.5lf, SS(%.1lf),SB(%.1lf),SP(%.1lf),SF(%.1lf) ", 
 									sq4[idxSS].Time01, sq4[idxSS].VSP03, sq4[idxSB].VSP03, sq4[idxSP].VSP03, sq4[idxSF].VSP03  );
 
-						fprintf(stderr,"\033[31m"); /* RED color */
-						fprintf(stderr," << Abnormal \r\n");
-						fprintf(stderr,"\033[0m"); /* color released */
+
+						ColorSet(0, 0, RED, 0);
+						fprintf(stderr," << Abnormal \n");
+						ColorSet(0, 0, 0, COLOR_RELEASED);
 					}
 				
 					else if( sq4[idxNSS].curGear08 != sq4[idxSS].curGear08 )
@@ -20677,9 +21312,9 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 						fprintf(stderr,"  *DownShift gear changing err : SSTime %12.5lf, NSHS(%d) -> SS(%d/%d) ", 
 									sq4[idxSS].Time01, sq4[idxNSS].curGear08, sq4[idxSS].curGear08, sq4[idxSS].tgtGear11 );
 
-						fprintf(stderr,"\033[31m"); /* RED color */
-						fprintf(stderr," << Abnormal \r\n");
-						fprintf(stderr,"\033[0m"); /* color released */
+						ColorSet(0, 0, RED, 0);
+						fprintf(stderr," << Abnormal \n");
+						ColorSet(0, 0, 0, COLOR_RELEASED);
 					}
 					else if( (sq4[idxSS].DiffTime*NO_SHIFT_UNIT) < NO_SHIFT_START_KEEP_TIME ) /* 1sec under -> skip */
 					{
@@ -20687,9 +21322,9 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 						fprintf(stderr,"  *NoShift Begin Keep Time     : SSTime %12.5lf, %3dms/ default(%dms) ", 
 									sq4[idxSS].Time01, (int)(sq4[idxSS].DiffTime*NO_SHIFT_UNIT), (int)(NO_SHIFT_START_KEEP_TIME) );
 
-						fprintf(stderr,"\033[31m"); /* RED color */
-						fprintf(stderr," << Abnormal \r\n");
-						fprintf(stderr,"\033[0m"); /* color released */
+						ColorSet(0, 0, RED, 0);
+						fprintf(stderr," << Abnormal \n");
+						ColorSet(0, 0, 0, COLOR_RELEASED);
 					}
 					else if( (sq4[idxNSE].DiffTime*NO_SHIFT_UNIT) < NO_SHIFT_ENDED_KEEP_TIME ) /* 1sec under -> skip */
 					{
@@ -20697,9 +21332,9 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 						fprintf(stderr,"  *NoShift End Keep Time(%d->%d) : SSTime %12.5lf, %3dms/ default(%dms) ", 
 									sq4[idxSS].curGear08, sq4[idxNSE].curGear08, sq4[idxSS].Time01, (int)(sq4[idxNSE].DiffTime*NO_SHIFT_UNIT), (int)(NO_SHIFT_ENDED_KEEP_TIME) );
 
-						fprintf(stderr,"\033[31m"); /* RED color */
-						fprintf(stderr," << Abnormal \r\n");
-						fprintf(stderr,"\033[0m"); /* color released */
+						ColorSet(0, 0, RED, 0);
+						fprintf(stderr," << Abnormal \n");
+						ColorSet(0, 0, 0, COLOR_RELEASED);
 					}
 					
 					/* ----------------------------------------------------
@@ -20733,9 +21368,9 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 										sq4[idxSS].Time01, sq4[idxJerk].fJerk1, sq4[idxJerk].deltams );
 						}
 
-						fprintf(stderr,"\033[31m"); /* RED color */
-						fprintf(stderr," << Abnormal \r\n");
-						fprintf(stderr,"\033[0m"); /* color released */
+						ColorSet(0, 0, RED, 0);
+						fprintf(stderr," << Abnormal \n");
+						ColorSet(0, 0, 0, COLOR_RELEASED);
 
 						//memset( (void*)&sq4[idxJerk], 0x00, sizeof(sqdAps_type) );
 						is2File = 0; /* File NOT Saved!! */
@@ -20755,9 +21390,9 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 										sq4[idxSS].Time01, sq4[idxJerk2].fJerk2, sq4[idxJerk2].deltams2 );
 						}
 
-						fprintf(stderr,"\033[31m"); /* RED color */
-						fprintf(stderr," << Abnormal \r\n");
-						fprintf(stderr,"\033[0m"); /* color released */
+						ColorSet(0, 0, RED, 0);
+						fprintf(stderr," << Abnormal \n");
+						ColorSet(0, 0, 0, COLOR_RELEASED);
 
 						//memset( (void*)&sq4[idxJerk2], 0x00, sizeof(sqdAps_type) );
 						is2File = 0; /* File NOT Saved!! */
@@ -20774,9 +21409,9 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 						fprintf(stderr,"  *Out of APS Power Level      : SSTime %12.5lf, SS(%.1lf),SB(%.1lf),SP(%.1lf),SF(%.1lf) ", 
 									sq4[idxSS].Time01, sq4[idxSS].APS09, sq4[idxSB].APS09, sq4[idxSP].APS09, sq4[idxSF].APS09 );
 
-						fprintf(stderr,"\033[31m"); /* RED color */
-						fprintf(stderr," << Abnormal \r\n");
-						fprintf(stderr,"\033[0m"); /* color released */
+						ColorSet(0, 0, RED, 0);
+						fprintf(stderr," << Abnormal \n");
+						ColorSet(0, 0, 0, COLOR_RELEASED);
 
 						is2File = 0; /* File NOT Saved!! */
 					}
@@ -20784,16 +21419,22 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 
 					if( 0==strcmp(sq4[idxkickDown].sTimePos, TXT_KICK_DOWN) ) // idxkickDown>=0 )
 					{
+						iKickDownTotalCount ++;
 						if( (int)(sq4[idxkickDown].DiffTime * TIME_SCALE) > KICK_IN_TIME_MS )
 						{
 							fprintf(stderr,"  *Out of KickDown SS(%d/%d)->%d  : SSTime %12.5lf, KickDown Time:%dms/ default(%dms) ", 
 										sq4[idxSS].curGear08, sq4[idxSS].tgtGear11, sq4[idxSF].tgtGear11, sq4[idxSS].Time01, (int)(sq4[idxkickDown].DiffTime * TIME_SCALE), KICK_IN_TIME_MS );
 
-							fprintf(stderr,"\033[31m"); /* RED color */
-							fprintf(stderr," << Abnormal \r\n");
-							fprintf(stderr,"\033[0m"); /* color released */
+							ColorSet(0, 0, RED, 0);
+							fprintf(stderr," << Abnormal \n");
+							ColorSet(0, 0, 0, COLOR_RELEASED);
 
 							is2File = 0; /* File NOT Saved!! */
+						}
+						else
+						{
+							fprintf(stderr,"  *The Kickdown has occurred   : SSTime %12.5lf, KickDown Time:%dms/ default(%dms) \n", 
+										sq4[idxSS].Time01, (int)(sq4[idxkickDown].DiffTime * TIME_SCALE), KICK_IN_TIME_MS );
 						}
 					}
 
@@ -20861,9 +21502,27 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 						else if( SHIFT_DN==shiDir03 ) igDnDif = -1;
 
 
+				#if SKIP_DOWNSHIFT_KICKDOWN /* 2023-06-04 - When Kickdown */
+						if( SHIFT_SKIP_DN==shiDir03 && (1==iKickDown) )
+						{
+
+						strcat(sq4[idxkickDown].arrGear, "K"); /* When Kick Skip downshift, Indexing Kickdown */
+
+						fprintf(outfile, SAVE_PRT_DN01,
+								sq4[idxSS].curGear08, sq4[idxSS].tgtGear11, sq4[idxkickDown].arrGear, (int)VSkphTblDN[ sq4[idxSS].TableIdx ], sq4[idxSS].VSP03 );
+
+						sq4[idxSS].ShiTy12   = sq4[idxkickDown].ShiTy12;     /* When Kick Skip downshift, For updating Table */
+						sq4[idxSS].tgtGear11 = sq4[idxkickDown].tgtGear11;   /* When Kick Skip downshift, For updating Graph */
+
+						iKickDownCount ++;
+
+						}
+						else
+				#endif /* SKIP_DOWNSHIFT_KICKDOWN */
+						{
 						fprintf(outfile, SAVE_PRT_DN01,
 								sq4[idxSS].curGear08, sq4[idxSS].tgtGear11,	sq4[idxSS].arrGear, (int)VSkphTblDN[ sq4[idxSS].TableIdx ], sq4[idxSS].VSP03 );
-
+						}
 
 						G_dif = (sq4[idxSF].Gavg - sq4[idxSP].Gavg);
 
@@ -21120,11 +21779,11 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 					idxNSS = 0;
 					idxNSE = 0;
 				
-					idxkickDown = 0;
+					idxkickDown = -1;
 					idxkickUp = 0;
 					iKickDown = 0;
 					iKickUp   = 0;
-					
+
 					idxSS = 0;
 					idxSB = 0;
 					idxSP = 0;
@@ -21856,6 +22515,12 @@ int ShiftData_Report(short aiPATs05, int shiDir03, int avgTime, short iSBchoiceP
 		}
 		else
 			fprintf(stderr,"  %d items are analyzed and detected...\n", iReportCount);
+
+		if(iKickDownCount)
+		{
+			fprintf(stderr,"  Total of %d kickdowns occured and %d kickdowns were saved... \n", iKickDownTotalCount, iKickDownCount);
+		}
+		
 		fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
 	}
 
@@ -22890,9 +23555,9 @@ int main(int argc, char *argv[])
 				fprintf(wt,"            APS PWR# : APS Power On low level as 3%% or 4%%. (default 3%%) \n");
 				fprintf(wt,"             VS Tol# : Vehicle Speed tolerance as +/-5kph, (default +/-5kph) \n");
 				fprintf(wt,"\n");
-				fprintf(wt," Ex) shift.exe --input GN7_3.5GDI_PONDOWN_KD.tsv --output gn7_spt.txt --downshift SPT.gn7.g1	 3 150 60 70 m15 20 3 5 \n");
+				fprintf(wt," Ex) shift.exe --input GN7_3.5GDI_PONDOWN_KD.tsv --output gn7_spt.txt --downshift SPT.gn7.g1	3 150 60 70 m15 20 3 5 \n");
 				fprintf(wt,"     shift.exe --input GN7_3.5GDI_PONDOWN_KD.tsv --output gn7_eco.txt --downshift eco.skip.file  \n");
-				fprintf(wt,"     shift.exe --input GN7_3.5GDI_PONDOWN_KD.tsv --output gn7_eco.txt --downshift eco.gn7.skip  3 250 \033[0m \n");
+				fprintf(wt,"     shift.exe --input GN7_3.5GDI_PONDOWN_KD.tsv --output gn7_eco.txt --downshift eco.gn7.skip  3 250 \n");
 				fprintf(wt,"       -> Sorted result output : gn7_spt.gil and gn7_spt.rpt \n");
 				fprintf(wt,"\n");
 				fprintf(wt," [ModeID]: HOT WUP MNL DN2 DN1 UP1 UP2 UP3 NOR ECO ECODN2 ECODN1 ECOUP1 ECOUP2 ECOUP3 CRZ CRZUP1 CRZUP2 BRK1 BRK2 \n" );
@@ -25217,6 +25882,7 @@ int main(int argc, char *argv[])
 							}
 						}
 					}
+
 					if( strstr(str_ShiftOp[0], ".GN7") || strstr(str_ShiftOp[0], ".gn7") )
 					{
 					int i, len;
@@ -25237,6 +25903,29 @@ int main(int argc, char *argv[])
 							}
 						}
 					}
+
+					if( strstr(str_ShiftOp[0], ".VW1") || strstr(str_ShiftOp[0], ".vw1") )
+					{
+					int i, len;
+
+						iGearTableIndex = 3; /* VW1 vehicle type index */
+
+						len = strlen( str_ShiftOp[0] );
+						for(i=len; i>0; i--)
+						{
+							if( 0==strncasecmp( (char*)&str_ShiftOp[0][i], (char*)".VW1", 4) ) 
+							{
+								memcpy( gearTable, gearTable_VW1, sizeof(gearTable_VW1) );
+								fprintf(stderr,"\n");
+								fprintf(stderr,">>Gear Ratio type  : %s (Index:%d)", &str_ShiftOp[0][i+1], iGearTableIndex ); 
+
+								strcpy( (char*)&str_ShiftOp[0][i], (char*)&str_ShiftOp[0][i+4] );
+								break;
+							}
+						}
+					}
+					
+						
 
 					if( strstr(str_ShiftOp[0], ".file") || strstr(str_ShiftOp[0], ".FILE") )
 					{
@@ -25284,7 +25973,11 @@ int main(int argc, char *argv[])
 						/* --------------------------------------------------------------- */
 						if( strstr(str_ShiftOp[0], ".skip") )
 						{
+					#if DOS_COLOR_PRINT
 							fprintf(stderr,"                     The option .skip can NOT use in --upshift. \033[1;31m The option .skip is for downshift. \033[0m \n\n"); 
+					#else
+							fprintf(stderr,"                     The option .skip can NOT use in --upshift. The option .skip is for downshift. \n\n"); 
+					#endif
 						}
 						else
 						{
@@ -25336,7 +26029,9 @@ int main(int argc, char *argv[])
 							else
 							{
 								fprintf(stderr,"\n");
+								ColorSet(BOLD_SET, 0, RED, 0);
 								fprintf(stderr,">>SB decision Num  : <<%d>> %d - Warning times... available range:1~%d ", kk, iSBdecision, SB_DECISION_MAX_TIMES-1 ); 
+								ColorSet(0, 0, 0, COLOR_RELEASED);
 								fprintf(stderr,"\r\n\n");
 								AllFilesClosed();
 								exit(EXIT_FAILURE);
@@ -25355,13 +26050,15 @@ int main(int argc, char *argv[])
 								fprintf(stderr,">>Jerk Time Length : <<%d>> %dmsec ", kk, iJerkTimeLen ); 
 								if( 0 != iMod )
 								{
-									fprintf(stderr,"\n  Warning: Jerk Time Length is wrong %d msec, check in 5msec unit...", iJerkTimeLen);
+									fprintf(stderr,"\n  Warning: Jerk Time Length is wrong %dmsec, check in 5msec unit...", iJerkTimeLen);
 								}
 							}
 							else
 							{
 								fprintf(stderr,"\n");
+								ColorSet(BOLD_SET, 0, RED, 0);
 								fprintf(stderr,">>Jerk Time Length : <<%d>> %dmsec - Invalid value for Jerk... available arrange:%d~%dmsec", kk, iJerkTimeLen, JERK_min_TIME_mSec, JERK_MAX_TIME_mSec ); 
+								ColorSet(0, 0, 0, COLOR_RELEASED);
 								fprintf(stderr,"\r\n\n");
 								AllFilesClosed();
 								exit(EXIT_FAILURE);
@@ -25386,7 +26083,9 @@ int main(int argc, char *argv[])
 							else
 							{
 								fprintf(stderr,"\n");
+								ColorSet(BOLD_SET, 0, RED, 0);
 								fprintf(stderr,">>Nt-min/-Max Time : <<%d>> %dmsec - Invalid value for Nt-min/Max... available arrange:%d~%dmsec", kk, iNtTimeLen, Nt_min_TIME_mSec, Nt_MAX_TIME_mSec ); 
+								ColorSet(0, 0, 0, COLOR_RELEASED);
 								fprintf(stderr,"\r\n\n");
 								AllFilesClosed();
 								exit(EXIT_FAILURE);
@@ -25439,6 +26138,7 @@ int main(int argc, char *argv[])
 							fprintf(stderr,"\n");
 							fprintf(stderr,">>APS Table Init   : <<%d>> %.1lf ", kk, aps1 ); 
 							break;
+
 						case 9:
 							aps2 = atof( str_ShiftOp[kk] ); 
 							fprintf(stderr,"\n");
@@ -25481,7 +26181,9 @@ int main(int argc, char *argv[])
 
 						default:
 							fprintf(stderr,"\n");
+							ColorSet(BOLD_SET, 0, RED, 0);
 							fprintf(stderr,">>upshift options  : <<%d>> (%s) ", kk, str_ShiftOp[kk] ); 
+							ColorSet(0, 0, 0, COLOR_RELEASED);
 							break;
 						}
 
@@ -25491,7 +26193,9 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
+					ColorSet(BOLD_SET, 0, RED, 0);
 					fprintf(stderr,"\n\n[++ERROR++] up shift option error. %s \r\n", optarg );
+					ColorSet(0, 0, 0, COLOR_RELEASED);
 
 					beep(700,100);
 					AllFilesClosed();
@@ -25695,6 +26399,26 @@ int main(int argc, char *argv[])
 						}
 					}
 
+					if( strstr(str_ShiftOp[0], ".VW1") || strstr(str_ShiftOp[0], ".vw1") )
+					{
+					int i, len;
+
+						iGearTableIndex = 3; /* VW1 vehicle type index */
+						len = strlen( str_ShiftOp[0] );
+						for(i=len; i>0; i--)
+						{
+							if( 0==strncasecmp( (char*)&str_ShiftOp[0][i], (char*)".VW1", 4) ) 
+							{
+								memcpy( gearTable, gearTable_VW1, sizeof(gearTable_VW1) );
+								fprintf(stderr,"\n");
+								fprintf(stderr,">>Gear Ratio type  : %s (Index:%d)", &str_ShiftOp[0][i+1], iGearTableIndex ); 
+								strcpy( (char*)&str_ShiftOp[0][i], (char*)&str_ShiftOp[0][i+4] );
+								break;
+							}
+						}
+					}
+
+					
 					if( strstr(str_ShiftOp[0], ".file") || strstr(str_ShiftOp[0], ".FILE") )
 					{
 					int i, len;
@@ -25773,7 +26497,9 @@ int main(int argc, char *argv[])
 							else
 							{
 								fprintf(stderr,"\n");
+								ColorSet(BOLD_SET, 0, RED, 0);
 								fprintf(stderr,">>SB decision Num  : <<%d>> %d - Warning times... available range:1~%d ", kk, iSBdecision, SB_DECISION_MAX_TIMES-1 ); 
+								ColorSet(0, 0, 0, COLOR_RELEASED);
 								fprintf(stderr,"\r\n\n");
 								AllFilesClosed();
 								exit(EXIT_FAILURE);
@@ -25802,7 +26528,9 @@ int main(int argc, char *argv[])
 							else
 							{
 								fprintf(stderr,"\n");
-								fprintf(stderr,">>Jerk Time Length : <<%d>> %dmsec - Invalid value for Jerk... available arrange:%d~%d msec", kk, iJerkTimeLen, JERK_min_TIME_mSec, JERK_MAX_TIME_mSec ); 
+								ColorSet(BOLD_SET, 0, RED, 0);
+								fprintf(stderr,">>Jerk Time Length : <<%d>> %dmsec - Invalid value for Jerk... available arrange:%d~%dmsec", kk, iJerkTimeLen, JERK_min_TIME_mSec, JERK_MAX_TIME_mSec ); 
+								ColorSet(0, 0, 0, COLOR_RELEASED);
 								fprintf(stderr,"\r\n\n");
 								AllFilesClosed();
 								exit(EXIT_FAILURE);
@@ -25821,13 +26549,15 @@ int main(int argc, char *argv[])
 								fprintf(stderr,">>Nt-min/-Max Time : <<%d>> %dmsec ", kk, iNtTimeLen ); 
 								if( 0 != iMod )
 								{
-									fprintf(stderr,"\n	Warning: Nt-min/Nt-Max Time Length is wrong %d msec, check in 5msec unit...", iNtTimeLen);
+									fprintf(stderr,"\n	Warning: Nt-min/Nt-Max Time Length is wrong %dmsec, check in 5msec unit...", iNtTimeLen);
 								}
 							}
 							else
 							{
 								fprintf(stderr,"\n");
-								fprintf(stderr,">>Nt-min/-Max Time : <<%d>> %dmsec - Invalid value for Nt-min/Max... available arrange:%d~%d msec", kk, iNtTimeLen, Nt_min_TIME_mSec, Nt_MAX_TIME_mSec ); 
+								ColorSet(BOLD_SET, 0, RED, 0);
+								fprintf(stderr,">>Nt-min/-Max Time : <<%d>> %dmsec - Invalid value for Nt-min/Max... available arrange:%d~%dmsec", kk, iNtTimeLen, Nt_min_TIME_mSec, Nt_MAX_TIME_mSec ); 
+								ColorSet(0, 0, 0, COLOR_RELEASED);
 								fprintf(stderr,"\r\n\n");
 								AllFilesClosed();
 								exit(EXIT_FAILURE);
@@ -25898,7 +26628,9 @@ int main(int argc, char *argv[])
 
 						default:
 							fprintf(stderr,"\n");
+							ColorSet(BOLD_SET, 0, RED, 0);
 							fprintf(stderr,">>Downshift options  : <<%d>> (%s) ", kk, str_ShiftOp[kk] ); 
+							ColorSet(0, 0, 0, COLOR_RELEASED);
 							break;
 						}
 
@@ -25912,7 +26644,7 @@ int main(int argc, char *argv[])
 					beep(700,100);
 					AllFilesClosed();
 
-					exit(0);
+					exit(EXIT_FAILURE);
 					return 0;
 				}
 
@@ -29987,11 +30719,17 @@ int main(int argc, char *argv[])
 		int iavgtm=0;
 		tSQData_PairCheck_type SRPoint; 
 
+	#if DOS_COLOR_PRINT
 		fprintf(stderr,"\r\n");
 		fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
 		fprintf(stderr,"Shift Quality Data Sorting -->\033[1;35m UPShift...  \033[0m \n");
 		fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
-
+	#else
+		fprintf(stderr,"\r\n");
+		fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
+		fprintf(stderr,"Shift Quality Data Sorting --> UPShift...  \n");
+		fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
+	#endif
 
 		// -------------------------------------------------------------------
 		// UPSHIFT >> 1st STEP -----------------------------------------------
@@ -30067,17 +30805,31 @@ int main(int argc, char *argv[])
 
 		if(SHIFT_DN==isDownShift)
 		{
+	#if DOS_COLOR_PRINT
 			fprintf(stderr,"\r\n");
 			fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
 			fprintf(stderr,"Shift Quality Data Sorting -->\033[1;35m Sequential DownShift...  \033[0m \n");
 			fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
+	#else
+			fprintf(stderr,"\r\n");
+			fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
+			fprintf(stderr,"Shift Quality Data Sorting --> Sequential DownShift...  \n");
+			fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
+	#endif
 		}
 		else if(SHIFT_SKIP_DN==isDownShift)
 		{
+	#if DOS_COLOR_PRINT
 			fprintf(stderr,"\r\n");
 			fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
 			fprintf(stderr,"Shift Quality Data Sorting -->\033[1;35m Skip DownShift...  \033[0m \n");
 			fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
+	#else
+			fprintf(stderr,"\r\n");
+			fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
+			fprintf(stderr,"Shift Quality Data Sorting --> Skip DownShift... \n");
+			fprintf(stderr,"--------------------------------------------------------------------------------------\n" );
+	#endif
 		}
 
 		// ---------------------------------------------------------------------
